@@ -36,3 +36,21 @@
 .history-delete{border:1px solid #fecaca;background:#fff;color:#dc2626;border-radius:8px;padding:4px 8px;font-size:12px;cursor:pointer}
 .history-delete:hover{background:#fef2f2}
 @media(max-width:760px){.contract-edit-row{grid-template-columns:34px 1fr}.contract-edit-row>input,.contract-edit-row>.stage-amount-label,.contract-edit-row>.na-label{grid-column:2}.stage-amount-label input{min-width:0;width:100%}}
+
+/* v1.6.1 매물 목록 압축 표시 */
+.listing-table{min-width:1120px}
+.listing-table th,.listing-table td{padding:9px 8px;font-size:13px}
+.listing-table .listing-title-cell{max-width:170px;overflow:hidden;text-overflow:ellipsis}
+.listing-table .muted{font-size:11px}
+.listing-table .row-actions{gap:4px}
+.listing-table .row-actions button{padding:5px 7px;font-size:11px}
+@media(min-width:1400px){.listing-table{min-width:100%}}
+
+/* v1.7 고객 거래유형·등급 */
+.customer-grade{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;font-size:13px;font-weight:900;border:1px solid transparent}
+.customer-grade.grade-a{background:#fee2e2;color:#b91c1c;border-color:#fecaca}
+.customer-grade.grade-b{background:#fef3c7;color:#a16207;border-color:#fde68a}
+.customer-grade.grade-c{background:#dbeafe;color:#1d4ed8;border-color:#bfdbfe}
+.customer-grade.grade-d{background:#e5e7eb;color:#4b5563;border-color:#d1d5db}
+.customer-table{min-width:1180px}
+@media(max-width:900px){.customer-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.customer-grade{width:26px;height:26px}}

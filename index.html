@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>공인중개사 공동매물 CRM</title>
-  <link rel="stylesheet" href="styles.css?v=160" />
+  <link rel="stylesheet" href="styles.css?v=180" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -67,6 +67,7 @@
         <button class="nav" data-view="customers">내 고객</button>
         <button class="nav" data-view="myListings">내 매물 시트</button>
         <button class="nav" data-view="network">공동매물망</button>
+        <button class="nav admin-only hidden" data-view="adminListings">전체 매물 관리</button>
         <button class="nav admin-only hidden" data-view="members">회원 승인·관리</button>
         <button class="nav admin-only hidden" data-view="transfer">퇴사자 일괄 이관</button>
       </nav>
@@ -96,6 +97,6 @@
     </form>
   </dialog>
 
-  <script src="app.js?v=160"></script>
+  <script src="app.js?v=180"></script>
 </body>
 </html>
