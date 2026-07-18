@@ -18,6 +18,32 @@ function badge(text,type='gray'){return `<span class="badge ${type}">${text}</sp
 function gradeBadge(grade){const g=grade||'C';const colors={A:'grade-a',B:'grade-b',C:'grade-c',D:'grade-d'};return `<span class="customer-grade ${colors[g]||'grade-c'}">${escapeHtml(g)}</span>`}
 function escapeHtml(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 
+function safeFileName(name='image.jpg'){
+  const ext=(name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'')||'jpg';
+  return `${crypto.randomUUID()}.${ext}`;
+}
+function canManageListing(listing){return !!listing&&(listing.owner_id===state.profile.id||state.profile.role==='admin')}
+async function uploadListingPhotos(listingId,files){
+  const list=[...(files||[])];
+  if(!list.length)return {uploaded:0,failed:0};
+  let uploaded=0,failed=0;
+  for(const file of list){
+    if(!file.type.startsWith('image/')){failed++;continue}
+    if(file.size>10*1024*1024){failed++;continue}
+    const path=`${listingId}/${safeFileName(file.name)}`;
+    const {error:upError}=await state.client.storage.from('listing-photos').upload(path,file,{cacheControl:'3600',upsert:false,contentType:file.type});
+    if(upError){failed++;continue}
+    const {error:dbError}=await state.client.from('listing_photos').insert({listing_id:listingId,storage_path:path,file_name:file.name,uploaded_by:state.profile.id});
+    if(dbError){await state.client.storage.from('listing-photos').remove([path]);failed++;continue}
+    uploaded++;
+  }
+  return {uploaded,failed};
+}
+async function signedPhotoUrl(path){
+  const {data,error}=await state.client.storage.from('listing-photos').createSignedUrl(path,3600);
+  return error?null:data?.signedUrl||null;
+}
+
 function initClient(){
   const url=localStorage.getItem(SUPA_URL_KEY), key=localStorage.getItem(SUPA_ANON_KEY);
   if(!url||!key){showOnly('setupScreen');return false}
@@ -136,13 +162,24 @@ function listingAreaText(x){
   return [...new Set([district,dong].filter(Boolean))].join(' ')||x.district||'-';
 }
 function renderListingTable(rows,target,mine,adminMode=false){
-  const el=$('#'+target);el.innerHTML=rows.length?`<div class="table-wrap listing-table-wrap"><table class="listing-table"><thead><tr><th>상태</th><th>거래</th><th>유형</th><th>매물명</th><th>지역</th><th>금액/월세</th><th>연락처</th><th>대출</th><th>면적</th><th>방/욕실</th><th>입주</th><th>담당</th><th>계약</th><th>최종 FU</th><th>예정 FU</th>${mine?'<th>관리</th>':''}</tr></thead><tbody>${rows.map(x=>`<tr><td>${badge(x.status==='available'?'거래 가능':x.status==='complete'?'거래 완료':'협의 중',x.status==='available'?'green':x.status==='complete'?'gray':'yellow')}</td><td>${escapeHtml(x.transaction_type)}</td><td>${escapeHtml(x.property_type)}</td><td class="listing-title-cell"><strong>${escapeHtml(x.title)}</strong>${x.is_public?'':' '+badge('비공개','red')}</td><td>${escapeHtml(listingAreaText(x))}</td><td>${listingPriceText(x)}</td><td>${escapeHtml(x.contact_phone||'-')}</td><td>${x.loan_available===true?badge('O','green'):x.loan_available===false?badge('X','red'):badge('미확인','gray')}${x.loan_available===true&&x.official_price?`<br><span class="muted">기준 ${fmtMoney(x.official_price)}</span>`:''}</td><td>${x.area_m2?x.area_m2+'㎡':'-'}</td><td>${x.room_count!==null&&x.room_count!==undefined?escapeHtml(String(x.room_count)):'-'} / ${x.bathroom_count!==null&&x.bathroom_count!==undefined?escapeHtml(String(x.bathroom_count)):'-'}</td><td>${moveInText(x)}</td><td>${escapeHtml(x.owner?.full_name||'-')}</td><td>${contractStage(x)}</td><td>${fmtDate(x.last_follow_up_at||x.last_confirmed_at)}</td><td>${dueBadge(x.next_follow_up_at)}</td>${mine?`<td><div class="row-actions"><button class="success" onclick="openFollowUpModal('listing','${x.id}')">FU</button><button class="ghost" onclick="openHistoryModal('listing','${x.id}')">히스토리</button><button class="ghost" onclick="openContractModal('listing','${x.id}')">계약일정</button><button class="ghost" onclick="openListingModal('${x.id}')">수정</button>${adminMode?`<button class="primary" onclick="openSingleListingTransfer('${x.id}')">개별 이관</button>`:''}<button class="danger" onclick="deleteListing('${x.id}')">삭제</button></div></td>`:''}</tr>`).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 매물이 없습니다.</div>';
+  const el=$('#'+target);el.innerHTML=rows.length?`<div class="table-wrap listing-table-wrap"><table class="listing-table"><thead><tr><th>상태</th><th>거래</th><th>유형</th><th>매물명</th><th>지역</th><th>금액/월세</th><th>연락처</th><th>대출</th><th>면적</th><th>방/욕실</th><th>입주</th><th>담당</th><th>계약</th><th>최종 FU</th><th>예정 FU</th>${mine?'<th>관리</th>':''}</tr></thead><tbody>${rows.map(x=>`<tr><td>${badge(x.status==='available'?'거래 가능':x.status==='complete'?'거래 완료':'협의 중',x.status==='available'?'green':x.status==='complete'?'gray':'yellow')}</td><td>${escapeHtml(x.transaction_type)}</td><td>${escapeHtml(x.property_type)}</td><td class="listing-title-cell"><strong>${escapeHtml(x.title)}</strong>${x.is_public?'':' '+badge('비공개','red')}<br><button type="button" class="photo-link" onclick="openListingPhotos('${x.id}')">📷 내부사진</button></td><td>${escapeHtml(listingAreaText(x))}</td><td>${listingPriceText(x)}</td><td>${escapeHtml(x.contact_phone||'-')}</td><td>${x.loan_available===true?badge('O','green'):x.loan_available===false?badge('X','red'):badge('미확인','gray')}${x.loan_available===true&&x.official_price?`<br><span class="muted">기준 ${fmtMoney(x.official_price)}</span>`:''}</td><td>${x.area_m2?x.area_m2+'㎡':'-'}</td><td>${x.room_count!==null&&x.room_count!==undefined?escapeHtml(String(x.room_count)):'-'} / ${x.bathroom_count!==null&&x.bathroom_count!==undefined?escapeHtml(String(x.bathroom_count)):'-'}</td><td>${moveInText(x)}</td><td>${escapeHtml(x.owner?.full_name||'-')}</td><td>${contractStage(x)}</td><td>${fmtDate(x.last_follow_up_at||x.last_confirmed_at)}</td><td>${dueBadge(x.next_follow_up_at)}</td>${mine?`<td><div class="row-actions"><button class="success" onclick="openFollowUpModal('listing','${x.id}')">FU</button><button class="ghost" onclick="openHistoryModal('listing','${x.id}')">히스토리</button><button class="ghost" onclick="openContractModal('listing','${x.id}')">계약일정</button><button class="ghost" onclick="openListingModal('${x.id}')">수정</button>${adminMode?`<button class="primary" onclick="openSingleListingTransfer('${x.id}')">개별 이관</button>`:''}<button class="danger" onclick="deleteListing('${x.id}')">삭제</button></div></td>`:''}</tr>`).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 매물이 없습니다.</div>';
 }
 function openListingModal(id){
   const x=state.listings.find(v=>v.id===id)||{};$('#modalTitle').textContent=id?'매물 수정':'매물 등록';
-  $('#modalBody').innerHTML=`<div class="form-grid"><label>매물명<input name="title" value="${escapeHtml(x.title||'')}" required></label><label>매도/임대인 연락처<input name="contact_phone" value="${escapeHtml(x.contact_phone||'')}" placeholder="010-0000-0000" required></label><label>거래 유형<select name="transaction_type"><option>매매</option><option>전세</option><option>월세</option></select></label><label>매물 유형<select name="property_type"><option>아파트</option><option>오피스텔</option><option>빌라</option><option>상가</option><option>사무실</option><option>토지</option></select></label><label>상태<select name="status"><option value="available">거래 가능</option><option value="hold">협의 중</option><option value="complete">거래 완료</option></select></label><label>지역<input name="district" value="${escapeHtml(x.district||'')}"></label><label class="span-2">주소<input name="address" value="${escapeHtml(x.address||'')}"></label><label>금액(만원)<input name="price" type="number" value="${x.price||''}"></label><label>월세(만원)<input name="monthly_rent" type="number" value="${x.monthly_rent||''}"></label><label>관리비(만원)<input name="management_fee" type="number" step="0.1" value="${x.management_fee??''}"></label><label>전용면적(㎡)<input name="area_m2" type="number" step="0.01" value="${x.area_m2||''}"></label><label>방 개수<input name="room_count" type="number" min="0" step="1" value="${x.room_count??''}" placeholder="예: 3"></label><label>화장실 개수<input name="bathroom_count" type="number" min="0" step="1" value="${x.bathroom_count??''}" placeholder="예: 2"></label><label class="span-2">옵션<input name="options" value="${escapeHtml(x.options||'')}" placeholder="예: 에어컨, 냉장고, 세탁기, 붙박이장"></label><label>반려동물<select name="pet_allowed"><option>미확인</option><option>가능</option><option>불가</option><option>협의</option></select></label><label>대출 가능 여부<select id="listingLoanAvailable" name="loan_available"><option value="">미확인</option><option value="true">O</option><option value="false">X</option></select></label><label id="listingOfficialPriceWrap">공시지가/기준시가(만원)<input name="official_price" type="number" value="${x.official_price||''}"></label><label>입주 가능일<input id="moveInDateInput" name="move_in_date" type="date" value="${x.move_in_date||''}"></label><label class="check-label"><input id="moveInNegotiable" name="move_in_negotiable" type="checkbox" ${x.move_in_negotiable?'checked':''}> 입주일 협의 가능</label><label>예정 FU<input name="next_follow_up_at" type="date" value="${x.next_follow_up_at?x.next_follow_up_at.slice(0,10):''}"></label><label>공개 여부<select name="is_public"><option value="true">공개</option><option value="false">비공개</option></select></label><label>최종 확인일<input name="last_confirmed_at" type="date" value="${x.last_confirmed_at?x.last_confirmed_at.slice(0,10):''}"></label><label class="span-2">상세 설명<textarea name="description" rows="5">${escapeHtml(x.description||'')}</textarea></label></div>`;
+  $('#modalBody').innerHTML=`<div class="form-grid"><label>매물명<input name="title" value="${escapeHtml(x.title||'')}" required></label><label>매도/임대인 연락처<input name="contact_phone" value="${escapeHtml(x.contact_phone||'')}" placeholder="010-0000-0000" required></label><label>거래 유형<select name="transaction_type"><option>매매</option><option>전세</option><option>월세</option></select></label><label>매물 유형<select name="property_type"><option>아파트</option><option>오피스텔</option><option>빌라</option><option>상가</option><option>사무실</option><option>토지</option></select></label><label>상태<select name="status"><option value="available">거래 가능</option><option value="hold">협의 중</option><option value="complete">거래 완료</option></select></label><label>지역<input name="district" value="${escapeHtml(x.district||'')}"></label><label class="span-2">주소<input name="address" value="${escapeHtml(x.address||'')}"></label><label>금액(만원)<input name="price" type="number" value="${x.price||''}"></label><label>월세(만원)<input name="monthly_rent" type="number" value="${x.monthly_rent||''}"></label><label>관리비(만원)<input name="management_fee" type="number" step="0.1" value="${x.management_fee??''}"></label><label>전용면적(㎡)<input name="area_m2" type="number" step="0.01" value="${x.area_m2||''}"></label><label>방 개수<input name="room_count" type="number" min="0" step="1" value="${x.room_count??''}" placeholder="예: 3"></label><label>화장실 개수<input name="bathroom_count" type="number" min="0" step="1" value="${x.bathroom_count??''}" placeholder="예: 2"></label><label class="span-2">옵션<input name="options" value="${escapeHtml(x.options||'')}" placeholder="예: 에어컨, 냉장고, 세탁기, 붙박이장"></label><label>반려동물<select name="pet_allowed"><option>미확인</option><option>가능</option><option>불가</option><option>협의</option></select></label><label>대출 가능 여부<select id="listingLoanAvailable" name="loan_available"><option value="">미확인</option><option value="true">O</option><option value="false">X</option></select></label><label id="listingOfficialPriceWrap">공시지가/기준시가(만원)<input name="official_price" type="number" value="${x.official_price||''}"></label><label>입주 가능일<input id="moveInDateInput" name="move_in_date" type="date" value="${x.move_in_date||''}"></label><label class="check-label"><input id="moveInNegotiable" name="move_in_negotiable" type="checkbox" ${x.move_in_negotiable?'checked':''}> 입주일 협의 가능</label><label>예정 FU<input name="next_follow_up_at" type="date" value="${x.next_follow_up_at?x.next_follow_up_at.slice(0,10):''}"></label><label>공개 여부<select name="is_public"><option value="true">공개</option><option value="false">비공개</option></select></label><label>최종 확인일<input name="last_confirmed_at" type="date" value="${x.last_confirmed_at?x.last_confirmed_at.slice(0,10):''}"></label><label class="span-2">내부 사진 추가<input id="listingPhotoFiles" name="listing_photo_files" type="file" accept="image/*" multiple><span class="field-help">여러 장 선택 가능 · 사진 1장당 최대 10MB · 등록 후에도 사진 메뉴에서 추가/삭제 가능</span></label><label class="span-2">상세 설명<textarea name="description" rows="5">${escapeHtml(x.description||'')}</textarea></label></div>`;
   ['transaction_type','property_type','status'].forEach(n=>$('#modalBody').querySelector(`[name=${n}]`).value=x[n]||({transaction_type:'매매',property_type:'아파트',status:'available'}[n]));$('#modalBody').querySelector('[name=is_public]').value=String(x.is_public!==false);$('#modalBody').querySelector('[name=pet_allowed]').value=x.pet_allowed||'미확인';const listingLoan=$('#listingLoanAvailable');listingLoan.value=x.loan_available===true?'true':x.loan_available===false?'false':'';const toggleListingOfficial=()=>{$('#listingOfficialPriceWrap').style.display=listingLoan.value==='true'?'':'none'};listingLoan.onchange=toggleListingOfficial;toggleListingOfficial();
-  $('#modalSubmit').onclick=async(e)=>{e.preventDefault();const fd=new FormData($('#modalForm'));const p=Object.fromEntries(fd.entries());p.owner_id=id?(x.owner_id||state.profile.id):state.profile.id;p.is_public=p.is_public==='true';['price','monthly_rent','management_fee','area_m2','room_count','bathroom_count'].forEach(k=>p[k]=p[k]?Number(p[k]):null);p.loan_available=p.loan_available===''?null:p.loan_available==='true';p.official_price=p.loan_available===true&&p.official_price?Number(p.official_price):null;p.move_in_negotiable=fd.get('move_in_negotiable')==='on';p.move_in_date=p.move_in_negotiable?null:(p.move_in_date||null);p.next_follow_up_at=p.next_follow_up_at||null;p.last_confirmed_at=p.last_confirmed_at||new Date().toISOString().slice(0,10);const q=id?state.client.from('listings').update(p).eq('id',id):state.client.from('listings').insert(p);const {error}=await q;if(error)return toast(error.message);$('#modal').close();toast('저장했습니다. 공동매물망에 반영됩니다.');state.view==='adminListings'?renderAdminListings():renderMyListings()};$('#modal').showModal();
+  $('#modalSubmit').onclick=async(e)=>{e.preventDefault();const fd=new FormData($('#modalForm'));const p=Object.fromEntries(fd.entries());p.owner_id=id?(x.owner_id||state.profile.id):state.profile.id;p.is_public=p.is_public==='true';['price','monthly_rent','management_fee','area_m2','room_count','bathroom_count'].forEach(k=>p[k]=p[k]?Number(p[k]):null);p.loan_available=p.loan_available===''?null:p.loan_available==='true';p.official_price=p.loan_available===true&&p.official_price?Number(p.official_price):null;p.move_in_negotiable=fd.get('move_in_negotiable')==='on';p.move_in_date=p.move_in_negotiable?null:(p.move_in_date||null);p.next_follow_up_at=p.next_follow_up_at||null;p.last_confirmed_at=p.last_confirmed_at||new Date().toISOString().slice(0,10);delete p.listing_photo_files;
+    const files=$('#listingPhotoFiles')?.files;
+    let listingId=id;
+    if(id){const {error}=await state.client.from('listings').update(p).eq('id',id);if(error)return toast(error.message)}
+    else{const {data,error}=await state.client.from('listings').insert(p).select('id').single();if(error)return toast(error.message);listingId=data.id}
+    let photoResult={uploaded:0,failed:0};
+    if(files?.length)photoResult=await uploadListingPhotos(listingId,files);
+    $('#modal').close();
+    const extra=photoResult.uploaded?` 사진 ${photoResult.uploaded}장도 등록했습니다.`:'';
+    const failed=photoResult.failed?` (${photoResult.failed}장은 형식·용량 또는 권한 문제로 실패)` : '';
+    toast(`저장했습니다.${extra}${failed}`);
+    state.view==='adminListings'?renderAdminListings():renderMyListings()};$('#modal').showModal();
 }
 
 async function openFollowUpModal(entityType,id){
@@ -255,7 +292,51 @@ async function openContractModal(entityType,id){
   $('#modal').showModal();
 }
 
-async function deleteListing(id){if(!confirm('매물을 삭제할까요?'))return;const {error}=await state.client.from('listings').delete().eq('id',id);if(error)return toast(error.message);toast('삭제했습니다.');state.view==='adminListings'?renderAdminListings():renderMyListings()}
+
+async function openListingPhotos(id){
+  const listing=state.listings.find(x=>x.id===id);
+  if(!listing)return toast('매물을 찾을 수 없습니다.');
+  $('#modalTitle').textContent=`내부 사진 · ${listing.title}`;
+  $('#modalSubmit').classList.add('hidden');
+  $('#modalBody').innerHTML='<div class="photo-loading">사진을 불러오는 중입니다.</div>';
+  $('#modal').showModal();
+  await renderListingPhotoGallery(listing);
+  const cleanup=()=>$('#modalSubmit').classList.remove('hidden');
+  $('#modal').addEventListener('close',cleanup,{once:true});
+}
+async function renderListingPhotoGallery(listing){
+  const {data,error}=await state.client.from('listing_photos').select('*').eq('listing_id',listing.id).order('sort_order',{ascending:true}).order('created_at',{ascending:true});
+  if(error){$('#modalBody').innerHTML=`<div class="empty">${escapeHtml(error.message)}</div>`;return}
+  const photos=data||[];
+  const urls=await Promise.all(photos.map(p=>signedPhotoUrl(p.storage_path)));
+  const manageable=canManageListing(listing);
+  $('#modalBody').innerHTML=`${manageable?`<div class="photo-upload-panel"><label>사진 추가<input id="galleryPhotoFiles" type="file" accept="image/*" multiple></label><button type="button" class="primary" onclick="addListingPhotos('${listing.id}')">선택한 사진 업로드</button><span class="field-help">여러 장 선택 가능 · 1장당 최대 10MB</span></div>`:''}<div class="photo-gallery">${photos.length?photos.map((p,i)=>`<figure class="photo-card">${urls[i]?`<a href="${escapeHtml(urls[i])}" target="_blank" rel="noopener"><img src="${escapeHtml(urls[i])}" alt="${escapeHtml(p.file_name||'매물 내부 사진')}" loading="lazy"></a>`:'<div class="photo-error">사진 URL 오류</div>'}<figcaption><span>${escapeHtml(p.file_name||'사진')}</span>${manageable?`<button type="button" class="danger small" onclick="deleteListingPhoto('${listing.id}','${p.id}','${escapeHtml(p.storage_path)}')">삭제</button>`:''}</figcaption></figure>`).join(''):'<div class="empty photo-empty">등록된 내부 사진이 없습니다.</div>'}</div>`;
+}
+async function addListingPhotos(listingId){
+  const listing=state.listings.find(x=>x.id===listingId);if(!canManageListing(listing))return toast('사진을 추가할 권한이 없습니다.');
+  const files=$('#galleryPhotoFiles')?.files;if(!files?.length)return toast('업로드할 사진을 선택하세요.');
+  const result=await uploadListingPhotos(listingId,files);
+  toast(`사진 ${result.uploaded}장 업로드${result.failed?`, ${result.failed}장 실패`:''}`);
+  await renderListingPhotoGallery(listing);
+}
+async function deleteListingPhoto(listingId,photoId,path){
+  const listing=state.listings.find(x=>x.id===listingId);if(!canManageListing(listing))return toast('사진을 삭제할 권한이 없습니다.');
+  if(!confirm('이 사진을 삭제할까요?'))return;
+  const {error:storageError}=await state.client.storage.from('listing-photos').remove([path]);
+  if(storageError)return toast(storageError.message);
+  const {error}=await state.client.from('listing_photos').delete().eq('id',photoId);
+  if(error)return toast(error.message);
+  toast('사진을 삭제했습니다.');await renderListingPhotoGallery(listing);
+}
+
+async function deleteListing(id){
+  if(!confirm('매물을 삭제할까요? 등록된 내부 사진도 함께 삭제됩니다.'))return;
+  const {data:photos}=await state.client.from('listing_photos').select('storage_path').eq('listing_id',id);
+  const paths=(photos||[]).map(x=>x.storage_path);
+  if(paths.length){const {error:photoError}=await state.client.storage.from('listing-photos').remove(paths);if(photoError)return toast(`사진 삭제 실패: ${photoError.message}`)}
+  const {error}=await state.client.from('listings').delete().eq('id',id);if(error)return toast(error.message);
+  toast('매물과 내부 사진을 삭제했습니다.');state.view==='adminListings'?renderAdminListings():renderMyListings()
+}
 
 async function openSingleListingTransfer(id){
   if(state.profile.role!=='admin')return toast('관리자만 이관할 수 있습니다.');
