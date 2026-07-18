@@ -220,11 +220,6 @@ async function openContractModal(entityType,id){
     const detailKeys=['contracted_property_name','contracted_transaction_type','contracted_amount','counterparty_name','counterparty_phone'];
     const detailChanged=detailKeys.some(k=>String(item[k]??'')!==String(payload[k]??''));
     if(detailChanged&&detail)histories.push({...target,created_by:state.profile.id,follow_up_date:today(),contact_method:'계약정보',content:`계약 정보 등록/변경함.\n${detail}`,next_follow_up_at:null});
-    if(payload.interim_payment_not_applicable&&!item.interim_payment_not_applicable){
-      histories.push({...target,created_by:state.profile.id,follow_up_date:today(),contact_method:'중도금',content:`중도금 해당없음으로 처리함.${detail?`\n${detail}`:''}`,next_follow_up_at:null});
-    }else if(!payload.interim_payment_not_applicable&&item.interim_payment_not_applicable){
-      histories.push({...target,created_by:state.profile.id,follow_up_date:today(),contact_method:'중도금',content:'중도금 해당없음 처리를 해제함.',next_follow_up_at:null});
-    }
     if(histories.length){const {error:hErr}=await state.client.from('interaction_history').insert(histories);if(hErr)return toast(`계약 일정은 저장됐지만 히스토리 기록 실패: ${hErr.message}`)}
     $('#modal').close();toast('계약 정보·일정과 히스토리를 저장했습니다.');entityType==='customer'?renderCustomers():renderMyListings();
   };
