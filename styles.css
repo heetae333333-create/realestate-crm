@@ -101,3 +101,36 @@ button.small{padding:4px 7px;font-size:11px}
 .nav.admin-nav{border-left:3px solid transparent;padding-left:11px}
 .nav.admin-nav:hover,.nav.admin-nav.active{border-left-color:#f59e0b;background:#292524;color:#fff7ed}
 @media(max-width:760px){.sidebar nav{grid-template-columns:repeat(3,1fr)}.nav-section-label{grid-column:1/-1}.nav-section{grid-column:1/-1;grid-template-columns:repeat(3,1fr);border-top:1px solid #334155}.nav-section .nav-section-label{grid-column:1/-1}.nav.admin-nav{border-left:0;border-bottom:3px solid transparent;padding-left:6px}.nav.admin-nav:hover,.nav.admin-nav.active{border-left:0;border-bottom-color:#f59e0b}}
+
+/* v3.0.2 사이드바 스크롤 및 하단 메뉴 접근 수정 */
+.sidebar{
+  height:100vh;
+  height:100dvh;
+  overflow:hidden;
+}
+.sidebar nav{
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  overflow-x:hidden;
+  padding-right:6px;
+  padding-bottom:18px;
+  scrollbar-width:thin;
+  scrollbar-color:#475569 transparent;
+}
+.sidebar nav::-webkit-scrollbar{width:7px}
+.sidebar nav::-webkit-scrollbar-track{background:transparent}
+.sidebar nav::-webkit-scrollbar-thumb{background:#475569;border-radius:999px}
+.sidebar nav::-webkit-scrollbar-thumb:hover{background:#64748b}
+.sidebar-footer{
+  flex:0 0 auto;
+  margin-top:0;
+  padding-top:12px;
+  border-top:1px solid #334155;
+  background:var(--sidebar);
+}
+@media(max-width:760px){
+  .sidebar{height:auto;overflow:visible}
+  .sidebar nav{overflow:visible;padding-right:0;padding-bottom:0}
+  .sidebar-footer{border-top:0;padding-top:0}
+}
