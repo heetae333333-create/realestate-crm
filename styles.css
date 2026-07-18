@@ -54,3 +54,6 @@
 .customer-grade.grade-d{background:#e5e7eb;color:#4b5563;border-color:#d1d5db}
 .customer-table{min-width:1180px}
 @media(max-width:900px){.customer-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.customer-grade{width:26px;height:26px}}
+
+/* v1.9.1 자기자본금 모름 */
+.inline-field{display:flex;align-items:center;gap:12px}.inline-field>input{flex:1}.inline-check{display:flex;align-items:center;gap:6px;white-space:nowrap;font-weight:700}.inline-check input{width:18px;height:18px}.inline-field>input:disabled{background:#eef1f5;color:#8a93a3}
