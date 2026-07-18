@@ -10,7 +10,8 @@ function fmtDate(v){return v?new Date(v).toLocaleDateString('ko-KR'):'-'}
 function today(){return new Date().toISOString().slice(0,10)}
 function dueBadge(v){if(!v)return '-';const d=new Date(v+'T00:00:00'),now=new Date(today()+'T00:00:00');const diff=Math.round((d-now)/86400000);return diff<0?badge(fmtDate(v)+' 지남','red'):diff===0?badge('오늘','yellow'):badge(fmtDate(v),'blue')}
 function moveInText(x){return x.move_in_negotiable?'협의 가능':fmtDate(x.move_in_date)}
-function contractStage(x){const stages=[['잔금',x.final_payment_date],['중도금',x.interim_payment_date],['본계약',x.contract_date],['가계약',x.provisional_contract_date]];const hit=stages.find(v=>v[1]);return hit?badge(hit[0],'blue'):'-'}
+function contractStage(x){const stages=[['잔금',x.final_payment_date],['중도금',x.interim_payment_date],['본계약',x.contract_date],['가계약',x.provisional_contract_date]];const hit=stages.find(v=>v[1]);if(hit)return badge(hit[0],'blue');if(x.interim_payment_not_applicable)return badge('중도금 해당없음','gray');return '-'}
+function contractDetailText(item,entityType){const parts=[];if(item.contracted_property_name)parts.push(`매물명: ${item.contracted_property_name}`);if(item.contracted_transaction_type)parts.push(`거래유형: ${item.contracted_transaction_type}`);if(item.contracted_amount!==null&&item.contracted_amount!==undefined&&item.contracted_amount!=='')parts.push(`거래금액: ${fmtMoney(item.contracted_amount)}`);if(item.counterparty_name)parts.push(`거래 고객명: ${item.counterparty_name}`);if(item.counterparty_phone){let label='상대방 연락처';if(entityType==='customer'){label=['매수','임차'].includes(item.customer_type)?'매도/임대측 연락처':'매수/임차측 연락처'}else label='매수/임차측 연락처';parts.push(`${label}: ${item.counterparty_phone}`)}return parts.join(' / ')}
 function badge(text,type='gray'){return `<span class="badge ${type}">${text}</span>`}
 function escapeHtml(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
 
@@ -132,7 +133,8 @@ async function openHistoryModal(entityType,id){
   const {data,error}=await state.client.from('interaction_history').select('*, writer:profiles!interaction_history_created_by_fkey(full_name)').eq(col,id).order('follow_up_date',{ascending:false}).order('created_at',{ascending:false});
   if(error)return toast(error.message);
   $('#modalTitle').textContent=`${entityType==='customer'?item?.name:item?.title} · FU 히스토리`;
-  $('#modalBody').innerHTML=`<div class="history-layout"><section><div class="contract-strip">${[['가계약',item?.provisional_contract_date],['본계약',item?.contract_date],['중도금',item?.interim_payment_date],['잔금',item?.final_payment_date]].map(([n,d])=>`<div class="contract-step ${d?'done':''}"><span>${n}</span><strong>${d?fmtDate(d):'미정'}</strong></div>`).join('')}</div></section><section>${(data||[]).length?`<div class="history-list">${data.map(h=>`<article class="history-item"><div class="history-head"><div><span class="history-type">${escapeHtml(h.contact_method)}</span> <strong>${fmtDate(h.follow_up_date)}</strong></div><span class="muted">${escapeHtml(h.writer?.full_name||'')}</span></div><p>${escapeHtml(h.content).replace(/\n/g,'<br>')}</p>${h.next_follow_up_at?`<div class="next-fu">예정 FU · ${fmtDate(h.next_follow_up_at)}</div>`:''}</article>`).join('')}</div>`:'<div class="empty">아직 기록된 상담 히스토리가 없습니다.</div>'}</section></div>`;
+  const contractSteps=[['가계약',item?.provisional_contract_date,false],['본계약',item?.contract_date,false],['중도금',item?.interim_payment_date,!!item?.interim_payment_not_applicable],['잔금',item?.final_payment_date,false]];
+  $('#modalBody').innerHTML=`<div class="history-layout"><section><div class="contract-strip">${contractSteps.map(([n,d,na])=>`<div class="contract-step ${d?'done':''} ${na?'not-applicable':''}"><span>${n}</span><strong>${na?'해당없음':d?fmtDate(d):'미정'}</strong></div>`).join('')}</div></section><section>${(data||[]).length?`<div class="history-list">${data.map(h=>`<article class="history-item"><div class="history-head"><div><span class="history-type">${escapeHtml(h.contact_method)}</span> <strong>${fmtDate(h.follow_up_date)}</strong></div><span class="muted">${escapeHtml(h.writer?.full_name||'')}</span></div><p>${escapeHtml(h.content).replace(/\n/g,'<br>')}</p>${h.next_follow_up_at?`<div class="next-fu">예정 FU · ${fmtDate(h.next_follow_up_at)}</div>`:''}</article>`).join('')}</div>`:'<div class="empty">아직 기록된 상담 히스토리가 없습니다.</div>'}</section></div>`;
   $('#modalSubmit').style.display='none';
   const close=()=>{$('#modalSubmit').style.display='';$('#modal').removeEventListener('close',close)};$('#modal').addEventListener('close',close);$('#modal').showModal();
 }
@@ -143,9 +145,70 @@ async function openContractModal(entityType,id){
   if(!item)return toast('대상을 찾지 못했습니다.');
   $('#modalTitle').textContent=`${entityType==='customer'?item.name:item.title} · 계약 일정`;
   const steps=[['provisional_contract_date','가계약'],['contract_date','본계약'],['interim_payment_date','중도금'],['final_payment_date','잔금']];
-  $('#modalBody').innerHTML=`<div class="contract-editor"><p class="muted">완료된 단계는 체크하고 날짜를 입력하세요. 가계약 → 본계약 → 중도금 → 잔금 순서로 표시됩니다.</p>${steps.map(([key,label],i)=>`<div class="contract-edit-row"><div class="step-no">${i+1}</div><label class="check-label"><input type="checkbox" data-stage-check="${key}" ${item[key]?'checked':''}> ${label}</label><input type="date" name="${key}" value="${item[key]||''}" ${item[key]?'':'disabled'}></div>`).join('')}</div>`;
+  const demandSide=entityType==='customer'&&['매수','임차'].includes(item.customer_type);
+  const supplySide=entityType==='listing'||(entityType==='customer'&&['매도','임대'].includes(item.customer_type));
+  const defaultProperty=entityType==='listing'?item.title:(item.contracted_property_name||'');
+  const defaultType=entityType==='listing'?item.transaction_type:(item.contracted_transaction_type||'');
+  const defaultAmount=entityType==='listing'?(item.contracted_amount??item.price??''):(item.contracted_amount??'');
+  const detailFields=demandSide?`
+    <div class="contract-detail-grid">
+      <label>계약 매물명<input name="contracted_property_name" value="${escapeHtml(defaultProperty)}" placeholder="예: 철산자이 101동 1203호"></label>
+      <label>거래유형<select name="contracted_transaction_type"><option value="">선택</option><option>매매</option><option>전세</option><option>월세</option></select></label>
+      <label>거래금액(만원)<input name="contracted_amount" type="number" value="${defaultAmount}"></label>
+      <label>매도/임대측 연락처<input name="counterparty_phone" value="${escapeHtml(item.counterparty_phone||'')}" placeholder="010-0000-0000"></label>
+    </div>`:`
+    <div class="contract-detail-grid">
+      ${entityType==='listing'?`<label>계약 매물명<input name="contracted_property_name" value="${escapeHtml(defaultProperty)}"></label><label>거래유형<select name="contracted_transaction_type"><option value="">선택</option><option>매매</option><option>전세</option><option>월세</option></select></label>`:''}
+      <label>거래금액(만원)<input name="contracted_amount" type="number" value="${defaultAmount}"></label>
+      <label>거래 고객명<input name="counterparty_name" value="${escapeHtml(item.counterparty_name||'')}" placeholder="매수인 또는 임차인 이름"></label>
+      <label>매수/임차측 연락처<input name="counterparty_phone" value="${escapeHtml(item.counterparty_phone||'')}" placeholder="010-0000-0000"></label>
+    </div>`;
+  $('#modalBody').innerHTML=`<div class="contract-editor"><p class="muted">계약 상대방 정보와 일정을 함께 기록하세요. 저장된 내용은 히스토리에 자동으로 남습니다.</p><section class="contract-detail-box"><h4>계약 정보</h4>${detailFields}</section>${steps.map(([key,label],i)=>{const isInterim=key==='interim_payment_date',na=isInterim&&item.interim_payment_not_applicable;return `<div class="contract-edit-row ${na?'not-applicable':''}" data-contract-row="${key}"><div class="step-no">${i+1}</div><label class="check-label"><input type="checkbox" data-stage-check="${key}" ${item[key]?'checked':''} ${na?'disabled':''}> ${label}</label><input type="date" name="${key}" value="${item[key]||''}" ${item[key]&&!na?'':'disabled'}>${isInterim?`<label class="na-label"><input type="checkbox" id="interimNotApplicable" ${na?'checked':''}> 해당없음</label>`:''}</div>`}).join('')}</div>`;
+  const typeSelect=$('#modalBody [name=contracted_transaction_type]');if(typeSelect)typeSelect.value=defaultType||'';
+  const syncInterim=()=>{
+    const na=$('#interimNotApplicable')?.checked||false;
+    const row=$('[data-contract-row="interim_payment_date"]');
+    const check=$('[data-stage-check="interim_payment_date"]');
+    const input=$('#modalBody [name=interim_payment_date]');
+    row?.classList.toggle('not-applicable',na);
+    if(check){check.disabled=na;if(na)check.checked=false}
+    if(input){if(na)input.value='';input.disabled=na||!check?.checked}
+  };
   $$('[data-stage-check]').forEach(ch=>ch.onchange=()=>{const input=$(`#modalBody [name=${ch.dataset.stageCheck}]`);input.disabled=!ch.checked;if(ch.checked&&!input.value)input.value=today();if(!ch.checked)input.value=''});
-  $('#modalSubmit').onclick=async(e)=>{e.preventDefault();const fd=new FormData($('#modalForm'));const payload={};steps.forEach(([key])=>payload[key]=fd.get(key)||null);const table=entityType==='customer'?'customers':'listings';const {error}=await state.client.from(table).update(payload).eq('id',id);if(error)return toast(error.message);$('#modal').close();toast('계약 일정을 저장했습니다.');entityType==='customer'?renderCustomers():renderMyListings()};
+  if($('#interimNotApplicable'))$('#interimNotApplicable').onchange=syncInterim;
+  syncInterim();
+  $('#modalSubmit').onclick=async(e)=>{
+    e.preventDefault();
+    const fd=new FormData($('#modalForm')),payload={};
+    steps.forEach(([key])=>payload[key]=fd.get(key)||null);
+    payload.interim_payment_not_applicable=$('#interimNotApplicable')?.checked||false;
+    if(payload.interim_payment_not_applicable)payload.interim_payment_date=null;
+    payload.contracted_property_name=fd.get('contracted_property_name')||null;
+    payload.contracted_transaction_type=fd.get('contracted_transaction_type')||null;
+    payload.contracted_amount=fd.get('contracted_amount')?Number(fd.get('contracted_amount')):null;
+    payload.counterparty_name=fd.get('counterparty_name')||null;
+    payload.counterparty_phone=fd.get('counterparty_phone')||null;
+    const table=entityType==='customer'?'customers':'listings';
+    const {error}=await state.client.from(table).update(payload).eq('id',id);
+    if(error)return toast(error.message);
+    const histories=[];
+    const target={customer_id:entityType==='customer'?id:null,listing_id:entityType==='listing'?id:null};
+    const detail=contractDetailText({...item,...payload},entityType);
+    for(const [key,label] of steps){
+      const before=item[key]||null,after=payload[key]||null;
+      if(after&&after!==before)histories.push({...target,created_by:state.profile.id,follow_up_date:after,contact_method:label,content:`${label} 진행함. 날짜 ${fmtDate(after)}${detail?`\n${detail}`:''}`,next_follow_up_at:null});
+    }
+    const detailKeys=['contracted_property_name','contracted_transaction_type','contracted_amount','counterparty_name','counterparty_phone'];
+    const detailChanged=detailKeys.some(k=>String(item[k]??'')!==String(payload[k]??''));
+    if(detailChanged&&detail)histories.push({...target,created_by:state.profile.id,follow_up_date:today(),contact_method:'계약정보',content:`계약 정보 등록/변경함.\n${detail}`,next_follow_up_at:null});
+    if(payload.interim_payment_not_applicable&&!item.interim_payment_not_applicable){
+      histories.push({...target,created_by:state.profile.id,follow_up_date:today(),contact_method:'중도금',content:`중도금 해당없음으로 처리함.${detail?`\n${detail}`:''}`,next_follow_up_at:null});
+    }else if(!payload.interim_payment_not_applicable&&item.interim_payment_not_applicable){
+      histories.push({...target,created_by:state.profile.id,follow_up_date:today(),contact_method:'중도금',content:'중도금 해당없음 처리를 해제함.',next_follow_up_at:null});
+    }
+    if(histories.length){const {error:hErr}=await state.client.from('interaction_history').insert(histories);if(hErr)return toast(`계약 일정은 저장됐지만 히스토리 기록 실패: ${hErr.message}`)}
+    $('#modal').close();toast('계약 정보·일정과 히스토리를 저장했습니다.');entityType==='customer'?renderCustomers():renderMyListings();
+  };
   $('#modal').showModal();
 }
 
@@ -167,5 +230,6 @@ $('#saveSetupBtn').onclick=()=>{localStorage.setItem(SUPA_URL_KEY,$('#setupUrl')
 $('#clearSetupBtn').onclick=()=>{localStorage.removeItem(SUPA_URL_KEY);localStorage.removeItem(SUPA_ANON_KEY);toast('설정을 삭제했습니다.')};
 $('#openSetupBtn').onclick=()=>showOnly('setupScreen');
 $$('.nav').forEach(b=>b.onclick=()=>renderView(b.dataset.view));
+$$('#modal [value="cancel"]').forEach(btn=>{btn.type='button';btn.onclick=()=>$('#modal').close('cancel')});
 window.renderView=renderView;window.openContractModal=openContractModal;window.openFollowUpModal=openFollowUpModal;window.openHistoryModal=openHistoryModal;window.filterCustomers=filterCustomers;window.openCustomerModal=openCustomerModal;window.deleteCustomer=deleteCustomer;window.openListingModal=openListingModal;window.deleteListing=deleteListing;window.filterNetwork=filterNetwork;window.setMemberStatus=setMemberStatus;window.previewTransfer=previewTransfer;window.executeTransfer=executeTransfer;
 boot();
