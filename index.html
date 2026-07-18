@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>공인중개사 공동매물 CRM</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div id="toast" class="toast"></div>
+
+  <section id="setupScreen" class="screen center-card hidden">
+    <div class="card auth-card">
+      <h1>초기 연결 설정</h1>
+      <p class="muted">Supabase 프로젝트 주소와 공개 키를 입력하세요. 브라우저에만 저장됩니다.</p>
+      <label>Supabase URL<input id="setupUrl" placeholder="https://xxxx.supabase.co" /></label>
+      <label>Supabase anon key<textarea id="setupKey" rows="4" placeholder="eyJ..."></textarea></label>
+      <button id="saveSetupBtn" class="primary">저장하고 시작</button>
+      <button id="clearSetupBtn" class="ghost">기존 설정 삭제</button>
+    </div>
+  </section>
+
+  <section id="authScreen" class="screen center-card hidden">
+    <div class="card auth-card">
+      <div class="brand-mark">중개</div>
+      <h1>공인중개사 공동매물 CRM</h1>
+      <p class="muted">승인된 중개사만 이용할 수 있습니다.</p>
+      <div class="tabs compact">
+        <button class="tab active" data-auth-tab="login">로그인</button>
+        <button class="tab" data-auth-tab="signup">가입 신청</button>
+      </div>
+      <form id="loginForm" class="stack">
+        <label>이메일<input id="loginEmail" type="email" required /></label>
+        <label>비밀번호<input id="loginPassword" type="password" minlength="6" required /></label>
+        <button class="primary" type="submit">로그인</button>
+      </form>
+      <form id="signupForm" class="stack hidden">
+        <label>이름<input id="signupName" required /></label>
+        <label>중개사무소명<input id="signupOffice" required /></label>
+        <label>연락처<input id="signupPhone" required /></label>
+        <label>이메일<input id="signupEmail" type="email" required /></label>
+        <label>비밀번호<input id="signupPassword" type="password" minlength="6" required /></label>
+        <button class="primary" type="submit">가입 신청</button>
+      </form>
+      <button id="openSetupBtn" class="link-btn">Supabase 연결 설정</button>
+    </div>
+  </section>
+
+  <section id="pendingScreen" class="screen center-card hidden">
+    <div class="card auth-card">
+      <h1>관리자 승인 대기 중</h1>
+      <p>가입 신청이 접수되었습니다. 관리자가 승인한 후 이용할 수 있습니다.</p>
+      <button id="pendingRefreshBtn" class="primary">승인 상태 새로고침</button>
+      <button id="pendingLogoutBtn" class="ghost">로그아웃</button>
+    </div>
+  </section>
+
+  <section id="appScreen" class="hidden">
+    <aside class="sidebar">
+      <div class="logo-area">
+        <div class="brand-mark small">중개</div>
+        <div><strong>공동매물 CRM</strong><span id="officeNameSide"></span></div>
+      </div>
+      <nav id="navMenu">
+        <button class="nav active" data-view="dashboard">대시보드</button>
+        <button class="nav" data-view="customers">내 고객</button>
+        <button class="nav" data-view="myListings">내 매물 시트</button>
+        <button class="nav" data-view="network">공동매물망</button>
+        <button class="nav admin-only hidden" data-view="members">회원 승인·관리</button>
+        <button class="nav admin-only hidden" data-view="transfer">퇴사자 일괄 이관</button>
+      </nav>
+      <div class="sidebar-footer">
+        <div id="userBadge"></div>
+        <button id="logoutBtn" class="ghost full">로그아웃</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h2 id="pageTitle">대시보드</h2>
+          <p id="pageSubtitle" class="muted"></p>
+        </div>
+        <div id="topActions"></div>
+      </header>
+      <div id="content"></div>
+    </main>
+  </section>
+
+  <dialog id="modal">
+    <form method="dialog" class="modal-card" id="modalForm">
+      <div class="modal-header"><h3 id="modalTitle"></h3><button class="icon-btn" value="cancel">×</button></div>
+      <div id="modalBody"></div>
+      <div class="modal-actions"><button value="cancel" class="ghost">취소</button><button id="modalSubmit" value="default" class="primary">저장</button></div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
