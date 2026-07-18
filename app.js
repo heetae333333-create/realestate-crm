@@ -1,4 +1,4 @@
-const state = { client:null, session:null, profile:null, view:'dashboard', customers:[], listings:[], members:[] };
+const state = { client:null, session:null, profile:null, view:'dashboard', customers:[], listings:[], members:[], adminSelectedListings:new Set() };
 const $ = (s)=>document.querySelector(s);
 const $$ = (s)=>[...document.querySelectorAll(s)];
 const SUPA_URL_KEY='crm_supabase_url', SUPA_ANON_KEY='crm_supabase_anon';
@@ -144,8 +144,8 @@ async function renderMyListings(){await loadListings();state.myListings=state.li
 async function renderAdminListings(){
   if(state.profile.role!=='admin')return renderView('dashboard');
   await Promise.all([loadListings(),loadMembers()]);
-  $('#topActions').innerHTML='<button class="primary" onclick="openListingModal()">+ 관리자 매물 등록</button>';
-  $('#content').innerHTML=`<div class="notice" style="margin-bottom:14px">관리자는 모든 중개사의 공개·비공개 매물을 열람, 수정, 삭제하고 매물별로 담당자를 이관할 수 있습니다.</div><div class="panel"><div class="filters admin-listing-filters"><input id="adminListingSearch" placeholder="매물명·주소·담당자 검색" oninput="filterAdminListings()"><select id="adminListingOwner" onchange="filterAdminListings()"><option value="">전체 담당자</option>${state.members.filter(x=>x.status==='approved').map(x=>`<option value="${x.id}">${escapeHtml(x.full_name)} · ${escapeHtml(x.office_name||'')}</option>`).join('')}</select><select id="adminListingVisibility" onchange="filterAdminListings()"><option value="">공개+비공개</option><option value="public">공개</option><option value="private">비공개</option></select><select id="adminListingStatus" onchange="filterAdminListings()"><option value="">전체 상태</option><option value="available">거래 가능</option><option value="hold">협의 중</option><option value="complete">거래 완료</option></select></div><div id="adminListingTable"></div></div>`;
+  $('#topActions').innerHTML='<button class="primary" onclick="openListingModal()">+ 관리자 매물 등록</button><button class="success" id="bulkTransferTopBtn" onclick="openBulkListingTransfer()" disabled>선택 매물 일괄 이관 (0)</button>'; state.adminSelectedListings.clear();
+  $('#content').innerHTML=`<div class="notice" style="margin-bottom:14px">관리자는 모든 중개사의 공개·비공개 매물을 열람, 수정, 삭제하고 매물별로 담당자를 이관할 수 있습니다.</div><div class="panel"><div class="filters admin-listing-filters"><input id="adminListingSearch" placeholder="매물명·주소·담당자 검색" oninput="filterAdminListings()"><select id="adminListingOwner" onchange="filterAdminListings()"><option value="">전체 담당자</option>${state.members.filter(x=>x.status==='approved').map(x=>`<option value="${x.id}">${escapeHtml(x.full_name)} · ${escapeHtml(x.office_name||'')}</option>`).join('')}</select><select id="adminListingVisibility" onchange="filterAdminListings()"><option value="">공개+비공개</option><option value="public">공개</option><option value="private">비공개</option></select><select id="adminListingStatus" onchange="filterAdminListings()"><option value="">전체 상태</option><option value="available">거래 가능</option><option value="hold">협의 중</option><option value="complete">거래 완료</option></select></div><div class="bulk-listing-toolbar"><label class="inline-check"><input type="checkbox" id="selectAllAdminListings" onchange="toggleAllAdminListings(this.checked)"> 현재 목록 전체 선택</label><button class="primary" id="bulkTransferBtn" onclick="openBulkListingTransfer()" disabled>선택 매물 일괄 이관 (0)</button></div><div id="adminListingTable"></div></div>`;
   filterAdminListings();
 }
 function filterAdminListings(){
@@ -162,7 +162,8 @@ function listingAreaText(x){
   return [...new Set([district,dong].filter(Boolean))].join(' ')||x.district||'-';
 }
 function renderListingTable(rows,target,mine,adminMode=false){
-  const el=$('#'+target);el.innerHTML=rows.length?`<div class="table-wrap listing-table-wrap"><table class="listing-table"><thead><tr><th>상태</th><th>거래</th><th>유형</th><th>매물명</th><th>지역</th><th>금액/월세</th><th>연락처</th><th>대출</th><th>면적</th><th>방/욕실</th><th>입주</th><th>담당</th><th>계약</th><th>최종 FU</th><th>예정 FU</th>${mine?'<th>관리</th>':''}</tr></thead><tbody>${rows.map(x=>`<tr><td>${badge(x.status==='available'?'거래 가능':x.status==='complete'?'거래 완료':'협의 중',x.status==='available'?'green':x.status==='complete'?'gray':'yellow')}</td><td>${escapeHtml(x.transaction_type)}</td><td>${escapeHtml(x.property_type)}</td><td class="listing-title-cell"><strong>${escapeHtml(x.title)}</strong>${x.is_public?'':' '+badge('비공개','red')}<br><button type="button" class="photo-link" onclick="openListingPhotos('${x.id}')">📷 내부사진</button></td><td>${escapeHtml(listingAreaText(x))}</td><td>${listingPriceText(x)}</td><td>${escapeHtml(x.contact_phone||'-')}</td><td>${x.loan_available===true?badge('O','green'):x.loan_available===false?badge('X','red'):badge('미확인','gray')}${x.loan_available===true&&x.official_price?`<br><span class="muted">기준 ${fmtMoney(x.official_price)}</span>`:''}</td><td>${x.area_m2?x.area_m2+'㎡':'-'}</td><td>${x.room_count!==null&&x.room_count!==undefined?escapeHtml(String(x.room_count)):'-'} / ${x.bathroom_count!==null&&x.bathroom_count!==undefined?escapeHtml(String(x.bathroom_count)):'-'}</td><td>${moveInText(x)}</td><td>${escapeHtml(x.owner?.full_name||'-')}</td><td>${contractStage(x)}</td><td>${fmtDate(x.last_follow_up_at||x.last_confirmed_at)}</td><td>${dueBadge(x.next_follow_up_at)}</td>${mine?`<td><div class="row-actions"><button class="success" onclick="openFollowUpModal('listing','${x.id}')">FU</button><button class="ghost" onclick="openHistoryModal('listing','${x.id}')">히스토리</button><button class="ghost" onclick="openContractModal('listing','${x.id}')">계약일정</button><button class="ghost" onclick="openListingModal('${x.id}')">수정</button>${adminMode?`<button class="primary" onclick="openSingleListingTransfer('${x.id}')">개별 이관</button>`:''}<button class="danger" onclick="deleteListing('${x.id}')">삭제</button></div></td>`:''}</tr>`).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 매물이 없습니다.</div>';
+  const el=$('#'+target);el.innerHTML=rows.length?`<div class="table-wrap listing-table-wrap"><table class="listing-table"><thead><tr>${adminMode?'<th class="select-col">선택</th>':''}<th>상태</th><th>거래</th><th>유형</th><th>매물명</th><th>지역</th><th>금액/월세</th><th>연락처</th><th>대출</th><th>면적</th><th>방/욕실</th><th>입주</th><th>담당</th><th>계약</th><th>최종 FU</th><th>예정 FU</th>${mine?'<th>관리</th>':''}</tr></thead><tbody>${rows.map(x=>`<tr>${adminMode?`<td class="select-col"><input type="checkbox" class="admin-listing-check" value="${x.id}" ${state.adminSelectedListings.has(x.id)?'checked':''} onchange="toggleAdminListingSelection('${x.id}',this.checked)"></td>`:''}<td>${badge(x.status==='available'?'거래 가능':x.status==='complete'?'거래 완료':'협의 중',x.status==='available'?'green':x.status==='complete'?'gray':'yellow')}</td><td>${escapeHtml(x.transaction_type)}</td><td>${escapeHtml(x.property_type)}</td><td class="listing-title-cell"><strong>${escapeHtml(x.title)}</strong>${x.is_public?'':' '+badge('비공개','red')}<br><button type="button" class="photo-link" onclick="openListingPhotos('${x.id}')">📷 내부사진</button></td><td>${escapeHtml(listingAreaText(x))}</td><td>${listingPriceText(x)}</td><td>${escapeHtml(x.contact_phone||'-')}</td><td>${x.loan_available===true?badge('O','green'):x.loan_available===false?badge('X','red'):badge('미확인','gray')}${x.loan_available===true&&x.official_price?`<br><span class="muted">기준 ${fmtMoney(x.official_price)}</span>`:''}</td><td>${x.area_m2?x.area_m2+'㎡':'-'}</td><td>${x.room_count!==null&&x.room_count!==undefined?escapeHtml(String(x.room_count)):'-'} / ${x.bathroom_count!==null&&x.bathroom_count!==undefined?escapeHtml(String(x.bathroom_count)):'-'}</td><td>${moveInText(x)}</td><td>${escapeHtml(x.owner?.full_name||'-')}</td><td>${contractStage(x)}</td><td>${fmtDate(x.last_follow_up_at||x.last_confirmed_at)}</td><td>${dueBadge(x.next_follow_up_at)}</td>${mine?`<td><div class="row-actions"><button class="success" onclick="openFollowUpModal('listing','${x.id}')">FU</button><button class="ghost" onclick="openHistoryModal('listing','${x.id}')">히스토리</button><button class="ghost" onclick="openContractModal('listing','${x.id}')">계약일정</button><button class="ghost" onclick="openListingModal('${x.id}')">수정</button>${adminMode?`<button class="primary" onclick="openSingleListingTransfer('${x.id}')">개별 이관</button>`:''}<button class="danger" onclick="deleteListing('${x.id}')">삭제</button></div></td>`:''}</tr>`).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 매물이 없습니다.</div>';
+  if(adminMode) updateBulkTransferControls();
 }
 function openListingModal(id){
   const x=state.listings.find(v=>v.id===id)||{};$('#modalTitle').textContent=id?'매물 수정':'매물 등록';
@@ -382,6 +383,48 @@ async function deleteListing(id){
   if(paths.length){const {error:photoError}=await state.client.storage.from('listing-photos').remove(paths);if(photoError)return toast(`사진 삭제 실패: ${photoError.message}`)}
   const {error}=await state.client.from('listings').delete().eq('id',id);if(error)return toast(error.message);
   toast('매물과 내부 사진을 삭제했습니다.');state.view==='adminListings'?renderAdminListings():renderMyListings()
+}
+
+
+function toggleAdminListingSelection(id,checked){
+  checked?state.adminSelectedListings.add(id):state.adminSelectedListings.delete(id);
+  updateBulkTransferControls();
+}
+function toggleAllAdminListings(checked){
+  $$('.admin-listing-check').forEach(el=>{el.checked=checked;checked?state.adminSelectedListings.add(el.value):state.adminSelectedListings.delete(el.value)});
+  updateBulkTransferControls();
+}
+function updateBulkTransferControls(){
+  const count=state.adminSelectedListings.size;
+  ['#bulkTransferBtn','#bulkTransferTopBtn'].forEach(sel=>{const b=$(sel);if(b){b.disabled=count===0;b.textContent=`선택 매물 일괄 이관 (${count})`}});
+  const checks=$$('.admin-listing-check'),all=$('#selectAllAdminListings');
+  if(all){all.checked=checks.length>0&&checks.every(x=>x.checked);all.indeterminate=checks.some(x=>x.checked)&&!checks.every(x=>x.checked)}
+}
+async function openBulkListingTransfer(){
+  if(state.profile.role!=='admin')return toast('관리자만 이관할 수 있습니다.');
+  const ids=[...state.adminSelectedListings];
+  if(!ids.length)return toast('이관할 매물을 먼저 선택하세요.');
+  await loadMembers();
+  const selected=state.listings.filter(x=>ids.includes(x.id));
+  const approved=state.members.filter(x=>x.status==='approved');
+  $('#modalTitle').textContent='선택 매물 일괄 이관';
+  $('#modalBody').innerHTML=`<div class="notice"><strong>${selected.length}개 매물</strong>을 한 번에 이관합니다.<br><span class="muted">공개·비공개 매물이 함께 선택되어 있어도 모두 이관됩니다.</span></div><div class="bulk-transfer-list">${selected.slice(0,20).map(x=>`<div><strong>${escapeHtml(x.title)}</strong><span>${escapeHtml(x.owner?.full_name||'-')} · ${x.is_public?'공개':'비공개'}</span></div>`).join('')}${selected.length>20?`<div class="muted">외 ${selected.length-20}개</div>`:''}</div><div class="form-grid" style="margin-top:16px"><label>새 담당 중개사<select id="bulkTransferTo" required><option value="">선택</option>${approved.map(x=>`<option value="${x.id}">${escapeHtml(x.full_name)} · ${escapeHtml(x.office_name||'')}</option>`).join('')}</select></label><label>이관 사유<input id="bulkTransferReason" value="관리자 선택 매물 일괄 이관"></label></div><div id="bulkTransferProgress" class="muted" style="margin-top:12px"></div>`;
+  $('#modalSubmit').onclick=async(e)=>{
+    e.preventDefault();
+    const to=$('#bulkTransferTo').value,reason=$('#bulkTransferReason').value.trim();
+    if(!to)return toast('새 담당 중개사를 선택하세요.');
+    if(!confirm(`선택한 ${ids.length}개 매물을 이관할까요?`))return;
+    const btn=$('#modalSubmit');btn.disabled=true;let success=0,failed=0;
+    for(let i=0;i<ids.length;i++){
+      $('#bulkTransferProgress').textContent=`이관 처리 중 ${i+1}/${ids.length}`;
+      const {error}=await state.client.rpc('transfer_single_listing',{p_listing:ids[i],p_to:to,p_reason:reason});
+      error?failed++:success++;
+    }
+    btn.disabled=false;$('#modal').close();state.adminSelectedListings.clear();
+    toast(`일괄 이관 완료: 성공 ${success}개${failed?`, 실패 ${failed}개`:''}`);
+    await renderAdminListings();
+  };
+  $('#modal').showModal();
 }
 
 async function openSingleListingTransfer(id){
