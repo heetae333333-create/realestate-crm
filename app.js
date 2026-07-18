@@ -310,8 +310,54 @@ async function renderListingPhotoGallery(listing){
   const photos=data||[];
   const urls=await Promise.all(photos.map(p=>signedPhotoUrl(p.storage_path)));
   const manageable=canManageListing(listing);
-  $('#modalBody').innerHTML=`${manageable?`<div class="photo-upload-panel"><label>사진 추가<input id="galleryPhotoFiles" type="file" accept="image/*" multiple></label><button type="button" class="primary" onclick="addListingPhotos('${listing.id}')">선택한 사진 업로드</button><span class="field-help">여러 장 선택 가능 · 1장당 최대 10MB</span></div>`:''}<div class="photo-gallery">${photos.length?photos.map((p,i)=>`<figure class="photo-card">${urls[i]?`<a href="${escapeHtml(urls[i])}" target="_blank" rel="noopener"><img src="${escapeHtml(urls[i])}" alt="${escapeHtml(p.file_name||'매물 내부 사진')}" loading="lazy"></a>`:'<div class="photo-error">사진 URL 오류</div>'}<figcaption><span>${escapeHtml(p.file_name||'사진')}</span>${manageable?`<button type="button" class="danger small" onclick="deleteListingPhoto('${listing.id}','${p.id}','${escapeHtml(p.storage_path)}')">삭제</button>`:''}</figcaption></figure>`).join(''):'<div class="empty photo-empty">등록된 내부 사진이 없습니다.</div>'}</div>`;
+  $('#modalBody').innerHTML=`${photos.length?`<div class="photo-download-bar"><button type="button" class="success" id="downloadAllPhotosBtn" onclick="downloadAllListingPhotos('${listing.id}')">사진 전체 다운로드 (.zip)</button><span class="field-help">등록된 사진 ${photos.length}장을 한 번에 압축해서 받습니다.</span></div>`:''}${manageable?`<div class="photo-upload-panel"><label>사진 추가<input id="galleryPhotoFiles" type="file" accept="image/*" multiple></label><button type="button" class="primary" onclick="addListingPhotos('${listing.id}')">선택한 사진 업로드</button><span class="field-help">여러 장 선택 가능 · 1장당 최대 10MB</span></div>`:''}<div class="photo-gallery">${photos.length?photos.map((p,i)=>`<figure class="photo-card">${urls[i]?`<a href="${escapeHtml(urls[i])}" target="_blank" rel="noopener"><img src="${escapeHtml(urls[i])}" alt="${escapeHtml(p.file_name||'매물 내부 사진')}" loading="lazy"></a>`:'<div class="photo-error">사진 URL 오류</div>'}<figcaption><span>${escapeHtml(p.file_name||'사진')}</span>${manageable?`<button type="button" class="danger small" onclick="deleteListingPhoto('${listing.id}','${p.id}','${escapeHtml(p.storage_path)}')">삭제</button>`:''}</figcaption></figure>`).join(''):'<div class="empty photo-empty">등록된 내부 사진이 없습니다.</div>'}</div>`;
 }
+
+async function downloadAllListingPhotos(listingId){
+  const listing=state.listings.find(x=>x.id===listingId);
+  if(!listing)return toast('매물을 찾을 수 없습니다.');
+  if(typeof JSZip==='undefined')return toast('압축 기능을 불러오지 못했습니다. 인터넷 연결 후 다시 시도하세요.');
+  const btn=$('#downloadAllPhotosBtn');
+  const original=btn?.textContent||'사진 전체 다운로드 (.zip)';
+  if(btn){btn.disabled=true;btn.textContent='사진 목록 확인 중...'}
+  try{
+    const {data,error}=await state.client.from('listing_photos').select('*').eq('listing_id',listingId).order('sort_order',{ascending:true}).order('created_at',{ascending:true});
+    if(error)throw error;
+    const photos=data||[];
+    if(!photos.length){toast('다운로드할 사진이 없습니다.');return}
+    const zip=new JSZip();
+    const used=new Set();
+    let success=0,failed=0;
+    for(let i=0;i<photos.length;i++){
+      if(btn)btn.textContent=`사진 다운로드 중 ${i+1}/${photos.length}`;
+      const photo=photos[i];
+      try{
+        const url=await signedPhotoUrl(photo.storage_path);
+        if(!url)throw new Error('사진 URL 생성 실패');
+        const res=await fetch(url);
+        if(!res.ok)throw new Error(`HTTP ${res.status}`);
+        const blob=await res.blob();
+        let name=(photo.file_name||`사진_${i+1}.jpg`).replace(/[\/:*?"<>|]/g,'_');
+        if(used.has(name)){
+          const dot=name.lastIndexOf('.');
+          const base=dot>0?name.slice(0,dot):name;
+          const ext=dot>0?name.slice(dot):'';
+          let n=2;while(used.has(`${base}_${n}${ext}`))n++;
+          name=`${base}_${n}${ext}`;
+        }
+        used.add(name);zip.file(name,blob);success++;
+      }catch(e){failed++;console.error('사진 다운로드 실패',photo,e)}
+    }
+    if(!success)throw new Error('다운로드 가능한 사진이 없습니다.');
+    if(btn)btn.textContent='압축파일 만드는 중...';
+    const out=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
+    const safeTitle=(listing.title||'매물사진').replace(/[\/:*?"<>|]/g,'_').trim()||'매물사진';
+    const a=document.createElement('a');a.href=URL.createObjectURL(out);a.download=`${safeTitle}_내부사진_${today()}.zip`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+    toast(`사진 ${success}장을 다운로드했습니다.${failed?` ${failed}장은 실패했습니다.`:''}`);
+  }catch(e){toast(`전체 다운로드 실패: ${e.message||e}`)}
+  finally{if(btn){btn.disabled=false;btn.textContent=original}}
+}
+
 async function addListingPhotos(listingId){
   const listing=state.listings.find(x=>x.id===listingId);if(!canManageListing(listing))return toast('사진을 추가할 권한이 없습니다.');
   const files=$('#galleryPhotoFiles')?.files;if(!files?.length)return toast('업로드할 사진을 선택하세요.');

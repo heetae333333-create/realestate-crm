@@ -74,3 +74,7 @@
 .photo-loading{padding:30px;text-align:center;color:#64748b}
 button.small{padding:4px 7px;font-size:11px}
 @media(max-width:640px){.photo-gallery{grid-template-columns:repeat(2,minmax(0,1fr))}.photo-card img{height:130px}.photo-upload-panel label{min-width:100%}}
+
+
+.photo-download-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 14px;margin-bottom:12px;border:1px solid #cfe8d7;border-radius:12px;background:#f3fbf6}
+.photo-download-bar button:disabled{opacity:.65;cursor:wait}
