@@ -21,3 +21,18 @@
 .contract-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .contract-detail-grid label{display:flex;flex-direction:column;gap:6px;font-weight:700}
 @media(max-width:720px){.contract-detail-grid{grid-template-columns:1fr}}
+
+/* v1.5 단계별 입금 금액 */
+.contract-edit-row .stage-amount{min-width:180px;font-size:12px;color:var(--muted)}
+.contract-edit-row .stage-amount input{margin-top:4px;width:100%}
+.contract-edit-row.not-applicable .stage-amount{opacity:.45;text-decoration:line-through}
+@media(max-width:760px){.contract-edit-row .stage-amount{grid-column:2/-1;width:100%}}
+
+/* v1.5.1 단계별 입금액 및 개별 히스토리 삭제 */
+.contract-edit-row{grid-template-columns:42px minmax(90px,120px) minmax(145px,180px) minmax(170px,220px) auto;align-items:end}
+.stage-amount-label{font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:5px}
+.stage-amount-label input{min-width:150px}
+.history-actions{display:flex;align-items:center;gap:10px}
+.history-delete{border:1px solid #fecaca;background:#fff;color:#dc2626;border-radius:8px;padding:4px 8px;font-size:12px;cursor:pointer}
+.history-delete:hover{background:#fef2f2}
+@media(max-width:760px){.contract-edit-row{grid-template-columns:34px 1fr}.contract-edit-row>input,.contract-edit-row>.stage-amount-label,.contract-edit-row>.na-label{grid-column:2}.stage-amount-label input{min-width:0;width:100%}}
