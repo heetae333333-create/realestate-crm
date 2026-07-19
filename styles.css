@@ -162,3 +162,12 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .match-type.alternative{background:#fff7ed;color:#c2410c}
 .match-card.alternative-match{border-color:#fed7aa;background:#fffdf9}
 .match-card.alternative-match .match-reason{background:#fff7ed;border-color:#fed7aa}
+
+/* CRM v3.6 */
+.crm36-fu-recommendations{margin-bottom:22px;padding-bottom:18px;border-bottom:2px solid var(--border,#e5e7eb)}
+.crm36-recommendation-list,.crm36-reverse-list{display:grid;gap:12px}
+.crm36-recommendation-item,.crm36-reverse-item{display:flex;justify-content:space-between;gap:16px;padding:16px;border:1px solid #dfe5ec;border-radius:14px;background:#fff}
+.crm36-status-line{margin-top:8px}.crm36-check-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:12px 0}
+.crm36-feature-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}.crm36-feature-tags span{font-size:11px;padding:3px 7px;border-radius:999px;background:#eef2ff;color:#3540a5}
+.crm36-match-actions{margin-top:12px}.crm36-new-alert{margin-top:16px}.crm36-alert-count{font-size:26px;color:#3157d5}.crm36-reverse-item .match-reason{margin-top:8px}
+@media(max-width:700px){.crm36-recommendation-item,.crm36-reverse-item{display:block}.crm36-recommendation-item .row-actions,.crm36-reverse-item .row-actions{margin-top:12px}.crm36-check-grid{grid-template-columns:1fr}}

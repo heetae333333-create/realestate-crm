@@ -850,3 +850,110 @@ renderAdminData=async function(){
 };
 
 console.info('CRM v3.2 중개사별 엑셀 선택관리 로드 완료');
+
+/* ================= CRM v3.6 영업 FU·역매칭·알림 ================= */
+state.savedRecommendations=[];
+
+const CRM36_EXCLUSION_OPTIONS=['반지하 제외','옥탑 제외','1층 제외','엘리베이터 필수','주차 필수','반려동물 가능 필수'];
+const CRM36_LISTING_FEATURES=['반지하','옥탑','1층','엘리베이터','주차','반려동물 가능'];
+function crm36Array(v){return Array.isArray(v)?v:[]}
+function crm36FeatureMap(tags){const s=new Set(crm36Array(tags));return {basement:s.has('반지하'),rooftop:s.has('옥탑'),first:s.has('1층'),elevator:s.has('엘리베이터'),parking:s.has('주차'),pet:s.has('반려동물 가능')}}
+function crm36PassExclusions(customer,listing){
+  const e=new Set(crm36Array(customer.recommendation_exclusions)),f=crm36FeatureMap(listing.feature_tags);
+  const fail=[];
+  if(e.has('반지하 제외')&&f.basement)fail.push('반지하 제외 조건');
+  if(e.has('옥탑 제외')&&f.rooftop)fail.push('옥탑 제외 조건');
+  if(e.has('1층 제외')&&f.first)fail.push('1층 제외 조건');
+  if(e.has('엘리베이터 필수')&&!f.elevator)fail.push('엘리베이터 없음');
+  if(e.has('주차 필수')&&!f.parking)fail.push('주차 불가');
+  if(e.has('반려동물 가능 필수')&&!f.pet)fail.push('반려동물 가능 미확인');
+  return {ok:!fail.length,fail};
+}
+
+const crm36BaseEvaluate=evaluateListingMatch;
+evaluateListingMatch=function(customer,listing){
+  const exclusion=crm36PassExclusions(customer,listing);
+  if(!exclusion.ok)return {matched:false,reasons:exclusion.fail};
+  return crm36BaseEvaluate(customer,listing);
+};
+
+async function crm36LoadRecommendations(customerId){
+  let q=state.client.from('customer_listing_recommendations').select('*, listing:listings(*), creator:profiles!customer_listing_recommendations_created_by_fkey(full_name)').order('created_at',{ascending:false});
+  if(customerId)q=q.eq('customer_id',customerId);
+  const {data,error}=await q;if(error){toast(error.message);return []}return data||[];
+}
+async function crm36SaveRecommendation(customerId,listingId){
+  const existing=await state.client.from('customer_listing_recommendations').select('id').eq('customer_id',customerId).eq('listing_id',listingId).maybeSingle();
+  if(existing.data)return toast('이미 이 고객에게 저장된 추천 매물입니다.');
+  const row={customer_id:customerId,listing_id:listingId,created_by:state.profile.id,reaction_status:'추천함'};
+  const {error}=await state.client.from('customer_listing_recommendations').insert(row);if(error)return toast(error.message);
+  await state.client.from('interaction_history').insert({created_by:state.profile.id,follow_up_date:today(),contact_method:'매물추천',content:`추천 매물 저장: ${state.listings.find(x=>x.id===listingId)?.title||'매물'}`,customer_id:customerId});
+  toast('추천 매물을 FU에 저장했습니다.');
+}
+async function crm36SetReaction(id,customerId){
+  const row=state.savedRecommendations.find(x=>x.id===id)||{};
+  $('#modalTitle').textContent='고객 반응·방문 일정';
+  $('#modalBody').innerHTML=`<div class="form-grid"><label>고객 반응<select id="crm36Reaction">${['추천함','관심 있음','방문 희망','가격 부담','방 개수 부족','월세 부담','위치 불만','거절','보류','계약 검토'].map(x=>`<option ${row.reaction_status===x?'selected':''}>${x}</option>`).join('')}</select></label><label>방문 상태<select id="crm36VisitStatus"><option value="">미등록</option>${['방문 예정','방문 완료','일정 변경','방문 취소'].map(x=>`<option ${row.visit_status===x?'selected':''}>${x}</option>`).join('')}</select></label><label>방문 날짜·시간<input id="crm36VisitAt" type="datetime-local" value="${row.visit_at?new Date(row.visit_at).toISOString().slice(0,16):''}"></label><label class="span-2">고객 반응·방문 결과<textarea id="crm36ReactionNote" rows="6" placeholder="고객이 좋게 본 점, 부담스러운 점, 다음 제안 방향 등을 기록하세요.">${escapeHtml(row.reaction_note||row.visit_result||'')}</textarea></label></div>`;
+  $('#modalSubmit').style.display='';$('#modalSubmit').onclick=async e=>{e.preventDefault();const payload={reaction_status:$('#crm36Reaction').value,reaction_note:$('#crm36ReactionNote').value||null,visit_status:$('#crm36VisitStatus').value||null,visit_at:$('#crm36VisitAt').value?new Date($('#crm36VisitAt').value).toISOString():null,visit_result:$('#crm36ReactionNote').value||null,updated_at:new Date().toISOString()};const {error}=await state.client.from('customer_listing_recommendations').update(payload).eq('id',id);if(error)return toast(error.message);const listingTitle=row.listing?.title||'추천 매물';const details=[`고객 반응: ${payload.reaction_status}`,payload.visit_status?`방문 상태: ${payload.visit_status}`:'',payload.visit_at?`방문 일정: ${new Date(payload.visit_at).toLocaleString('ko-KR')}`:'',payload.reaction_note?`내용: ${payload.reaction_note}`:''].filter(Boolean).join('\n');await state.client.from('interaction_history').insert({created_by:state.profile.id,follow_up_date:today(),contact_method:payload.visit_status?'방문일정':'추천반응',content:`${listingTitle}\n${details}`,customer_id:customerId});$('#modal').close();toast('FU에 고객 반응과 방문 일정을 저장했습니다.');openHistoryModal('customer',customerId)};$('#modal').showModal();
+}
+async function crm36DeleteRecommendation(id,customerId){if(!confirm('이 추천 기록을 삭제할까요?'))return;const {error}=await state.client.from('customer_listing_recommendations').delete().eq('id',id);if(error)return toast(error.message);toast('추천 기록을 삭제했습니다.');openHistoryModal('customer',customerId)}
+
+const crm36BaseHistory=openHistoryModal;
+openHistoryModal=async function(entityType,id){
+  await crm36BaseHistory(entityType,id);
+  if(entityType!=='customer')return;
+  state.savedRecommendations=await crm36LoadRecommendations(id);
+  const body=$('#modalBody');if(!body)return;
+  const section=document.createElement('section');section.className='crm36-fu-recommendations';
+  section.innerHTML=`<div class="panel-head"><div><h3>추천 매물·고객 반응·방문 일정</h3><div class="muted">추천 이후 반응과 방문 결과를 FU와 함께 관리합니다.</div></div></div>${state.savedRecommendations.length?`<div class="crm36-recommendation-list">${state.savedRecommendations.map(r=>`<article class="crm36-recommendation-item"><div><strong>${escapeHtml(r.listing?.title||'삭제된 매물')}</strong><div class="muted">${escapeHtml(r.listing?.transaction_type||'')} ${r.listing?listingPriceText(r.listing):''} · ${fmtDate(r.created_at)}</div><div class="crm36-status-line">${badge(r.reaction_status||'추천함','blue')} ${r.visit_status?badge(r.visit_status,r.visit_status==='방문 완료'?'green':'yellow'):''}</div>${r.visit_at?`<div class="next-fu">방문 일정 · ${new Date(r.visit_at).toLocaleString('ko-KR')}</div>`:''}${r.reaction_note?`<p>${escapeHtml(r.reaction_note).replace(/\n/g,'<br>')}</p>`:''}</div><div class="row-actions"><button class="primary" onclick="crm36SetReaction('${r.id}','${id}')">반응·방문 관리</button><button class="danger" onclick="crm36DeleteRecommendation('${r.id}','${id}')">삭제</button></div></article>`).join('')}</div>`:'<div class="empty">저장된 추천 매물이 없습니다.</div>'}`;
+  body.prepend(section);
+};
+
+const crm36BaseShowMatches=showCustomerMatches;
+showCustomerMatches=async function(){
+  await crm36BaseShowMatches();
+  const customerId=$('#matchCustomer')?.value;if(!customerId)return;
+  $$('#matchResults .match-card').forEach((card,i)=>{const check=card.querySelector('input[type=checkbox]');const listingId=check?.getAttribute('onchange')?.match(/'([^']+)'/)?.[1];if(!listingId)return;const actions=document.createElement('div');actions.className='row-actions crm36-match-actions';actions.innerHTML=`<button class="success" onclick="crm36SaveRecommendation('${customerId}','${listingId}')">FU에 추천 저장</button><button class="ghost" onclick="crm36QuickVisit('${customerId}','${listingId}')">방문 일정</button>`;card.appendChild(actions)});
+  const toolbar=$('#matchResults .match-toolbar');if(toolbar)toolbar.insertAdjacentHTML('beforeend',`<button class="success" onclick="crm36KakaoMessage('${customerId}')">카카오톡 추천문구</button>`);
+};
+async function crm36QuickVisit(customerId,listingId){
+  const {data,error}=await state.client.from('customer_listing_recommendations').select('*').eq('customer_id',customerId).eq('listing_id',listingId).maybeSingle();if(error)return toast(error.message);
+  if(data){state.savedRecommendations=[{...data,listing:state.listings.find(x=>x.id===listingId)}];return crm36SetReaction(data.id,customerId)}
+  const {data:inserted,error:insertError}=await state.client.from('customer_listing_recommendations').insert({customer_id:customerId,listing_id:listingId,created_by:state.profile.id,reaction_status:'방문 희망'}).select().single();if(insertError)return toast(insertError.message);state.savedRecommendations=[{...inserted,listing:state.listings.find(x=>x.id===listingId)}];crm36SetReaction(inserted.id,customerId)
+}
+function crm36KakaoMessage(customerId){
+  const customer=state.customers.find(x=>x.id===customerId);const rows=state.listings.filter(x=>state.matchSelection.has(x.id));if(!rows.length)return toast('카카오톡 문구에 넣을 매물을 먼저 체크하세요.');
+  const lines=[`안녕하세요, ${customer.name} 고객님.`,`말씀해주신 조건을 기준으로 현재 확인 가능한 매물 중 비교해보실 만한 매물을 정리해드렸습니다.`,``,`[고객님 희망 조건]`,`• 거래유형: ${customer.deal_type||customer.customer_type}`,`• 희망금액: ${fmtMoney(customer.budget_max)}`,`• 희망 방 개수: ${customerRoomText(customer)}`,customer.desired_monthly_rent?`• 희망 월세: 월 ${fmtMoney(customer.desired_monthly_rent)}`:'',``,`[추천 매물 ${rows.length}건]`].filter(Boolean);
+  rows.forEach((x,i)=>{lines.push(``,`${i+1}. ${x.title}`,`• 거래조건: ${x.transaction_type} ${listingPriceText(x)}`,`• 구조: 방 ${listingRoomText(x)} / 욕실 ${x.bathroom_count??'-'}개`,x.area_m2?`• 면적: ${x.area_m2}㎡`:'',x.district||x.address?`• 위치: ${[x.district,x.address].filter(Boolean).join(' ')}`:'',x.move_in_date?`• 입주 가능일: ${fmtDate(x.move_in_date)}`:'',x.description?`• 매물 특징: ${x.description}`:'').filter(Boolean)});
+  lines.push(``,`※ 매물은 실시간으로 계약되거나 조건이 변경될 수 있어 방문 전 현재 상태를 다시 확인해드리겠습니다.`,`관심 가는 매물 번호를 말씀해주시면 내부사진과 상세조건을 추가로 안내드리고, 가능한 시간에 맞춰 방문 일정도 잡아드리겠습니다.`,``,`담당 중개사: ${state.profile.full_name||''}`,state.profile.office_name?`소속: ${state.profile.office_name}`:'',state.profile.phone?`연락처: ${state.profile.phone}`:'');
+  const text=lines.filter(Boolean).join('\n');$('#modalTitle').textContent='카카오톡 추천 문구';$('#modalBody').innerHTML=`<textarea id="crm36KakaoText" rows="22" style="width:100%">${escapeHtml(text)}</textarea><div class="notice" style="margin-top:12px">고객에게 보내기 전에 실시간 거래 가능 여부와 금액 변동을 다시 확인하세요.</div>`;$('#modalSubmit').textContent='문구 복사';$('#modalSubmit').style.display='';$('#modalSubmit').onclick=async e=>{e.preventDefault();await navigator.clipboard.writeText($('#crm36KakaoText').value);toast('카카오톡 문구를 복사했습니다.');$('#modal').close()};const reset=()=>{$('#modalSubmit').textContent='저장';$('#modal').removeEventListener('close',reset)};$('#modal').addEventListener('close',reset);$('#modal').showModal();
+}
+
+async function crm36OpenCustomerExclusions(customerId){const c=state.customers.find(x=>x.id===customerId);const selected=new Set(crm36Array(c.recommendation_exclusions));$('#modalTitle').textContent=`${c.name} · 추천 제외 조건`;$('#modalBody').innerHTML=`<p class="muted">선택한 조건에 맞지 않는 매물은 자동추천과 역매칭에서 제외됩니다.</p><div class="crm36-check-grid">${CRM36_EXCLUSION_OPTIONS.map(x=>`<label class="inline-check"><input type="checkbox" value="${x}" ${selected.has(x)?'checked':''}> ${x}</label>`).join('')}</div>`;$('#modalSubmit').style.display='';$('#modalSubmit').onclick=async e=>{e.preventDefault();const tags=[...$('#modalBody input:checked')].map(x=>x.value);const {error}=await state.client.from('customers').update({recommendation_exclusions:tags}).eq('id',customerId);if(error)return toast(error.message);$('#modal').close();toast('추천 제외 조건을 저장했습니다.');renderCustomers()};$('#modal').showModal()}
+async function crm36OpenListingFeatures(listingId){const l=state.listings.find(x=>x.id===listingId);const selected=new Set(crm36Array(l.feature_tags));$('#modalTitle').textContent=`${l.title} · 매물 특징`;$('#modalBody').innerHTML=`<p class="muted">추천 제외조건 판단에 사용될 매물 특징을 체크하세요.</p><div class="crm36-check-grid">${CRM36_LISTING_FEATURES.map(x=>`<label class="inline-check"><input type="checkbox" value="${x}" ${selected.has(x)?'checked':''}> ${x}</label>`).join('')}</div>`;$('#modalSubmit').style.display='';$('#modalSubmit').onclick=async e=>{e.preventDefault();const tags=[...$('#modalBody input:checked')].map(x=>x.value);const {error}=await state.client.from('listings').update({feature_tags:tags}).eq('id',listingId);if(error)return toast(error.message);$('#modal').close();toast('매물 특징을 저장했습니다.');state.view==='adminListings'?renderAdminListings():renderMyListings()};$('#modal').showModal()}
+
+const crm36BaseRenderCustomers=renderCustomers;
+renderCustomers=async function(){await crm36BaseRenderCustomers();$$('#customerTable tbody tr').forEach((tr,i)=>{const c=(state.filteredCustomers||state.customers)[i];if(!c)return;const cell=tr.lastElementChild;const box=cell?.querySelector('.row-actions');if(box)box.insertAdjacentHTML('beforeend',`<button class="ghost" onclick="crm36OpenCustomerExclusions('${c.id}')">추천 제외조건</button>`)});};
+
+const crm36BaseListingTable=renderListingTable;
+renderListingTable=function(rows,target,mine,adminMode=false){crm36BaseListingTable(rows,target,mine,adminMode);const trs=$$('#'+target+' tbody tr');trs.forEach((tr,i)=>{const l=rows[i];if(!l)return;const title=tr.querySelector('.listing-title-cell');if(title){const tags=crm36Array(l.feature_tags);if(tags.length)title.insertAdjacentHTML('beforeend',`<div class="crm36-feature-tags">${tags.map(x=>`<span>${escapeHtml(x)}</span>`).join('')}</div>`)}const action=tr.lastElementChild?.querySelector('.row-actions');if(action&&(mine||adminMode)){action.insertAdjacentHTML('beforeend',`<button class="ghost" onclick="crm36OpenListingFeatures('${l.id}')">매물 특징</button><button class="success" onclick="crm36ReverseMatch('${l.id}')">고객 찾기</button><button class="ghost" onclick="crm36ConfirmListing('${l.id}')">확인 전화</button><button class="ghost" onclick="crm36PriceHistory('${l.id}')">가격 이력</button>`)}})};
+
+async function crm36ConfirmListing(listingId){const l=state.listings.find(x=>x.id===listingId);$('#modalTitle').textContent=`${l.title} · 매물 확인 전화`;$('#modalBody').innerHTML=`<div class="form-grid"><label>확인 결과<select id="crm36ConfirmResult"><option>거래 가능</option><option>가격 변경</option><option>협의 중</option><option>거래 완료</option><option>연락 안 됨</option><option>재확인 필요</option></select></label><label>다음 확인일<input id="crm36NextConfirm" type="date" value="${dateInDays(14)}"></label><label>확인한 가격(만원)<input id="crm36ConfirmPrice" type="number" value="${l.price??''}"></label><label>확인한 월세(만원)<input id="crm36ConfirmRent" type="number" value="${l.monthly_rent??''}"></label><label class="span-2">통화 내용<textarea id="crm36ConfirmNote" rows="6" placeholder="임대인/매도인 통화 내용, 입주 가능일, 가격 협의 여부 등을 기록하세요."></textarea></label></div>`;$('#modalSubmit').style.display='';$('#modalSubmit').onclick=async e=>{e.preventDefault();const result=$('#crm36ConfirmResult').value,price=Number($('#crm36ConfirmPrice').value||0)||null,rent=Number($('#crm36ConfirmRent').value||0)||null,note=$('#crm36ConfirmNote').value;const {error}=await state.client.from('listing_confirmation_logs').insert({listing_id:listingId,confirmed_by:state.profile.id,result,note,confirmed_price:price,confirmed_monthly_rent:rent,next_confirm_at:$('#crm36NextConfirm').value||null});if(error)return toast(error.message);const update={last_confirmed_at:today(),next_confirm_at:$('#crm36NextConfirm').value||null};if(price!==null)update.price=price;if(l.transaction_type==='월세'&&rent!==null)update.monthly_rent=rent;if(result==='거래 완료')update.status='complete';else if(result==='협의 중')update.status='hold';else if(result==='거래 가능')update.status='available';await state.client.from('listings').update(update).eq('id',listingId);await state.client.from('interaction_history').insert({created_by:state.profile.id,follow_up_date:today(),contact_method:'매물확인',content:`확인 결과: ${result}\n${note||''}`,listing_id:listingId,next_follow_up_at:$('#crm36NextConfirm').value||null});$('#modal').close();toast('매물 확인 전화 기록을 저장했습니다.');renderMyListings()};$('#modal').showModal()}
+async function crm36PriceHistory(listingId){const l=state.listings.find(x=>x.id===listingId);const {data,error}=await state.client.from('listing_price_history').select('*, changer:profiles!listing_price_history_changed_by_fkey(full_name)').eq('listing_id',listingId).order('created_at',{ascending:false});if(error)return toast(error.message);$('#modalTitle').textContent=`${l.title} · 가격 변경 이력`;$('#modalBody').innerHTML=(data||[]).length?`<div class="history-list">${data.map(x=>`<article class="history-item"><div class="history-head"><strong>${new Date(x.created_at).toLocaleString('ko-KR')}</strong><span class="muted">${escapeHtml(x.changer?.full_name||'')}</span></div><p>${escapeHtml(x.transaction_type||l.transaction_type)} · ${fmtMoney(x.old_price)}${x.old_monthly_rent?` / 월 ${fmtMoney(x.old_monthly_rent)}`:''} → <strong>${fmtMoney(x.new_price)}${x.new_monthly_rent?` / 월 ${fmtMoney(x.new_monthly_rent)}`:''}</strong></p></article>`).join('')}</div>`:'<div class="empty">가격 변경 이력이 없습니다.</div>';$('#modalSubmit').style.display='none';const reset=()=>{$('#modalSubmit').style.display='';$('#modal').removeEventListener('close',reset)};$('#modal').addEventListener('close',reset);$('#modal').showModal()}
+async function crm36ReverseMatch(listingId){await loadCustomers();const l=state.listings.find(x=>x.id===listingId);const rows=state.customers.filter(x=>['매수','임차'].includes(x.customer_type)).map(c=>({c,m:evaluateListingMatch(c,l)})).filter(x=>x.m.matched).sort((a,b)=>(a.m.matchKind==='direct'?-1:1)-(b.m.matchKind==='direct'?-1:1));$('#modalTitle').textContent=`${l.title} · 맞는 고객 찾기`;$('#modalBody').innerHTML=rows.length?`<div class="crm36-reverse-list">${rows.map(({c,m})=>`<article class="crm36-reverse-item"><div><strong>${escapeHtml(c.name)}</strong> ${gradeBadge(c.customer_grade)}<div class="muted">${escapeHtml(c.deal_type||c.customer_type)} · 희망 ${fmtMoney(c.budget_max)} · 방 ${customerRoomText(c)}</div><div class="match-reason">${m.reasons.map(r=>`<div>• ${escapeHtml(r)}</div>`).join('')}</div></div><div class="row-actions"><button class="success" onclick="crm36SaveRecommendation('${c.id}','${l.id}')">FU에 추천 저장</button><button class="ghost" onclick="crm36QuickVisit('${c.id}','${l.id}')">방문 일정</button></div></article>`).join('')}</div>`:'<div class="empty">현재 조건에 맞는 고객이 없습니다.</div>';$('#modalSubmit').style.display='none';const reset=()=>{$('#modalSubmit').style.display='';$('#modal').removeEventListener('close',reset)};$('#modal').addEventListener('close',reset);$('#modal').showModal()}
+
+const crm36BaseDashboard=renderDashboard;
+renderDashboard=async function(){await crm36BaseDashboard();const recent=state.listings.filter(x=>x.is_public&&x.status==='available'&&x.created_at&&Date.now()-new Date(x.created_at).getTime()<=7*86400000);let matchCount=0;for(const l of recent){if(state.customers.some(c=>['매수','임차'].includes(c.customer_type)&&evaluateListingMatch(c,l).matched))matchCount++}const panel=document.createElement('div');panel.className='panel crm36-new-alert';panel.innerHTML=`<div class="panel-head"><div><h3>신규 추천 가능 매물</h3><div class="muted">최근 7일 등록된 공개 매물 중 내 고객 조건에 맞는 매물</div></div><strong class="crm36-alert-count">${matchCount}건</strong></div>${recent.slice(0,8).map(l=>`<div class="list-item"><div><strong>${escapeHtml(l.title)}</strong><div class="muted">${l.transaction_type} ${listingPriceText(l)} · 방 ${listingRoomText(l)}</div></div><button class="ghost" onclick="crm36ReverseMatch('${l.id}')">맞는 고객</button></div>`).join('')||'<div class="empty">최근 7일 신규 매물이 없습니다.</div>'}`;$('#content').appendChild(panel)};
+
+Object.assign(window,{crm36SaveRecommendation,crm36SetReaction,crm36DeleteRecommendation,crm36QuickVisit,crm36KakaoMessage,crm36OpenCustomerExclusions,crm36OpenListingFeatures,crm36ConfirmListing,crm36PriceHistory,crm36ReverseMatch});
+console.info('CRM v3.6 영업 FU·역매칭·알림 로드 완료');
+
+/* v3.6 customer filter action persistence fix */
+const crm36BaseFilterCustomers=filterCustomers;
+filterCustomers=function(){
+  crm36BaseFilterCustomers();
+  const q=($('#customerSearch')?.value||'').toLowerCase(),t=$('#customerType')?.value||'',s=$('#customerStatus')?.value||'',d=$('#customerDealType')?.value||'',g=$('#customerGrade')?.value||'';
+  const rows=state.customers.filter(x=>(!q||`${x.name} ${x.phone}`.toLowerCase().includes(q))&&(!t||x.customer_type===t)&&(!s||x.status===s)&&(!d||x.deal_type===d)&&(!g||x.customer_grade===g));
+  $$('#customerTable tbody tr').forEach((tr,i)=>{const c=rows[i];if(!c)return;const box=tr.lastElementChild?.querySelector('.row-actions');if(box&&!box.querySelector('[data-crm36-exclusion]'))box.insertAdjacentHTML('beforeend',`<button data-crm36-exclusion class="ghost" onclick="crm36OpenCustomerExclusions('${c.id}')">추천 제외조건</button>`)});
+};
+Object.assign(window,{openHistoryModal,showCustomerMatches,filterCustomers});
