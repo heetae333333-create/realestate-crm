@@ -1135,6 +1135,8 @@ async function crm37OpenQuickListing(){
   $('#modalSubmit').style.display='';$('#modalSubmit').onclick=async e=>{e.preventDefault();const tx=$('#qListingTx').value,rooms=Number($('#qListingRooms').value||0),address=$('#qListingAddress').value.trim();const payload={owner_id:state.profile.id,title:$('#qListingTitle').value.trim(),transaction_type:tx,property_type:$('#qListingType').value,price:$('#qListingPrice').value?Number($('#qListingPrice').value):null,monthly_rent:tx==='월세'&&$('#qListingRent').value?Number($('#qListingRent').value):null,room_count:rooms===1.5?1:(rooms||null),is_one_point_five_room:rooms===1.5,district:address,address,contact_phone:$('#qListingPhone').value.trim()||null,description:$('#qListingMemo').value||null,status:'available',is_public:true};if(!payload.title)return toast('매물명을 입력하세요.');const {error}=await state.client.from('listings').insert(payload);if(error)return toast(error.message);$('#modal').close();toast('매물을 빠르게 등록했습니다.');await loadListings();if(state.view==='myListings')renderMyListings();};$('#modal').showModal();
 }
 function crm37AddQuickActions(){
+  // 대시보드에는 본문 안의 빠른 등록 버튼만 표시하고, 상단 번개 버튼은 숨깁니다.
+  if(state.view==='dashboard') return;
   const top=$('#topActions');if(!top||top.querySelector('.crm37-quick-actions'))return;
   top.insertAdjacentHTML('afterbegin',`<span class="crm37-quick-actions"><button class="ghost" onclick="crm37OpenQuickCustomer()">⚡ 고객 빠른 등록</button><button class="ghost" onclick="crm37OpenQuickListing()">⚡ 매물 빠른 등록</button></span>`);
 }
