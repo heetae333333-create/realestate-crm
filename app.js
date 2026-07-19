@@ -554,14 +554,20 @@ function evaluateListingMatch(customer,listing){
     return {matched:true,category:'추천',matchKind:'direct',reasons,sortValue:budget?Math.abs(listingPrice-budget):listingPrice};
   }
 
-  // 전세 고객에게 월세 대체 추천: 월세 보증금이 희망 전세금의 120% 이하
+  // 전세 고객에게 월세 대체 추천
+  // 월세를 전세금처럼 비교하기 위해 '보증금 + 월세×100'으로 간편 환산한다.
+  // 예: 전세 희망 15,000만원 ↔ 월세 12,000/30은 12,000 + 30×100 = 15,000만원으로 추천.
   if(customerTypes.includes('전세')&&listing.transaction_type==='월세'){
+    const converted=listingPrice+(listingRent*100);
     const ceiling=budget?budget*1.2:0;
-    if(ceiling&&listingPrice>ceiling)return {matched:false,reasons:['월세 보증금이 전세 희망금액 한도 초과']};
+    if(ceiling&&converted>ceiling)return {matched:false,reasons:['월세 전세환산금액이 희망 전세금 120% 한도 초과']};
     reasons.push('전세 고객에게 월세 매물 대체 추천');
-    reasons.push(`보증금 ${fmtMoney(listingPrice)}${budget?` / 희망 전세금 ${fmtMoney(budget)}의 ${ratioPercent(listingPrice,budget)}%`:''}`);
-    reasons.push(`월차임 ${fmtMoney(listingRent)} 별도`);
-    return {matched:true,category:'대체 추천',matchKind:'alternative',reasons,sortValue:budget?Math.abs(listingPrice-budget):listingPrice};
+    reasons.push(`월세 전세환산: 보증금 ${fmtMoney(listingPrice)} + 월세 ${fmtMoney(listingRent)}×100 = ${fmtMoney(converted)}`);
+    if(budget){
+      reasons.push(`희망 전세금 ${fmtMoney(budget)}의 ${ratioPercent(converted,budget)}%`);
+      reasons.push(`추천 한도 ${fmtMoney(Math.round(ceiling))} 이내`);
+    }
+    return {matched:true,category:'대체 추천',matchKind:'alternative',reasons,sortValue:budget?Math.abs(converted-budget):converted};
   }
 
   // 월세 고객: 보증금 120% 이하 + 월차임 130% 이하
@@ -598,7 +604,7 @@ function evaluateListingMatch(customer,listing){
 async function renderSmartMatch(){
   await Promise.all([loadCustomers(),loadListings()]);
   const demand=state.customers.filter(x=>['매수','임차'].includes(x.customer_type));
-  $('#content').innerHTML=`<div class="panel"><div class="notice"><strong>간편 추천 기준</strong><br>지역은 추천 조건에서 제외하고 <b>방 개수와 금액</b>을 중심으로 추천합니다. 매매·전세는 희망금액의 120%까지, 월세는 보증금 120%와 월차임 130%까지 추천합니다. 전세 고객에게 월세, 월세 고객에게 전세 매물도 대체 추천합니다. 추천 사유는 중개사 화면에서만 보이며 고객용 소개서에는 포함되지 않습니다.</div><div class="filters" style="margin-top:16px"><select id="matchCustomer" onchange="showCustomerMatches()"><option value="">고객 선택</option>${demand.map(x=>`<option value="${x.id}">${escapeHtml(x.name)} · ${escapeHtml(x.deal_type||x.customer_type)} · 방 ${customerRoomText(x)} · ${fmtMoney(x.budget_max)}</option>`).join('')}</select><button class="ghost" onclick="renderView('customers')">고객 관리</button></div><div id="matchResults" class="empty">고객을 선택하면 방 개수와 금액 조건에 맞는 공개 매물을 추천합니다.</div></div>`;
+  $('#content').innerHTML=`<div class="panel"><div class="notice"><strong>간편 추천 기준</strong><br>지역은 추천 조건에서 제외하고 <b>방 개수와 금액</b>을 중심으로 추천합니다. 매매·전세는 희망금액의 120%까지, 월세는 보증금 120%와 월차임 130%까지 추천합니다. 전세 고객에게 월세를 추천할 때는 보증금+월세×100으로 전세환산하고, 월세 고객에게 전세도 대체 추천합니다. 추천 사유는 중개사 화면에서만 보이며 고객용 소개서에는 포함되지 않습니다.</div><div class="filters" style="margin-top:16px"><select id="matchCustomer" onchange="showCustomerMatches()"><option value="">고객 선택</option>${demand.map(x=>`<option value="${x.id}">${escapeHtml(x.name)} · ${escapeHtml(x.deal_type||x.customer_type)} · 방 ${customerRoomText(x)} · ${fmtMoney(x.budget_max)}</option>`).join('')}</select><button class="ghost" onclick="renderView('customers')">고객 관리</button></div><div id="matchResults" class="empty">고객을 선택하면 방 개수와 금액 조건에 맞는 공개 매물을 추천합니다.</div></div>`;
 }
 async function showCustomerMatches(){
   const customer=state.customers.find(x=>x.id===$('#matchCustomer').value);if(!customer)return;
@@ -692,7 +698,7 @@ renderListingPhotoGallery=async function(listing){
 async function updatePhotoMeta(id,key,value){const {error}=await state.client.from('listing_photos').update({[key]:value}).eq('id',id);if(error)return toast(error.message);toast('사진 정보를 저장했습니다.')}
 async function setCoverPhoto(listingId,photoId){const {error}=await state.client.from('listings').update({cover_photo_id:photoId}).eq('id',listingId);if(error)return toast(error.message);toast('대표사진을 지정했습니다.');await loadListings();const l=state.listings.find(x=>x.id===listingId);renderListingPhotoGallery(l)}
 
-console.info('CRM v3.3 간편 자동매칭 로드 완료');
+console.info('CRM v3.5 전월세 환산 자동매칭 로드 완료');
 
 /* ================= CRM v3.2 중개사별 엑셀 선택 관리 ================= */
 state.adminExcel = {
