@@ -2,6 +2,8 @@ const state = { client:null, session:null, profile:null, view:'dashboard', custo
 const $ = (s)=>document.querySelector(s);
 const $$ = (s)=>[...document.querySelectorAll(s)];
 const SUPA_URL_KEY='crm_supabase_url', SUPA_ANON_KEY='crm_supabase_anon';
+const DEFAULT_SUPABASE_URL='https://zcxxxqyntzlvyaakbnlq.supabase.co';
+const DEFAULT_SUPABASE_PUBLISHABLE_KEY='sb_publishable_k1lbkjVDKgYgxq_kp9lzsw_iNGSVbnJ';
 
 function toast(msg){const el=$('#toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2600)}
 function showOnly(id){['setupScreen','authScreen','pendingScreen','appScreen'].forEach(x=>$('#'+x).classList.toggle('hidden',x!==id))}
@@ -45,8 +47,8 @@ async function signedPhotoUrl(path){
 }
 
 function initClient(){
-  const url=localStorage.getItem(SUPA_URL_KEY), key=localStorage.getItem(SUPA_ANON_KEY);
-  if(!url||!key){showOnly('setupScreen');return false}
+  const url=DEFAULT_SUPABASE_URL;
+  const key=DEFAULT_SUPABASE_PUBLISHABLE_KEY;
   state.client=window.supabase.createClient(url,key);
   return true;
 }
@@ -461,8 +463,8 @@ $('#loginForm').onsubmit=async(e)=>{e.preventDefault();const {data,error}=await 
 $('#signupForm').onsubmit=async(e)=>{e.preventDefault();const email=$('#signupEmail').value,password=$('#signupPassword').value;const {data,error}=await state.client.auth.signUp({email,password,options:{data:{full_name:$('#signupName').value,office_name:$('#signupOffice').value,phone:$('#signupPhone').value}}});if(error)return toast(error.message);toast('가입 신청이 완료되었습니다.');if(data.session){state.session=data.session;await loadProfile()}else{$$('[data-auth-tab]')[0].click()}};
 $('#logoutBtn').onclick=$('#pendingLogoutBtn').onclick=async()=>{await state.client.auth.signOut();state.session=null;state.profile=null;showOnly('authScreen')};
 $('#pendingRefreshBtn').onclick=loadProfile;
-$('#saveSetupBtn').onclick=()=>{localStorage.setItem(SUPA_URL_KEY,$('#setupUrl').value.trim());localStorage.setItem(SUPA_ANON_KEY,$('#setupKey').value.trim());location.reload()};
-$('#clearSetupBtn').onclick=()=>{localStorage.removeItem(SUPA_URL_KEY);localStorage.removeItem(SUPA_ANON_KEY);toast('설정을 삭제했습니다.')};
+$('#saveSetupBtn').onclick=()=>{location.reload()};
+$('#clearSetupBtn').onclick=()=>{toast('Supabase 연결정보는 앱에 기본 설정되어 있습니다.')};
 $('#openSetupBtn').onclick=()=>showOnly('setupScreen');
 $$('.nav').forEach(b=>b.onclick=()=>renderView(b.dataset.view));
 $$('#modal [value="cancel"]').forEach(btn=>{btn.type='button';btn.onclick=()=>$('#modal').close('cancel')});
