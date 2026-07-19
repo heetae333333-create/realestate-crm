@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>공인중개사 공동매물 CRM</title>
-  <link rel="stylesheet" href="styles.css?v=361" />
+  <link rel="stylesheet" href="styles.css?v=362" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -58,9 +58,16 @@
 
   <section id="appScreen" class="hidden">
     <aside class="sidebar">
-      <div class="logo-area">
-        <div class="brand-mark small">중개</div>
-        <div><strong>공동매물 CRM</strong><span id="officeNameSide"></span></div>
+      <div class="logo-area" id="sidebarProfileArea">
+        <div class="sidebar-profile-image-wrap">
+          <div class="brand-mark small" id="sidebarProfileFallback">중개</div>
+          <img id="sidebarProfileImage" class="sidebar-profile-image hidden" alt="사무실 프로필 이미지" />
+        </div>
+        <div class="sidebar-profile-copy">
+          <strong id="sidebarProfileTitle">공동매물 CRM</strong>
+          <span id="sidebarProfileSubtitle">더퍼스트</span>
+        </div>
+        <button id="editSidebarProfileBtn" class="sidebar-profile-edit admin-only hidden" type="button" title="프로필 영역 수정">⚙</button>
       </div>
       <nav id="navMenu">
         <div class="nav-section-label">일반 업무</div>
@@ -111,6 +118,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="app.js?v=361"></script>
+  <script src="app.js?v=362"></script>
 </body>
 </html>

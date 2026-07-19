@@ -67,7 +67,6 @@ async function loadProfile(){
   state.profile=data;
   if(data.status!=='approved'){showOnly('pendingScreen');return}
   showOnly('appScreen');
-  $('#officeNameSide').textContent=data.office_name||'';
   $('#userBadge').innerHTML=`<strong>${escapeHtml(data.full_name)}</strong><div class="muted">${data.role==='admin'?'관리자':'공인중개사'}</div>`;
   $$('.admin-only').forEach(el=>el.classList.toggle('hidden',data.role!=='admin'));
   renderView('dashboard');
@@ -1006,3 +1005,95 @@ async function crm361OpenListingFu(id){
 openFollowUpModal=function(entityType,id){return entityType==='listing'?crm361OpenListingFu(id):crm361BaseOpenFollowUpModal(entityType,id)};
 Object.assign(window,{openFollowUpModal,crm361SetFuTab});
 console.info('CRM v3.6.1 간소화 FU 통합 로드 완료');
+
+
+/* ================= CRM v3.6.2 사이드바 프로필 관리 ================= */
+state.sidebarBranding=null;
+
+async function crm362LoadSidebarBranding(){
+  let data=null;
+  const {data:row,error}=await state.client.from('app_settings').select('*').eq('setting_key','sidebar_profile').maybeSingle();
+  if(!error&&row)data=row;
+  state.sidebarBranding=data||{title:'공동매물 CRM',subtitle:state.profile?.office_name||'더퍼스트',image_path:null};
+  crm362ApplySidebarBranding();
+}
+
+function crm362ApplySidebarBranding(){
+  const b=state.sidebarBranding||{};
+  const title=b.title||'공동매물 CRM';
+  const subtitle=b.subtitle||state.profile?.office_name||'더퍼스트';
+  $('#sidebarProfileTitle').textContent=title;
+  $('#sidebarProfileSubtitle').textContent=subtitle;
+  const img=$('#sidebarProfileImage'),fallback=$('#sidebarProfileFallback');
+  if(b.image_path){
+    const {data}=state.client.storage.from('crm-branding').getPublicUrl(b.image_path);
+    img.src=data?.publicUrl?`${data.publicUrl}?v=${encodeURIComponent(b.updated_at||Date.now())}`:'';
+    img.classList.toggle('hidden',!img.src);
+    fallback.classList.toggle('hidden',!!img.src);
+  }else{
+    img.removeAttribute('src');img.classList.add('hidden');fallback.classList.remove('hidden');
+  }
+}
+
+async function crm362OpenSidebarBranding(){
+  if(state.profile?.role!=='admin')return;
+  const b=state.sidebarBranding||{};
+  let previewUrl='';
+  if(b.image_path){const {data}=state.client.storage.from('crm-branding').getPublicUrl(b.image_path);previewUrl=data?.publicUrl||''}
+  $('#modalTitle').textContent='사이드바 프로필 수정';
+  $('#modalBody').innerHTML=`
+    <div class="form-grid">
+      <label class="span-2">위쪽 제목<input id="brandingTitle" maxlength="30" value="${escapeHtml(b.title||'공동매물 CRM')}" placeholder="예: 더퍼스트 공동매물 CRM"></label>
+      <label class="span-2">아래 문구<input id="brandingSubtitle" maxlength="40" value="${escapeHtml(b.subtitle||state.profile.office_name||'')}" placeholder="예: 더퍼스트 부동산"></label>
+      <label class="span-2">프로필 사진<input id="brandingImageFile" type="file" accept="image/png,image/jpeg,image/webp"><span class="field-help">정사각형 이미지 권장 · 최대 5MB · PNG/JPG/WEBP</span></label>
+      <div class="span-2 branding-preview">
+        ${previewUrl?`<img id="brandingCurrentPreview" src="${previewUrl}" alt="현재 프로필 이미지">`:`<div id="brandingCurrentPreview" class="branding-preview-fallback">중개</div>`}
+        <div><strong>현재 표시 미리보기</strong><div class="muted">제목과 문구는 저장 후 모든 직원 화면에 동일하게 적용됩니다.</div>${b.image_path?'<label class="branding-remove-row"><input id="brandingRemoveImage" type="checkbox"> 현재 사진 삭제</label>':''}</div>
+      </div>
+    </div>`;
+  const fileInput=$('#brandingImageFile');
+  fileInput.onchange=()=>{const f=fileInput.files?.[0];if(!f)return;const url=URL.createObjectURL(f);const old=$('#brandingCurrentPreview');const img=document.createElement('img');img.id='brandingCurrentPreview';img.src=url;img.alt='새 프로필 이미지 미리보기';old.replaceWith(img)};
+  $('#modalSubmit').style.display='';
+  $('#modalSubmit').onclick=crm362SaveSidebarBranding;
+  $('#modal').showModal();
+}
+
+async function crm362SaveSidebarBranding(e){
+  e.preventDefault();
+  if(state.profile?.role!=='admin')return toast('관리자만 수정할 수 있습니다.');
+  const title=$('#brandingTitle').value.trim()||'공동매물 CRM';
+  const subtitle=$('#brandingSubtitle').value.trim();
+  const file=$('#brandingImageFile').files?.[0];
+  const remove=$('#brandingRemoveImage')?.checked;
+  if(file&&file.size>5*1024*1024)return toast('사진은 5MB 이하만 등록할 수 있습니다.');
+  let imagePath=state.sidebarBranding?.image_path||null;
+  if(remove&&imagePath){await state.client.storage.from('crm-branding').remove([imagePath]);imagePath=null}
+  if(file){
+    if(!file.type.startsWith('image/'))return toast('이미지 파일만 등록할 수 있습니다.');
+    if(imagePath)await state.client.storage.from('crm-branding').remove([imagePath]);
+    const ext=(file.name.split('.').pop()||'jpg').replace(/[^a-z0-9]/gi,'').toLowerCase()||'jpg';
+    imagePath=`sidebar/profile-${Date.now()}.${ext}`;
+    const {error:upError}=await state.client.storage.from('crm-branding').upload(imagePath,file,{upsert:true,contentType:file.type,cacheControl:'3600'});
+    if(upError)return toast(`사진 업로드 실패: ${upError.message}`);
+  }
+  const payload={setting_key:'sidebar_profile',title,subtitle,image_path:imagePath,updated_by:state.profile.id,updated_at:new Date().toISOString()};
+  const {data,error}=await state.client.from('app_settings').upsert(payload,{onConflict:'setting_key'}).select().single();
+  if(error)return toast(error.message);
+  state.sidebarBranding=data;
+  crm362ApplySidebarBranding();
+  $('#modal').close();
+  toast('사이드바 프로필을 변경했습니다.');
+}
+
+const crm362OriginalLoadProfile=loadProfile;
+loadProfile=async function(){
+  await crm362OriginalLoadProfile();
+  if(state.profile?.status==='approved')await crm362LoadSidebarBranding();
+};
+
+document.addEventListener('DOMContentLoaded',()=>{
+  const btn=$('#editSidebarProfileBtn');
+  if(btn)btn.addEventListener('click',crm362OpenSidebarBranding);
+});
+
+console.info('CRM v3.6.2 사이드바 프로필 관리 로드 완료');
