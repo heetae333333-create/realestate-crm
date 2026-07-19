@@ -156,3 +156,9 @@ button.small{padding:4px 7px;font-size:11px}
 .invalid-row{opacity:.58;background:#fff5f5}
 button:disabled{opacity:.45;cursor:not-allowed}
 @media(max-width:760px){.excel-agent-bar,.excel-import-controls,.excel-list-toolbar{align-items:stretch}.excel-agent-bar label,.excel-import-controls label{min-width:100%;max-width:none}.excel-agent-bar>button,.excel-list-toolbar .row-actions{width:100%}.excel-list-toolbar .row-actions button{flex:1}}
+
+
+/* CRM v3.3 간편 자동매칭 */
+.match-type.alternative{background:#fff7ed;color:#c2410c}
+.match-card.alternative-match{border-color:#fed7aa;background:#fffdf9}
+.match-card.alternative-match .match-reason{background:#fff7ed;border-color:#fed7aa}

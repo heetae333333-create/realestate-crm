@@ -478,7 +478,7 @@ renderView=async function(view){
   const custom={smartMatch:renderSmartMatch,globalSearch:renderGlobalSearch,documents:renderDocuments,adminStats:renderAdminStats,auditLogs:renderAuditLogs,customerTransfer:renderCustomerTransfer,adminData:renderAdminData};
   if(custom[view]){
     state.view=view;$$('.nav').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
-    const titles={smartMatch:['고객·매물 자동매칭','거래유형·지역·방 개수·금액 조건을 충족하는 매물만 추천'],globalSearch:['통합검색','고객·매물·연락처·주소·메모를 한 번에 검색'],documents:['계약서류','계약 관련 파일을 담당자와 관리자만 관리'],adminStats:['중개사 업무 통계','중개사별 고객·매물·계약·FU 현황'],auditLogs:['변경 기록','고객과 매물의 등록·수정·삭제 이력'],customerTransfer:['고객 선택 일괄 이관','여러 고객을 체크해 한 번에 담당자 변경'],adminData:['엑셀 데이터 관리','관리자만 고객·매물 엑셀 가져오기와 내보내기 가능']};
+    const titles={smartMatch:['고객·매물 자동매칭','지역과 무관하게 방 개수·금액 중심으로 추천'],globalSearch:['통합검색','고객·매물·연락처·주소·메모를 한 번에 검색'],documents:['계약서류','계약 관련 파일을 담당자와 관리자만 관리'],adminStats:['중개사 업무 통계','중개사별 고객·매물·계약·FU 현황'],auditLogs:['변경 기록','고객과 매물의 등록·수정·삭제 이력'],customerTransfer:['고객 선택 일괄 이관','여러 고객을 체크해 한 번에 담당자 변경'],adminData:['엑셀 데이터 관리','관리자만 고객·매물 엑셀 가져오기와 내보내기 가능']};
     $('#pageTitle').textContent=titles[view][0];$('#pageSubtitle').textContent=titles[view][1];$('#topActions').innerHTML='';
     await custom[view]();return;
   }
@@ -502,66 +502,83 @@ renderDashboard=async function(){
 function customerDealTypes(customer){
   return String(customer.deal_type||'').split('+').map(x=>x.trim()).filter(Boolean);
 }
-function areaMatches(customer,listing){
-  const area=normalizeText(customer.preferred_area);
-  if(!area)return true;
-  const addr=normalizeText(`${listing.district||''} ${listing.address||''}`);
-  const tokens=area.split(/[,/\s]+/).filter(Boolean);
-  return tokens.some(token=>addr.includes(token));
-}
 function roomMatches(customer,listing){
   const wanted=moneyNumber(customer.desired_rooms);
   if(!wanted)return true;
   return moneyNumber(listing.room_count)>=wanted;
 }
-function jeonseEquivalent(listing){
-  // 실무상 빠른 비교를 위한 단순 환산: 보증금 + 월세 × 100
-  return moneyNumber(listing.price)+(moneyNumber(listing.monthly_rent)*100);
+function ratioPercent(actual,base){
+  if(!base)return 0;
+  return Math.round((actual/base)*1000)/10;
 }
 function evaluateListingMatch(customer,listing){
   const customerTypes=customerDealTypes(customer);
   const budget=moneyNumber(customer.budget_max);
   const wantedRent=moneyNumber(customer.desired_monthly_rent);
+  const listingPrice=moneyNumber(listing.price);
+  const listingRent=moneyNumber(listing.monthly_rent);
   const reasons=[];
 
-  if(!areaMatches(customer,listing))return {matched:false,reasons:['희망지역 불일치']};
-  if(customer.preferred_area)reasons.push(`희망지역 일치: ${customer.preferred_area}`);
-
+  // 지역은 자동매칭 조건에서 제외하고 참고정보로만 표시한다.
   if(!roomMatches(customer,listing))return {matched:false,reasons:[`방 개수 부족: 희망 ${customer.desired_rooms}개 / 매물 ${listing.room_count??0}개`]};
   if(customer.desired_rooms)reasons.push(`방 개수 충족: 희망 ${customer.desired_rooms}개 / 매물 ${listing.room_count??'-'}개`);
+  else reasons.push('희망 방 개수 미입력: 금액 기준으로 추천');
 
-  // 매매 고객
+  // 매매 고객: 희망금액의 120% 이하 매매 매물
   if(customerTypes.includes('매매')&&listing.transaction_type==='매매'){
-    if(budget&&moneyNumber(listing.price)>budget)return {matched:false,reasons:['매매 예산 초과']};
-    reasons.push(`매매 금액 충족: ${fmtMoney(listing.price)}${budget?` ≤ ${fmtMoney(budget)}`:''}`);
-    return {matched:true,category:'매매',reasons};
+    const ceiling=budget?budget*1.2:0;
+    if(ceiling&&listingPrice>ceiling)return {matched:false,reasons:['매매금액 120% 한도 초과']};
+    reasons.push(`매매금액 ${fmtMoney(listingPrice)}${budget?` / 희망 ${fmtMoney(budget)}의 ${ratioPercent(listingPrice,budget)}%`:''}`);
+    if(budget)reasons.push(`추천 한도 ${fmtMoney(Math.round(ceiling))} 이내`);
+    return {matched:true,category:'추천',matchKind:'direct',reasons,sortValue:budget?Math.abs(listingPrice-budget):listingPrice};
   }
 
-  // 전세 고객: 전세는 희망금액보다 5,000만원 높은 매물까지, 월세는 전세환산액으로 비교
-  if(customerTypes.includes('전세')){
-    const ceiling=budget?budget+5000:0;
-    if(listing.transaction_type==='전세'){
-      if(ceiling&&moneyNumber(listing.price)>ceiling)return {matched:false,reasons:['전세 허용금액 초과']};
-      reasons.push(`전세금 조건 충족: ${fmtMoney(listing.price)}${budget?` / 기준 ${fmtMoney(budget)} + 허용 5,000만원`:''}`);
-      return {matched:true,category:'전세',reasons};
-    }
-    if(listing.transaction_type==='월세'){
-      const equivalent=jeonseEquivalent(listing);
-      if(ceiling&&equivalent>ceiling)return {matched:false,reasons:['월세 전세환산액 초과']};
-      reasons.push(`월세 매물 전세환산 충족: 보증금 ${fmtMoney(listing.price)} + 월세 ${fmtMoney(listing.monthly_rent)}×100 = ${fmtMoney(equivalent)}`);
-      if(budget)reasons.push(`전세 기준 ${fmtMoney(budget)}에서 +5,000만원 범위 이내`);
-      return {matched:true,category:'전세환산 월세',reasons};
-    }
+  // 전세 고객: 전세는 희망금액의 120% 이하
+  if(customerTypes.includes('전세')&&listing.transaction_type==='전세'){
+    const ceiling=budget?budget*1.2:0;
+    if(ceiling&&listingPrice>ceiling)return {matched:false,reasons:['전세금 120% 한도 초과']};
+    reasons.push(`전세금 ${fmtMoney(listingPrice)}${budget?` / 희망 ${fmtMoney(budget)}의 ${ratioPercent(listingPrice,budget)}%`:''}`);
+    if(budget)reasons.push(`추천 한도 ${fmtMoney(Math.round(ceiling))} 이내`);
+    return {matched:true,category:'추천',matchKind:'direct',reasons,sortValue:budget?Math.abs(listingPrice-budget):listingPrice};
   }
 
-  // 월세 고객: 보증금은 희망 보증금 이내, 월차임은 희망 월세의 130% 이내
+  // 전세 고객에게 월세 대체 추천: 월세 보증금이 희망 전세금의 120% 이하
+  if(customerTypes.includes('전세')&&listing.transaction_type==='월세'){
+    const ceiling=budget?budget*1.2:0;
+    if(ceiling&&listingPrice>ceiling)return {matched:false,reasons:['월세 보증금이 전세 희망금액 한도 초과']};
+    reasons.push('전세 고객에게 월세 매물 대체 추천');
+    reasons.push(`보증금 ${fmtMoney(listingPrice)}${budget?` / 희망 전세금 ${fmtMoney(budget)}의 ${ratioPercent(listingPrice,budget)}%`:''}`);
+    reasons.push(`월차임 ${fmtMoney(listingRent)} 별도`);
+    return {matched:true,category:'대체 추천',matchKind:'alternative',reasons,sortValue:budget?Math.abs(listingPrice-budget):listingPrice};
+  }
+
+  // 월세 고객: 보증금 120% 이하 + 월차임 130% 이하
   if(customerTypes.includes('월세')&&listing.transaction_type==='월세'){
-    if(budget&&moneyNumber(listing.price)>budget)return {matched:false,reasons:['월세 보증금 초과']};
-    const rentLimit=wantedRent?wantedRent*1.3:0;
-    if(rentLimit&&moneyNumber(listing.monthly_rent)>rentLimit)return {matched:false,reasons:['월차임 130% 한도 초과']};
-    reasons.push(`보증금 충족: ${fmtMoney(listing.price)}${budget?` ≤ ${fmtMoney(budget)}`:''}`);
-    reasons.push(`월차임 충족: ${fmtMoney(listing.monthly_rent)}${wantedRent?` ≤ 희망 ${fmtMoney(wantedRent)}의 130% (${fmtMoney(Math.round(rentLimit))})`:''}`);
-    return {matched:true,category:'월세',reasons};
+    const depositCeiling=budget?budget*1.2:0;
+    const rentCeiling=wantedRent?wantedRent*1.3:0;
+    if(depositCeiling&&listingPrice>depositCeiling)return {matched:false,reasons:['월세 보증금 120% 한도 초과']};
+    if(rentCeiling&&listingRent>rentCeiling)return {matched:false,reasons:['월차임 130% 한도 초과']};
+    reasons.push(`보증금 ${fmtMoney(listingPrice)}${budget?` / 희망 ${fmtMoney(budget)}의 ${ratioPercent(listingPrice,budget)}%`:''}`);
+    reasons.push(`월차임 ${fmtMoney(listingRent)}${wantedRent?` / 희망 ${fmtMoney(wantedRent)}의 ${ratioPercent(listingRent,wantedRent)}%`:''}`);
+    if(budget)reasons.push(`보증금 한도 ${fmtMoney(Math.round(depositCeiling))} 이내`);
+    if(wantedRent)reasons.push(`월차임 한도 ${fmtMoney(Math.round(rentCeiling))} 이내`);
+    return {matched:true,category:'추천',matchKind:'direct',reasons,sortValue:(budget?Math.abs(listingPrice-budget):listingPrice)+(wantedRent?Math.abs(listingRent-wantedRent)*100:0)};
+  }
+
+  // 월세 고객에게 전세 대체 추천: 희망 보증금 + 희망 월세×100을 전세환산한 뒤 120% 이하
+  if(customerTypes.includes('월세')&&listing.transaction_type==='전세'){
+    const converted=budget+(wantedRent*100);
+    const ceiling=converted?converted*1.2:0;
+    if(ceiling&&listingPrice>ceiling)return {matched:false,reasons:['전세금이 월세 전세환산 한도 초과']};
+    reasons.push('월세 고객에게 전세 매물 대체 추천');
+    if(converted){
+      reasons.push(`월세 조건 전세환산: 보증금 ${fmtMoney(budget)} + 월세 ${fmtMoney(wantedRent)}×100 = ${fmtMoney(converted)}`);
+      reasons.push(`매물 전세금 ${fmtMoney(listingPrice)} / 환산 한도의 ${ratioPercent(listingPrice,converted)}%`);
+      reasons.push(`추천 한도 ${fmtMoney(Math.round(ceiling))} 이내`);
+    }else{
+      reasons.push(`매물 전세금 ${fmtMoney(listingPrice)}`);
+    }
+    return {matched:true,category:'대체 추천',matchKind:'alternative',reasons,sortValue:converted?Math.abs(listingPrice-converted):listingPrice};
   }
 
   return {matched:false,reasons:['거래유형 불일치']};
@@ -569,17 +586,19 @@ function evaluateListingMatch(customer,listing){
 async function renderSmartMatch(){
   await Promise.all([loadCustomers(),loadListings()]);
   const demand=state.customers.filter(x=>['매수','임차'].includes(x.customer_type));
-  $('#content').innerHTML=`<div class="panel"><div class="notice"><strong>추천 기준</strong><br>지역과 방 개수를 충족한 매물 중 거래유형별 금액 규칙을 적용합니다. 전세 고객에게 월세 매물을 추천할 때는 <b>보증금 + 월세×100</b>으로 전세환산합니다. 추천 사유는 로그인한 중개사 화면에서만 표시되며 고객용 소개서에는 포함되지 않습니다.</div><div class="filters" style="margin-top:16px"><select id="matchCustomer" onchange="showCustomerMatches()"><option value="">고객 선택</option>${demand.map(x=>`<option value="${x.id}">${escapeHtml(x.name)} · ${escapeHtml(x.deal_type||x.customer_type)} · ${escapeHtml(x.preferred_area||'지역미정')}</option>`).join('')}</select><button class="ghost" onclick="renderView('customers')">고객 관리</button></div><div id="matchResults" class="empty">고객을 선택하면 조건을 충족하는 공개 매물만 추천합니다.</div></div>`;
+  $('#content').innerHTML=`<div class="panel"><div class="notice"><strong>간편 추천 기준</strong><br>지역은 추천 조건에서 제외하고 <b>방 개수와 금액</b>을 중심으로 추천합니다. 매매·전세는 희망금액의 120%까지, 월세는 보증금 120%와 월차임 130%까지 추천합니다. 전세 고객에게 월세, 월세 고객에게 전세 매물도 대체 추천합니다. 추천 사유는 중개사 화면에서만 보이며 고객용 소개서에는 포함되지 않습니다.</div><div class="filters" style="margin-top:16px"><select id="matchCustomer" onchange="showCustomerMatches()"><option value="">고객 선택</option>${demand.map(x=>`<option value="${x.id}">${escapeHtml(x.name)} · ${escapeHtml(x.deal_type||x.customer_type)} · 방 ${x.desired_rooms||'미정'} · ${fmtMoney(x.budget_max)}</option>`).join('')}</select><button class="ghost" onclick="renderView('customers')">고객 관리</button></div><div id="matchResults" class="empty">고객을 선택하면 방 개수와 금액 조건에 맞는 공개 매물을 추천합니다.</div></div>`;
 }
 async function showCustomerMatches(){
   const customer=state.customers.find(x=>x.id===$('#matchCustomer').value);if(!customer)return;
   state.matchSelection.clear();
   const rows=state.listings.filter(x=>x.is_public&&x.status==='available').map(x=>({...x,_match:evaluateListingMatch(customer,x)})).filter(x=>x._match.matched).sort((a,b)=>{
-    const roomA=moneyNumber(a.room_count)-moneyNumber(customer.desired_rooms),roomB=moneyNumber(b.room_count)-moneyNumber(customer.desired_rooms);
+    if(a._match.matchKind!==b._match.matchKind)return a._match.matchKind==='direct'?-1:1;
+    const roomA=Math.max(0,moneyNumber(a.room_count)-moneyNumber(customer.desired_rooms));
+    const roomB=Math.max(0,moneyNumber(b.room_count)-moneyNumber(customer.desired_rooms));
     if(roomA!==roomB)return roomA-roomB;
-    return moneyNumber(a.price)-moneyNumber(b.price);
+    return (a._match.sortValue||0)-(b._match.sortValue||0);
   });
-  $('#matchResults').innerHTML=`<div class="match-toolbar"><strong>${escapeHtml(customer.name)} 조건 충족 매물 ${rows.length}개</strong><button class="primary" onclick="printSelectedListingBrochure('${customer.id}')">선택 매물 소개서 인쇄/PDF</button></div>${rows.length?`<div class="match-grid">${rows.map(x=>`<article class="match-card"><label class="check-label"><input type="checkbox" onchange="toggleMatchSelection('${x.id}',this.checked)"> 소개서 선택</label><div class="match-type">${escapeHtml(x._match.category)}</div><h3>${escapeHtml(x.title)}</h3><div class="match-reason"><strong>중개사 추천 사유</strong>${x._match.reasons.map(r=>`<div>• ${escapeHtml(r)}</div>`).join('')}</div><p>${escapeHtml(x.district||'')} · ${escapeHtml(x.transaction_type)} · ${listingPriceText(x)}</p><p>방 ${x.room_count??'-'} / 욕실 ${x.bathroom_count??'-'}</p><button class="ghost" onclick="openListingPhotos('${x.id}')">사진 보기</button></article>`).join('')}</div>`:'<div class="empty">현재 조건을 모두 충족하는 공개 매물이 없습니다.</div>'}`;
+  $('#matchResults').innerHTML=`<div class="match-toolbar"><strong>${escapeHtml(customer.name)} 추천 매물 ${rows.length}개</strong><button class="primary" onclick="printSelectedListingBrochure('${customer.id}')">선택 매물 소개서 인쇄/PDF</button></div>${rows.length?`<div class="match-grid">${rows.map(x=>`<article class="match-card ${x._match.matchKind==='alternative'?'alternative-match':''}"><label class="check-label"><input type="checkbox" onchange="toggleMatchSelection('${x.id}',this.checked)"> 소개서 선택</label><div class="match-type ${x._match.matchKind==='alternative'?'alternative':''}">${escapeHtml(x._match.category)}</div><h3>${escapeHtml(x.title)}</h3><div class="match-reason"><strong>중개사 추천 사유</strong>${x._match.reasons.map(r=>`<div>• ${escapeHtml(r)}</div>`).join('')}</div><p>${escapeHtml(x.district||'')} · ${escapeHtml(x.transaction_type)} · ${listingPriceText(x)}</p><p>방 ${x.room_count??'-'} / 욕실 ${x.bathroom_count??'-'}</p><button class="ghost" onclick="openListingPhotos('${x.id}')">사진 보기</button></article>`).join('')}</div>`:'<div class="empty">현재 방 개수와 금액 조건에 맞는 공개 매물이 없습니다.</div>'}`;
 }
 function toggleMatchSelection(id,checked){checked?state.matchSelection.add(id):state.matchSelection.delete(id)}
 async function printSelectedListingBrochure(customerId){
@@ -661,7 +680,7 @@ renderListingPhotoGallery=async function(listing){
 async function updatePhotoMeta(id,key,value){const {error}=await state.client.from('listing_photos').update({[key]:value}).eq('id',id);if(error)return toast(error.message);toast('사진 정보를 저장했습니다.')}
 async function setCoverPhoto(listingId,photoId){const {error}=await state.client.from('listings').update({cover_photo_id:photoId}).eq('id',listingId);if(error)return toast(error.message);toast('대표사진을 지정했습니다.');await loadListings();const l=state.listings.find(x=>x.id===listingId);renderListingPhotoGallery(l)}
 
-console.info('CRM v3.1 관리자 데이터관리·정밀 자동매칭 로드 완료');
+console.info('CRM v3.3 간편 자동매칭 로드 완료');
 
 /* ================= CRM v3.2 중개사별 엑셀 선택 관리 ================= */
 state.adminExcel = {
