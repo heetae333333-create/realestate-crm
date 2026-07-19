@@ -134,3 +134,9 @@ button.small{padding:4px 7px;font-size:11px}
   .sidebar nav{overflow:visible;padding-right:0;padding-bottom:0}
   .sidebar-footer{border-top:0;padding-top:0}
 }
+
+
+/* CRM v3.1 정밀 자동매칭 */
+.match-type{display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;background:#eaf2ff;color:#1d4ed8;font-weight:800;font-size:12px;margin:8px 0}
+.match-reason{background:#f8fafc;border:1px solid #dbe4ef;border-radius:12px;padding:12px;margin:10px 0;font-size:13px;line-height:1.6;color:#334155}
+.match-reason strong{display:block;color:#0f172a;margin-bottom:4px}

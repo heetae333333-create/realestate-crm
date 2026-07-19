@@ -475,10 +475,10 @@ function moneyNumber(v){const n=Number(v);return Number.isFinite(n)?n:0}
 
 const v300OriginalRenderView=renderView;
 renderView=async function(view){
-  const custom={smartMatch:renderSmartMatch,globalSearch:renderGlobalSearch,documents:renderDocuments,adminStats:renderAdminStats,auditLogs:renderAuditLogs,customerTransfer:renderCustomerTransfer};
+  const custom={smartMatch:renderSmartMatch,globalSearch:renderGlobalSearch,documents:renderDocuments,adminStats:renderAdminStats,auditLogs:renderAuditLogs,customerTransfer:renderCustomerTransfer,adminData:renderAdminData};
   if(custom[view]){
     state.view=view;$$('.nav').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
-    const titles={smartMatch:['고객·매물 자동매칭','지역·거래유형·예산·방 개수·월세 조건으로 추천'],globalSearch:['통합검색','고객·매물·연락처·주소·메모를 한 번에 검색'],documents:['계약서류','계약 관련 파일을 담당자와 관리자만 관리'],adminStats:['중개사 업무 통계','중개사별 고객·매물·계약·FU 현황'],auditLogs:['변경 기록','고객과 매물의 등록·수정·삭제 이력'],customerTransfer:['고객 선택 일괄 이관','여러 고객을 체크해 한 번에 담당자 변경']};
+    const titles={smartMatch:['고객·매물 자동매칭','거래유형·지역·방 개수·금액 조건을 충족하는 매물만 추천'],globalSearch:['통합검색','고객·매물·연락처·주소·메모를 한 번에 검색'],documents:['계약서류','계약 관련 파일을 담당자와 관리자만 관리'],adminStats:['중개사 업무 통계','중개사별 고객·매물·계약·FU 현황'],auditLogs:['변경 기록','고객과 매물의 등록·수정·삭제 이력'],customerTransfer:['고객 선택 일괄 이관','여러 고객을 체크해 한 번에 담당자 변경'],adminData:['엑셀 데이터 관리','관리자만 고객·매물 엑셀 가져오기와 내보내기 가능']};
     $('#pageTitle').textContent=titles[view][0];$('#pageSubtitle').textContent=titles[view][1];$('#topActions').innerHTML='';
     await custom[view]();return;
   }
@@ -499,25 +499,87 @@ renderDashboard=async function(){
   $('#content').appendChild(extra);
 };
 
-function matchScore(customer,listing){
-  let score=0,total=0,reasons=[];
-  total+=30;const area=normalizeText(customer.preferred_area),addr=normalizeText(`${listing.district} ${listing.address}`);if(!area||addr.includes(area)||area.split(/[,\s]+/).some(x=>x&&addr.includes(x))){score+=30;reasons.push('지역')}
-  total+=25;const deals=(customer.deal_type||'').split('+');if(!customer.deal_type||deals.includes(listing.transaction_type)){score+=25;reasons.push('거래유형')}
-  total+=20;if(!customer.budget_max||moneyNumber(listing.price)<=moneyNumber(customer.budget_max)){score+=20;reasons.push('금액')}
-  total+=15;if(!customer.desired_rooms||moneyNumber(listing.room_count)>=moneyNumber(customer.desired_rooms)){score+=15;reasons.push('방 개수')}
-  total+=10;if(!includesMonthly(customer.deal_type)||!customer.desired_monthly_rent||moneyNumber(listing.monthly_rent)<=moneyNumber(customer.desired_monthly_rent)){score+=10;reasons.push('월세')}
-  return {percent:Math.round(score/total*100),reasons};
+function customerDealTypes(customer){
+  return String(customer.deal_type||'').split('+').map(x=>x.trim()).filter(Boolean);
+}
+function areaMatches(customer,listing){
+  const area=normalizeText(customer.preferred_area);
+  if(!area)return true;
+  const addr=normalizeText(`${listing.district||''} ${listing.address||''}`);
+  const tokens=area.split(/[,/\s]+/).filter(Boolean);
+  return tokens.some(token=>addr.includes(token));
+}
+function roomMatches(customer,listing){
+  const wanted=moneyNumber(customer.desired_rooms);
+  if(!wanted)return true;
+  return moneyNumber(listing.room_count)>=wanted;
+}
+function jeonseEquivalent(listing){
+  // 실무상 빠른 비교를 위한 단순 환산: 보증금 + 월세 × 100
+  return moneyNumber(listing.price)+(moneyNumber(listing.monthly_rent)*100);
+}
+function evaluateListingMatch(customer,listing){
+  const customerTypes=customerDealTypes(customer);
+  const budget=moneyNumber(customer.budget_max);
+  const wantedRent=moneyNumber(customer.desired_monthly_rent);
+  const reasons=[];
+
+  if(!areaMatches(customer,listing))return {matched:false,reasons:['희망지역 불일치']};
+  if(customer.preferred_area)reasons.push(`희망지역 일치: ${customer.preferred_area}`);
+
+  if(!roomMatches(customer,listing))return {matched:false,reasons:[`방 개수 부족: 희망 ${customer.desired_rooms}개 / 매물 ${listing.room_count??0}개`]};
+  if(customer.desired_rooms)reasons.push(`방 개수 충족: 희망 ${customer.desired_rooms}개 / 매물 ${listing.room_count??'-'}개`);
+
+  // 매매 고객
+  if(customerTypes.includes('매매')&&listing.transaction_type==='매매'){
+    if(budget&&moneyNumber(listing.price)>budget)return {matched:false,reasons:['매매 예산 초과']};
+    reasons.push(`매매 금액 충족: ${fmtMoney(listing.price)}${budget?` ≤ ${fmtMoney(budget)}`:''}`);
+    return {matched:true,category:'매매',reasons};
+  }
+
+  // 전세 고객: 전세는 희망금액보다 5,000만원 높은 매물까지, 월세는 전세환산액으로 비교
+  if(customerTypes.includes('전세')){
+    const ceiling=budget?budget+5000:0;
+    if(listing.transaction_type==='전세'){
+      if(ceiling&&moneyNumber(listing.price)>ceiling)return {matched:false,reasons:['전세 허용금액 초과']};
+      reasons.push(`전세금 조건 충족: ${fmtMoney(listing.price)}${budget?` / 기준 ${fmtMoney(budget)} + 허용 5,000만원`:''}`);
+      return {matched:true,category:'전세',reasons};
+    }
+    if(listing.transaction_type==='월세'){
+      const equivalent=jeonseEquivalent(listing);
+      if(ceiling&&equivalent>ceiling)return {matched:false,reasons:['월세 전세환산액 초과']};
+      reasons.push(`월세 매물 전세환산 충족: 보증금 ${fmtMoney(listing.price)} + 월세 ${fmtMoney(listing.monthly_rent)}×100 = ${fmtMoney(equivalent)}`);
+      if(budget)reasons.push(`전세 기준 ${fmtMoney(budget)}에서 +5,000만원 범위 이내`);
+      return {matched:true,category:'전세환산 월세',reasons};
+    }
+  }
+
+  // 월세 고객: 보증금은 희망 보증금 이내, 월차임은 희망 월세의 130% 이내
+  if(customerTypes.includes('월세')&&listing.transaction_type==='월세'){
+    if(budget&&moneyNumber(listing.price)>budget)return {matched:false,reasons:['월세 보증금 초과']};
+    const rentLimit=wantedRent?wantedRent*1.3:0;
+    if(rentLimit&&moneyNumber(listing.monthly_rent)>rentLimit)return {matched:false,reasons:['월차임 130% 한도 초과']};
+    reasons.push(`보증금 충족: ${fmtMoney(listing.price)}${budget?` ≤ ${fmtMoney(budget)}`:''}`);
+    reasons.push(`월차임 충족: ${fmtMoney(listing.monthly_rent)}${wantedRent?` ≤ 희망 ${fmtMoney(wantedRent)}의 130% (${fmtMoney(Math.round(rentLimit))})`:''}`);
+    return {matched:true,category:'월세',reasons};
+  }
+
+  return {matched:false,reasons:['거래유형 불일치']};
 }
 async function renderSmartMatch(){
   await Promise.all([loadCustomers(),loadListings()]);
   const demand=state.customers.filter(x=>['매수','임차'].includes(x.customer_type));
-  $('#content').innerHTML=`<div class="panel"><div class="filters"><select id="matchCustomer" onchange="showCustomerMatches()"><option value="">고객 선택</option>${demand.map(x=>`<option value="${x.id}">${escapeHtml(x.name)} · ${escapeHtml(x.deal_type||x.customer_type)} · ${escapeHtml(x.preferred_area||'지역미정')}</option>`).join('')}</select><button class="ghost" onclick="renderView('customers')">고객 관리</button></div><div id="matchResults" class="empty">고객을 선택하면 조건에 맞는 공개 매물을 추천합니다.</div></div>`;
+  $('#content').innerHTML=`<div class="panel"><div class="notice"><strong>추천 기준</strong><br>지역과 방 개수를 충족한 매물 중 거래유형별 금액 규칙을 적용합니다. 전세 고객에게 월세 매물을 추천할 때는 <b>보증금 + 월세×100</b>으로 전세환산합니다. 추천 사유는 로그인한 중개사 화면에서만 표시되며 고객용 소개서에는 포함되지 않습니다.</div><div class="filters" style="margin-top:16px"><select id="matchCustomer" onchange="showCustomerMatches()"><option value="">고객 선택</option>${demand.map(x=>`<option value="${x.id}">${escapeHtml(x.name)} · ${escapeHtml(x.deal_type||x.customer_type)} · ${escapeHtml(x.preferred_area||'지역미정')}</option>`).join('')}</select><button class="ghost" onclick="renderView('customers')">고객 관리</button></div><div id="matchResults" class="empty">고객을 선택하면 조건을 충족하는 공개 매물만 추천합니다.</div></div>`;
 }
 async function showCustomerMatches(){
   const customer=state.customers.find(x=>x.id===$('#matchCustomer').value);if(!customer)return;
   state.matchSelection.clear();
-  const rows=state.listings.filter(x=>x.is_public&&x.status==='available').map(x=>({...x,_match:matchScore(customer,x)})).sort((a,b)=>b._match.percent-a._match.percent);
-  $('#matchResults').innerHTML=`<div class="match-toolbar"><strong>${escapeHtml(customer.name)} 추천 매물 ${rows.length}개</strong><button class="primary" onclick="printSelectedListingBrochure('${customer.id}')">선택 매물 소개서 인쇄/PDF</button></div><div class="match-grid">${rows.map(x=>`<article class="match-card"><label class="check-label"><input type="checkbox" onchange="toggleMatchSelection('${x.id}',this.checked)"> 소개서 선택</label><div class="match-score">${x._match.percent}%</div><h3>${escapeHtml(x.title)}</h3><p>${escapeHtml(x.district||'')} · ${escapeHtml(x.transaction_type)} · ${listingPriceText(x)}</p><p>방 ${x.room_count??'-'} / 욕실 ${x.bathroom_count??'-'}</p><div class="muted">일치: ${x._match.reasons.join(', ')}</div><button class="ghost" onclick="openListingPhotos('${x.id}')">사진 보기</button></article>`).join('')}</div>`;
+  const rows=state.listings.filter(x=>x.is_public&&x.status==='available').map(x=>({...x,_match:evaluateListingMatch(customer,x)})).filter(x=>x._match.matched).sort((a,b)=>{
+    const roomA=moneyNumber(a.room_count)-moneyNumber(customer.desired_rooms),roomB=moneyNumber(b.room_count)-moneyNumber(customer.desired_rooms);
+    if(roomA!==roomB)return roomA-roomB;
+    return moneyNumber(a.price)-moneyNumber(b.price);
+  });
+  $('#matchResults').innerHTML=`<div class="match-toolbar"><strong>${escapeHtml(customer.name)} 조건 충족 매물 ${rows.length}개</strong><button class="primary" onclick="printSelectedListingBrochure('${customer.id}')">선택 매물 소개서 인쇄/PDF</button></div>${rows.length?`<div class="match-grid">${rows.map(x=>`<article class="match-card"><label class="check-label"><input type="checkbox" onchange="toggleMatchSelection('${x.id}',this.checked)"> 소개서 선택</label><div class="match-type">${escapeHtml(x._match.category)}</div><h3>${escapeHtml(x.title)}</h3><div class="match-reason"><strong>중개사 추천 사유</strong>${x._match.reasons.map(r=>`<div>• ${escapeHtml(r)}</div>`).join('')}</div><p>${escapeHtml(x.district||'')} · ${escapeHtml(x.transaction_type)} · ${listingPriceText(x)}</p><p>방 ${x.room_count??'-'} / 욕실 ${x.bathroom_count??'-'}</p><button class="ghost" onclick="openListingPhotos('${x.id}')">사진 보기</button></article>`).join('')}</div>`:'<div class="empty">현재 조건을 모두 충족하는 공개 매물이 없습니다.</div>'}`;
 }
 function toggleMatchSelection(id,checked){checked?state.matchSelection.add(id):state.matchSelection.delete(id)}
 async function printSelectedListingBrochure(customerId){
@@ -569,15 +631,20 @@ async function downloadContractDocument(path,name){const {data,error}=await stat
 async function deleteContractDocument(id,path){if(!confirm('서류를 삭제할까요?'))return;await state.client.from('contract_documents').delete().eq('id',id);await state.client.storage.from('contract-documents').remove([path]);loadContractDocuments()}
 
 function exportRowsExcel(rows,fileName){if(!window.XLSX)return toast('엑셀 라이브러리를 불러오지 못했습니다.');const ws=XLSX.utils.json_to_sheet(rows),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'목록');XLSX.writeFile(wb,fileName)}
-function exportCustomersExcel(){exportRowsExcel(state.customers.map(x=>({고객명:x.name,연락처:x.phone,구분:x.customer_type,거래유형:x.deal_type,등급:x.customer_grade,희망지역:x.preferred_area,희망금액만원:x.budget_max,희망월세만원:x.desired_monthly_rent,희망방개수:x.desired_rooms,상태:x.status,메모:x.notes})),'고객목록.xlsx')}
-function exportListingsExcel(){exportRowsExcel((state.myListings||state.listings).map(x=>({매물명:x.title,거래유형:x.transaction_type,부동산유형:x.property_type,주소:x.address,가격만원:x.price,월세만원:x.monthly_rent,'면적㎡':x.area_m2,방:x.room_count,화장실:x.bathroom_count,연락처:x.contact_phone,공개:x.is_public?'공개':'비공개',상태:x.status,설명:x.description})),'매물목록.xlsx')}
+function exportCustomersExcel(){if(state.profile.role!=='admin')return toast('관리자만 엑셀 내보내기를 사용할 수 있습니다.');exportRowsExcel(state.customers.map(x=>({고객명:x.name,연락처:x.phone,구분:x.customer_type,거래유형:x.deal_type,등급:x.customer_grade,희망지역:x.preferred_area,희망금액만원:x.budget_max,희망월세만원:x.desired_monthly_rent,희망방개수:x.desired_rooms,상태:x.status,메모:x.notes})),'고객목록.xlsx')}
+function exportListingsExcel(){if(state.profile.role!=='admin')return toast('관리자만 엑셀 내보내기를 사용할 수 있습니다.');exportRowsExcel(state.listings.map(x=>({담당중개사:x.owner?.full_name||'',매물명:x.title,거래유형:x.transaction_type,부동산유형:x.property_type,주소:x.address,가격만원:x.price,월세만원:x.monthly_rent,'면적㎡':x.area_m2,방:x.room_count,화장실:x.bathroom_count,연락처:x.contact_phone,공개:x.is_public?'공개':'비공개',상태:x.status,설명:x.description})),'전체매물목록.xlsx')}
 function openExcelImport(kind){const input=document.createElement('input');input.type='file';input.accept='.xlsx,.xls,.csv';input.onchange=()=>importExcelFile(kind,input.files[0]);input.click()}
-async function importExcelFile(kind,file){if(!file)return;const buf=await file.arrayBuffer(),wb=XLSX.read(buf),rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);if(!rows.length)return toast('가져올 데이터가 없습니다.');let payload;if(kind==='customer')payload=rows.map(r=>({owner_id:state.profile.id,original_owner_id:state.profile.id,name:r.고객명||r.name,phone:r.연락처||r.phone,customer_type:r.구분||r.customer_type||'매수',deal_type:r.거래유형||r.deal_type||'매매',customer_grade:r.등급||r.customer_grade||'C',preferred_area:r.희망지역||r.preferred_area,budget_max:r.희망금액만원||r.budget_max||null,desired_monthly_rent:r.희망월세만원||null,desired_rooms:r.희망방개수||null,status:r.상태||'신규',notes:r.메모||''})).filter(x=>x.name);else payload=rows.map(r=>({owner_id:state.profile.id,original_owner_id:state.profile.id,title:r.매물명||r.title,transaction_type:r.거래유형||'매매',property_type:r.부동산유형||'아파트',address:r.주소||'',price:r.가격만원||null,monthly_rent:r.월세만원||null,area_m2:r['면적㎡']||null,room_count:r.방||null,bathroom_count:r.화장실||null,contact_phone:r.연락처||'',is_public:String(r.공개||'공개')!=='비공개',status:r.상태||'available',description:r.설명||''})).filter(x=>x.title);const {error}=await state.client.from(kind==='customer'?'customers':'listings').insert(payload);if(error)return toast(error.message);toast(`${payload.length}건을 가져왔습니다.`);kind==='customer'?renderCustomers():renderMyListings()}
+async function importExcelFile(kind,file){if(state.profile.role!=='admin')return toast('관리자만 엑셀 가져오기를 사용할 수 있습니다.');if(!file)return;const importOwner=$('#excelImportOwner')?.value||state.profile.id;const buf=await file.arrayBuffer(),wb=XLSX.read(buf),rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);if(!rows.length)return toast('가져올 데이터가 없습니다.');let payload;if(kind==='customer')payload=rows.map(r=>({owner_id:importOwner,original_owner_id:importOwner,name:r.고객명||r.name,phone:r.연락처||r.phone,customer_type:r.구분||r.customer_type||'매수',deal_type:r.거래유형||r.deal_type||'매매',customer_grade:r.등급||r.customer_grade||'C',preferred_area:r.희망지역||r.preferred_area,budget_max:r.희망금액만원||r.budget_max||null,desired_monthly_rent:r.희망월세만원||null,desired_rooms:r.희망방개수||null,status:r.상태||'신규',notes:r.메모||''})).filter(x=>x.name);else payload=rows.map(r=>({owner_id:importOwner,original_owner_id:importOwner,title:r.매물명||r.title,transaction_type:r.거래유형||'매매',property_type:r.부동산유형||'아파트',address:r.주소||'',price:r.가격만원||null,monthly_rent:r.월세만원||null,area_m2:r['면적㎡']||null,room_count:r.방||null,bathroom_count:r.화장실||null,contact_phone:r.연락처||'',is_public:String(r.공개||'공개')!=='비공개',status:r.상태||'available',description:r.설명||''})).filter(x=>x.title);const {error}=await state.client.from(kind==='customer'?'customers':'listings').insert(payload);if(error)return toast(error.message);toast(`${payload.length}건을 가져왔습니다.`);kind==='customer'?renderCustomers():renderMyListings()}
 
-const v300OriginalCustomers=renderCustomers;
-renderCustomers=async function(){await v300OriginalCustomers();$('#topActions').innerHTML+=` <button class="ghost" onclick="exportCustomersExcel()">엑셀 내보내기</button> <button class="ghost" onclick="openExcelImport('customer')">엑셀 가져오기</button>`;}
 const v300OriginalMyListings=renderMyListings;
-renderMyListings=async function(){await v300OriginalMyListings();$('#topActions').innerHTML+=` <button class="ghost" onclick="exportListingsExcel()">엑셀 내보내기</button> <button class="ghost" onclick="openExcelImport('listing')">엑셀 가져오기</button>`;const stale=state.myListings.filter(x=>(x.next_confirm_at||x.last_confirmed_at)&&daysFromToday(x.next_confirm_at||x.last_confirmed_at)<=0&&x.status!=='complete');if(stale.length){const n=document.createElement('div');n.className='notice warning-notice';n.innerHTML=`확인 필요 매물 <strong>${stale.length}개</strong> · 매물 수정에서 다음 확인일을 변경하세요.`;$('#content').prepend(n)}}
+renderMyListings=async function(){await v300OriginalMyListings();const stale=state.myListings.filter(x=>(x.next_confirm_at||x.last_confirmed_at)&&daysFromToday(x.next_confirm_at||x.last_confirmed_at)<=0&&x.status!=='complete');if(stale.length){const n=document.createElement('div');n.className='notice warning-notice';n.innerHTML=`확인 필요 매물 <strong>${stale.length}개</strong> · 매물 수정에서 다음 확인일을 변경하세요.`;$('#content').prepend(n)}}
+
+async function renderAdminData(){
+  if(state.profile.role!=='admin')return toast('관리자만 이용할 수 있습니다.');
+  await Promise.all([loadMembers(),loadCustomers(),loadListings()]);
+  const approved=state.members.filter(x=>x.status==='approved');
+  $('#content').innerHTML=`<div class="split"><section class="panel"><div class="panel-head"><h3>엑셀 내보내기</h3></div><p class="muted">관리자가 열람 가능한 전체 고객과 전체 매물을 내려받습니다.</p><div class="stack"><button class="primary" onclick="exportCustomersExcel()">전체 고객 엑셀 내보내기</button><button class="primary" onclick="exportListingsExcel()">전체 매물 엑셀 내보내기</button></div></section><section class="panel"><div class="panel-head"><h3>엑셀 가져오기</h3></div><p class="muted">가져온 자료의 담당 중개사를 먼저 지정하세요.</p><label>등록 담당 중개사<select id="excelImportOwner">${approved.map(x=>`<option value="${x.id}" ${x.id===state.profile.id?'selected':''}>${escapeHtml(x.full_name)} · ${escapeHtml(x.office_name||'')}</option>`).join('')}</select></label><div class="stack" style="margin-top:16px"><button class="ghost" onclick="openExcelImport('customer')">고객 엑셀 가져오기</button><button class="ghost" onclick="openExcelImport('listing')">매물 엑셀 가져오기</button></div><div class="notice" style="margin-top:16px">가져오기는 기존 데이터와 자동 병합되지 않습니다. 전화번호·주소 중복 여부를 확인한 뒤 진행하세요.</div></section></div>`;
+}
 
 const v300OriginalOpenCustomerModal=openCustomerModal;
 openCustomerModal=function(id){v300OriginalOpenCustomerModal(id);setTimeout(()=>{const phone=$('#modalBody [name=phone]');if(phone)phone.addEventListener('blur',async()=>{if(!phone.value)return;let q=state.client.from('customers').select('id,name,phone').eq('phone',phone.value);if(id)q=q.neq('id',id);const {data}=await q.limit(3);if(data?.length)toast(`중복 가능성: 같은 전화번호 고객 ${data.map(x=>x.name).join(', ')}`)})},50)}
@@ -594,4 +661,4 @@ renderListingPhotoGallery=async function(listing){
 async function updatePhotoMeta(id,key,value){const {error}=await state.client.from('listing_photos').update({[key]:value}).eq('id',id);if(error)return toast(error.message);toast('사진 정보를 저장했습니다.')}
 async function setCoverPhoto(listingId,photoId){const {error}=await state.client.from('listings').update({cover_photo_id:photoId}).eq('id',listingId);if(error)return toast(error.message);toast('대표사진을 지정했습니다.');await loadListings();const l=state.listings.find(x=>x.id===listingId);renderListingPhotoGallery(l)}
 
-console.info('CRM v3.0 통합 기능 로드 완료');
+console.info('CRM v3.1 관리자 데이터관리·정밀 자동매칭 로드 완료');
