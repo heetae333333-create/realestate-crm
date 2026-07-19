@@ -1097,3 +1097,101 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 
 console.info('CRM v3.6.2 사이드바 프로필 관리 로드 완료');
+
+/* ================= CRM v3.7 업무 통합·빠른등록·공지 ================= */
+state.announcements=[];
+const CRM37_CUSTOMER_STAGES=['신규 문의','조건 확인','매물 추천','방문 예정','방문 완료','협의 중','계약 예정','계약 완료','보류','종료'];
+
+function crm37DaysSince(value){
+  if(!value)return 999;
+  const d=new Date(value); if(Number.isNaN(d.getTime()))return 999;
+  return Math.max(0,Math.floor((Date.now()-d.getTime())/86400000));
+}
+function crm37LastContact(customer){return customer.last_follow_up_at||customer.updated_at||customer.created_at}
+function crm37DormantInfo(customer){
+  const days=crm37DaysSince(crm37LastContact(customer));
+  if(days>=30)return {days,label:`${days}일 미접촉`,color:'red'};
+  if(days>=14)return {days,label:`${days}일 미접촉`,color:'yellow'};
+  if(days>=7)return {days,label:`${days}일 미접촉`,color:'gray'};
+  return {days,label:'',color:'gray'};
+}
+async function crm37LoadAnnouncements(){
+  const {data,error}=await state.client.from('announcements').select('*, author:profiles!announcements_created_by_fkey(full_name)').eq('is_active',true).order('is_pinned',{ascending:false}).order('created_at',{ascending:false}).limit(20);
+  if(error){console.warn(error.message);state.announcements=[];return []}
+  state.announcements=data||[];return state.announcements;
+}
+function crm37AnnouncementCards(){
+  return state.announcements.length?`<div class="announcement-list">${state.announcements.map(a=>`<article class="announcement-card ${a.is_pinned?'pinned':''}"><div class="announcement-title">${a.is_pinned?'📌 ':''}${escapeHtml(a.title)}</div><div class="announcement-body">${escapeHtml(a.content||'').replace(/\n/g,'<br>')}</div><div class="muted">${escapeHtml(a.author?.full_name||'관리자')} · ${fmtDate(a.created_at)}</div></article>`).join('')}</div>`:'<div class="empty">등록된 공지사항이 없습니다.</div>';
+}
+
+async function crm37OpenQuickCustomer(){
+  $('#modalTitle').textContent='고객 빠른 등록';
+  $('#modalBody').innerHTML=`<div class="notice">필수 정보만 먼저 저장하고, 고객 목록의 수정 버튼에서 상세 내용을 보완할 수 있습니다.</div><div class="form-grid" style="margin-top:14px"><label>고객명<input id="qCustomerName" required></label><label>연락처<input id="qCustomerPhone" placeholder="010-0000-0000" required></label><label>고객 구분<select id="qCustomerKind"><option>매수</option><option>임차</option><option>매도</option><option>임대</option></select></label><label>거래유형<select id="qCustomerDeal"><option>매매</option><option>전세</option><option>월세</option></select></label><label>희망금액/보증금(만원)<input id="qCustomerBudget" type="number"></label><label>희망 월세(만원)<input id="qCustomerRent" type="number"></label><label>희망 방 개수<input id="qCustomerRooms" type="number" min="0" step="0.5"></label><label>다음 FU<input id="qCustomerFu" type="date"></label><label class="span-2">메모<textarea id="qCustomerMemo" rows="4"></textarea></label></div>`;
+  $('#modalSubmit').style.display='';$('#modalSubmit').onclick=async e=>{e.preventDefault();const kind=$('#qCustomerKind').value,deal=$('#qCustomerDeal').value;const rooms=Number($('#qCustomerRooms').value||0);const payload={owner_id:state.profile.id,name:$('#qCustomerName').value.trim(),phone:$('#qCustomerPhone').value.trim(),customer_type:kind,status:'신규 문의',deal_type:['매수','임차'].includes(kind)?deal:null,budget_max:$('#qCustomerBudget').value?Number($('#qCustomerBudget').value):null,desired_monthly_rent:deal==='월세'&&$('#qCustomerRent').value?Number($('#qCustomerRent').value):null,desired_rooms:rooms===1.5?1:(rooms||null),desired_one_point_five_room:rooms===1.5,next_follow_up_at:$('#qCustomerFu').value||null,notes:$('#qCustomerMemo').value||null,customer_grade:'C'};if(!payload.name||!payload.phone)return toast('고객명과 연락처를 입력하세요.');const {error}=await state.client.from('customers').insert(payload);if(error)return toast(error.message);$('#modal').close();toast('고객을 빠르게 등록했습니다.');await loadCustomers();if(state.view==='customers')renderCustomers();};$('#modal').showModal();
+}
+async function crm37OpenQuickListing(){
+  $('#modalTitle').textContent='매물 빠른 등록';
+  $('#modalBody').innerHTML=`<div class="notice">핵심 정보만 저장합니다. 이후 매물 수정에서 사진·특징·상세 내용을 보완하세요.</div><div class="form-grid" style="margin-top:14px"><label>매물명<input id="qListingTitle" required></label><label>거래유형<select id="qListingTx"><option>매매</option><option>전세</option><option>월세</option></select></label><label>매물유형<select id="qListingType"><option>아파트</option><option>오피스텔</option><option>빌라</option><option>원룸</option><option>상가</option><option>사무실</option><option>기타</option></select></label><label>매매가/전세금/보증금(만원)<input id="qListingPrice" type="number"></label><label>월세(만원)<input id="qListingRent" type="number"></label><label>방 개수<input id="qListingRooms" type="number" min="0" step="0.5"></label><label>지역·주소<input id="qListingAddress"></label><label>연락처<input id="qListingPhone"></label><label class="span-2">메모<textarea id="qListingMemo" rows="4"></textarea></label></div>`;
+  $('#modalSubmit').style.display='';$('#modalSubmit').onclick=async e=>{e.preventDefault();const tx=$('#qListingTx').value,rooms=Number($('#qListingRooms').value||0),address=$('#qListingAddress').value.trim();const payload={owner_id:state.profile.id,title:$('#qListingTitle').value.trim(),transaction_type:tx,property_type:$('#qListingType').value,price:$('#qListingPrice').value?Number($('#qListingPrice').value):null,monthly_rent:tx==='월세'&&$('#qListingRent').value?Number($('#qListingRent').value):null,room_count:rooms===1.5?1:(rooms||null),is_one_point_five_room:rooms===1.5,district:address,address,contact_phone:$('#qListingPhone').value.trim()||null,description:$('#qListingMemo').value||null,status:'available',is_public:true};if(!payload.title)return toast('매물명을 입력하세요.');const {error}=await state.client.from('listings').insert(payload);if(error)return toast(error.message);$('#modal').close();toast('매물을 빠르게 등록했습니다.');await loadListings();if(state.view==='myListings')renderMyListings();};$('#modal').showModal();
+}
+function crm37AddQuickActions(){
+  const top=$('#topActions');if(!top||top.querySelector('.crm37-quick-actions'))return;
+  top.insertAdjacentHTML('afterbegin',`<span class="crm37-quick-actions"><button class="ghost" onclick="crm37OpenQuickCustomer()">⚡ 고객 빠른 등록</button><button class="ghost" onclick="crm37OpenQuickListing()">⚡ 매물 빠른 등록</button></span>`);
+}
+
+const crm37BaseRenderView=renderView;
+renderView=async function(view){await crm37BaseRenderView(view);crm37AddQuickActions();};
+
+const crm37BaseRenderDashboard=renderDashboard;
+renderDashboard=async function(){
+  await Promise.all([loadCustomers(),loadListings(),crm37LoadAnnouncements()]);
+  await crm37BaseRenderDashboard();
+  const todayStr=today(), seven=dateInDays(7);
+  const dueCustomers=state.customers.filter(x=>x.next_follow_up_at&&x.next_follow_up_at<=todayStr);
+  const dueListings=state.listings.filter(x=>x.owner_id===state.profile.id&&x.next_follow_up_at&&x.next_follow_up_at<=todayStr);
+  const dormant=state.customers.filter(x=>crm37DormantInfo(x).days>=7).sort((a,b)=>crm37DormantInfo(b).days-crm37DormantInfo(a).days);
+  const {data:visits}=await state.client.from('customer_listing_recommendations').select('*, customer:customers(name), listing:listings(title)').not('visit_at','is',null).gte('visit_at',new Date(todayStr+'T00:00:00').toISOString()).lte('visit_at',new Date(seven+'T23:59:59').toISOString()).order('visit_at');
+  const contracts=[];[...state.customers,...state.listings.filter(x=>x.owner_id===state.profile.id)].forEach(x=>[['가계약',x.provisional_contract_date],['본계약',x.contract_date],['중도금',x.interim_payment_date],['잔금',x.final_payment_date]].forEach(([label,d])=>{if(d&&d>=todayStr&&d<=seven)contracts.push({label,date:d,name:x.name||x.title})}));
+  const newListings=state.listings.filter(x=>x.is_public&&x.status==='available'&&crm37DaysSince(x.created_at)<=7);
+  const matchingPairs=[];newListings.forEach(l=>state.customers.forEach(c=>{const m=evaluateListingMatch(c,l);if(m.matched)matchingPairs.push({l,c,m})}));
+  $('#content').innerHTML=`<div class="today-command"><div class="panel-head"><div><h3>오늘 할 일 통합 화면</h3><div class="muted">오늘 처리해야 할 업무를 한곳에서 확인합니다.</div></div><div class="row-actions"><button class="primary" onclick="crm37OpenQuickCustomer()">고객 빠른 등록</button><button class="success" onclick="crm37OpenQuickListing()">매물 빠른 등록</button></div></div><div class="grid stats"><div class="card stat"><div class="label">오늘·지연 FU</div><div class="value">${dueCustomers.length+dueListings.length}</div></div><div class="card stat"><div class="label">7일 내 방문</div><div class="value">${(visits||[]).length}</div></div><div class="card stat"><div class="label">7일 내 계약 일정</div><div class="value">${contracts.length}</div></div><div class="card stat alert-card"><div class="label">장기 미접촉 고객</div><div class="value">${dormant.length}</div></div><div class="card stat"><div class="label">신규 매칭 후보</div><div class="value">${matchingPairs.length}</div></div></div></div>
+  <div class="dashboard-three"><section class="panel"><div class="panel-head"><h3>오늘 처리할 FU</h3></div>${[...dueCustomers.map(x=>({name:x.name,type:'고객',date:x.next_follow_up_at,id:x.id})),...dueListings.map(x=>({name:x.title,type:'매물',date:x.next_follow_up_at,id:x.id}))].slice(0,12).map(x=>`<div class="list-item"><div><strong>${escapeHtml(x.name)}</strong><div class="muted">${x.type}</div></div><div class="row-actions">${dueBadge(x.date)}<button class="success" onclick="openFollowUpModal('${x.type==='고객'?'customer':'listing'}','${x.id}')">FU</button></div></div>`).join('')||'<div class="empty">오늘 처리할 FU가 없습니다.</div>'}</section>
+  <section class="panel"><div class="panel-head"><h3>방문·계약 일정</h3></div>${[...(visits||[]).map(v=>({date:v.visit_at?.slice(0,10),label:'방문',name:`${v.customer?.name||'고객'} · ${v.listing?.title||'매물'}`})),...contracts].sort((a,b)=>(a.date||'').localeCompare(b.date||'')).slice(0,12).map(x=>`<div class="list-item"><div><strong>${escapeHtml(x.name)}</strong><div class="muted">${escapeHtml(x.label)}</div></div>${dueBadge(x.date)}</div>`).join('')||'<div class="empty">7일 내 일정이 없습니다.</div>'}</section>
+  <section class="panel"><div class="panel-head"><h3>장기 미접촉 고객</h3><button class="ghost" onclick="renderView('customers')">고객목록</button></div>${dormant.slice(0,12).map(c=>`<div class="list-item"><div><strong>${escapeHtml(c.name)}</strong><div class="muted">${escapeHtml(c.phone||'')} · ${escapeHtml(c.status||'')}</div></div><div class="row-actions">${badge(crm37DormantInfo(c).label,crm37DormantInfo(c).color)}<button class="success" onclick="openFollowUpModal('customer','${c.id}')">연락 기록</button></div></div>`).join('')||'<div class="empty">7일 이상 미접촉 고객이 없습니다.</div>'}</section></div>
+  <div class="split" style="margin-top:16px"><section class="panel"><div class="panel-head"><h3>신규 매물 알림·재매칭</h3><button class="ghost" onclick="renderView('smartMatch')">자동매칭</button></div>${matchingPairs.slice(0,12).map(p=>`<div class="list-item"><div><strong>${escapeHtml(p.l.title)}</strong><div class="muted">${escapeHtml(p.c.name)} 고객 · ${escapeHtml(p.m.category)}</div></div><button class="success" onclick="crm36SaveRecommendation('${p.c.id}','${p.l.id}')">FU 저장</button></div>`).join('')||'<div class="empty">최근 7일 신규 매칭 후보가 없습니다.</div>'}</section><section class="panel"><div class="panel-head"><h3>공지사항</h3>${state.profile?.role==='admin'?'<button class="primary" onclick="crm37ManageAnnouncements()">공지 관리</button>':''}</div>${crm37AnnouncementCards()}</section></div>`;
+  crm37AddQuickActions();
+};
+
+const crm37BaseOpenCustomerModal=openCustomerModal;
+openCustomerModal=function(id){
+  const before=id?structuredClone(state.customers.find(x=>x.id===id)||{}):null;
+  crm37BaseOpenCustomerModal(id);
+  const status=$('#modalBody [name=status]');if(status){status.innerHTML=CRM37_CUSTOMER_STAGES.map(x=>`<option>${x}</option>`).join('');const old=before?.status||'신규 문의';status.value=CRM37_CUSTOMER_STAGES.includes(old)?old:({'신규':'신규 문의','상담중':'조건 확인','매물제안':'매물 추천','계약협의':'협의 중','계약완료':'계약 완료'}[old]||'신규 문의')}
+  const original=$('#modalSubmit').onclick;
+  $('#modalSubmit').onclick=async e=>{
+    if(!id)return original(e);
+    e.preventDefault();const form=$('#modalForm');const fd=new FormData(form);const changed=[];const fields=[['deal_type','거래유형'],['budget_max','희망금액'],['desired_monthly_rent','희망월세'],['desired_rooms','희망 방 개수'],['preferred_area','희망지역'],['status','고객단계']];fields.forEach(([key,label])=>{const nv=fd.get(key)||'';const ov=before?.[key]??'';if(String(nv)!==String(ov))changed.push({field_name:key,field_label:label,old_value:String(ov),new_value:String(nv)})});
+    await original({preventDefault(){}});
+    if(changed.length){await state.client.from('customer_condition_history').insert(changed.map(c=>({...c,customer_id:id,changed_by:state.profile.id})));await loadCustomers();await loadListings();const customer=state.customers.find(x=>x.id===id);const count=state.listings.filter(l=>l.is_public&&l.status==='available'&&evaluateListingMatch(customer,l).matched).length;toast(`고객 조건 변경 완료 · 새 조건 매칭 매물 ${count}건`);setTimeout(()=>{if(confirm(`조건이 변경되었습니다. 새 조건에 맞는 매물 ${count}건을 확인할까요?`)){renderView('smartMatch').then(()=>{const s=$('#matchCustomer');if(s){s.value=id;showCustomerMatches()}})}},300)}
+  };
+};
+
+const crm37BaseRenderCustomers=renderCustomers;
+renderCustomers=async function(){await crm37BaseRenderCustomers();const filter=$('#customerStatus');if(filter){filter.innerHTML='<option value="">전체 단계</option>'+CRM37_CUSTOMER_STAGES.map(x=>`<option>${x}</option>`).join('')};filterCustomers();crm37AddQuickActions();};
+filterCustomers=function(){
+  const q=($('#customerSearch')?.value||'').toLowerCase(),t=$('#customerType')?.value||'',s=$('#customerStatus')?.value||'',d=$('#customerDealType')?.value||'',g=$('#customerGrade')?.value||'';
+  const rows=state.customers.filter(x=>(!q||`${x.name} ${x.phone}`.toLowerCase().includes(q))&&(!t||x.customer_type===t)&&(!s||x.status===s)&&(!d||x.deal_type===d)&&(!g||x.customer_grade===g));
+  $('#customerTable').innerHTML=rows.length?`<div class="table-wrap"><table class="customer-table"><thead><tr><th>고객명</th><th>연락처</th><th>단계</th><th>미접촉</th><th>거래유형</th><th>등급</th><th>희망지역</th><th>방</th><th>희망금액/월세</th><th>예정 FU</th><th>관리</th></tr></thead><tbody>${rows.map(x=>{const dorm=crm37DormantInfo(x);return `<tr><td><strong>${escapeHtml(x.name)}</strong></td><td>${escapeHtml(x.phone||'-')}</td><td>${badge(x.status||'신규 문의','blue')}</td><td>${dorm.label?badge(dorm.label,dorm.color):badge('최근 연락','green')}</td><td>${escapeHtml(x.deal_type||'-')}</td><td>${gradeBadge(x.customer_grade)}</td><td>${escapeHtml(x.preferred_area||'-')}</td><td>${customerRoomText(x)}</td><td>${customerBudgetText(x)}</td><td>${dueBadge(x.next_follow_up_at)}</td><td><div class="row-actions"><button class="success" onclick="openFollowUpModal('customer','${x.id}')">FU</button><button class="ghost" onclick="openHistoryModal('customer','${x.id}')">히스토리</button><button class="ghost" onclick="openContractModal('customer','${x.id}')">계약일정</button><button class="ghost" onclick="openCustomerModal('${x.id}')">수정</button><button class="danger" onclick="deleteCustomer('${x.id}')">삭제</button></div></td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 고객이 없습니다.</div>';
+};
+
+async function crm37ManageAnnouncements(){
+  if(state.profile?.role!=='admin')return;
+  await crm37LoadAnnouncements();$('#modalTitle').textContent='공지사항 관리';$('#modalBody').innerHTML=`<div class="form-grid"><label class="span-2">제목<input id="annTitle" maxlength="100"></label><label class="span-2">내용<textarea id="annContent" rows="6"></textarea></label><label class="inline-check"><input id="annPinned" type="checkbox"> 상단 고정</label></div><div class="panel" style="margin-top:16px"><h4>현재 공지</h4>${state.announcements.map(a=>`<div class="list-item"><div><strong>${escapeHtml(a.title)}</strong><div class="muted">${escapeHtml((a.content||'').slice(0,80))}</div></div><button class="danger" onclick="crm37DeleteAnnouncement('${a.id}')">삭제</button></div>`).join('')||'<div class="empty">공지 없음</div>'}</div>`;$('#modalSubmit').style.display='';$('#modalSubmit').onclick=async e=>{e.preventDefault();const title=$('#annTitle').value.trim(),content=$('#annContent').value.trim();if(!title||!content)return toast('제목과 내용을 입력하세요.');const {error}=await state.client.from('announcements').insert({title,content,is_pinned:$('#annPinned').checked,created_by:state.profile.id,is_active:true});if(error)return toast(error.message);$('#modal').close();toast('공지사항을 등록했습니다.');renderDashboard()};$('#modal').showModal();
+}
+async function crm37DeleteAnnouncement(id){if(!confirm('공지사항을 삭제할까요?'))return;const {error}=await state.client.from('announcements').update({is_active:false}).eq('id',id);if(error)return toast(error.message);$('#modal').close();toast('공지사항을 삭제했습니다.');renderDashboard()}
+
+const crm37BaseRenderAdminStats=renderAdminStats;
+renderAdminStats=async function(){await crm37BaseRenderAdminStats();await Promise.all([loadCustomers(),loadListings(),loadMembers()]);const now=today();const rows=state.members.filter(m=>m.status==='approved').map(m=>{const cs=state.customers.filter(c=>c.owner_id===m.id),ls=state.listings.filter(l=>l.owner_id===m.id);return {m,customers:cs.length,listings:ls.length,due:cs.filter(c=>c.next_follow_up_at&&c.next_follow_up_at<=now).length,dormant:cs.filter(c=>crm37DormantInfo(c).days>=14).length,contracts:[...cs,...ls].filter(x=>x.contract_date||x.final_payment_date).length}});$('#content').insertAdjacentHTML('afterbegin',`<div class="panel" style="margin-bottom:16px"><div class="panel-head"><div><h3>담당 중개사 업무량</h3><div class="muted">업무 누락과 담당 편중을 확인하는 관리용 화면입니다.</div></div></div><div class="table-wrap"><table><thead><tr><th>중개사</th><th>고객</th><th>매물</th><th>오늘·지연 FU</th><th>14일+ 미접촉</th><th>계약 진행/완료</th></tr></thead><tbody>${rows.map(r=>`<tr><td><strong>${escapeHtml(r.m.full_name||'-')}</strong></td><td>${r.customers}</td><td>${r.listings}</td><td>${r.due?badge(String(r.due),'red'):'0'}</td><td>${r.dormant?badge(String(r.dormant),'yellow'):'0'}</td><td>${r.contracts}</td></tr>`).join('')}</tbody></table></div></div>`);crm37AddQuickActions();};
+
+Object.assign(window,{renderView,renderDashboard,renderCustomers,filterCustomers,openCustomerModal,crm37OpenQuickCustomer,crm37OpenQuickListing,crm37ManageAnnouncements,crm37DeleteAnnouncement});
+console.info('CRM v3.7 업무 통합 기능 로드 완료');
