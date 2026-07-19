@@ -171,3 +171,16 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .crm36-feature-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}.crm36-feature-tags span{font-size:11px;padding:3px 7px;border-radius:999px;background:#eef2ff;color:#3540a5}
 .crm36-match-actions{margin-top:12px}.crm36-new-alert{margin-top:16px}.crm36-alert-count{font-size:26px;color:#3157d5}.crm36-reverse-item .match-reason{margin-top:8px}
 @media(max-width:700px){.crm36-recommendation-item,.crm36-reverse-item{display:block}.crm36-recommendation-item .row-actions,.crm36-reverse-item .row-actions{margin-top:12px}.crm36-check-grid{grid-template-columns:1fr}}
+
+
+/* CRM v3.6.1 */
+.crm361-form-section{border:1px solid var(--line,#dbe3ef);border-radius:12px;padding:0;background:#f8fafc}
+.crm361-form-section summary{cursor:pointer;font-weight:800;padding:14px 16px;list-style:none}
+.crm361-form-section summary::-webkit-details-marker{display:none}
+.crm361-feature-grid{padding:0 16px 14px}
+.crm361-form-section .field-help{padding:0 16px 14px}
+.crm361-fu-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;padding:5px;background:#f1f5f9;border-radius:12px}
+.crm361-fu-tab{border:0;background:transparent;padding:10px 15px;border-radius:9px;font-weight:800;color:#475569;cursor:pointer}
+.crm361-fu-tab.active{background:#fff;color:#0f766e;box-shadow:0 1px 4px rgba(15,23,42,.12)}
+.crm361-fu-panel.hidden{display:none}
+@media(max-width:700px){.crm361-fu-tab{flex:1;padding:10px 8px;font-size:13px}}
