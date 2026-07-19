@@ -662,3 +662,154 @@ async function updatePhotoMeta(id,key,value){const {error}=await state.client.fr
 async function setCoverPhoto(listingId,photoId){const {error}=await state.client.from('listings').update({cover_photo_id:photoId}).eq('id',listingId);if(error)return toast(error.message);toast('대표사진을 지정했습니다.');await loadListings();const l=state.listings.find(x=>x.id===listingId);renderListingPhotoGallery(l)}
 
 console.info('CRM v3.1 관리자 데이터관리·정밀 자동매칭 로드 완료');
+
+/* ================= CRM v3.2 중개사별 엑셀 선택 관리 ================= */
+state.adminExcel = {
+  ownerId:'',
+  type:'customer',
+  customerSelection:new Set(),
+  listingSelection:new Set(),
+  importKind:null,
+  importRows:[],
+  importSelection:new Set(),
+  importFileName:''
+};
+
+function excelOwnerName(ownerId){
+  const m=state.members.find(x=>x.id===ownerId);
+  return m?.full_name||'담당자 미지정';
+}
+function customerExcelRow(x){
+  return {
+    담당중개사:excelOwnerName(x.owner_id),
+    고객명:x.name,연락처:x.phone,구분:x.customer_type,거래유형:x.deal_type,등급:x.customer_grade,
+    희망지역:x.preferred_area,희망금액만원:x.budget_max,희망월세만원:x.desired_monthly_rent,
+    희망방개수:x.desired_rooms,대출여부:x.loan_status,자기자본금만원:x.equity_amount,
+    자기자본금모름:x.equity_unknown?'모름':'',상태:x.status,메모:x.notes
+  };
+}
+function listingExcelRow(x){
+  return {
+    담당중개사:excelOwnerName(x.owner_id),매물명:x.title,거래유형:x.transaction_type,
+    부동산유형:x.property_type,주소:x.address,가격만원:x.price,월세만원:x.monthly_rent,
+    '면적㎡':x.area_m2,방:x.room_count,화장실:x.bathroom_count,연락처:x.contact_phone,
+    공개:x.is_public?'공개':'비공개',상태:x.status,설명:x.description
+  };
+}
+function safeAgentFileName(name='중개사'){return String(name).replace(/[\\/:*?"<>|]/g,'_').trim()||'중개사'}
+function adminExcelRows(type){
+  const owner=state.adminExcel.ownerId;
+  return (type==='customer'?state.customers:state.listings).filter(x=>!owner||x.owner_id===owner);
+}
+function setAdminExcelOwner(value){
+  state.adminExcel.ownerId=value;
+  state.adminExcel.customerSelection.clear();state.adminExcel.listingSelection.clear();
+  renderAdminExcelList();
+}
+function setAdminExcelType(type){
+  state.adminExcel.type=type;renderAdminExcelList();
+}
+function toggleAdminExcelRow(type,id,checked){
+  const set=type==='customer'?state.adminExcel.customerSelection:state.adminExcel.listingSelection;
+  checked?set.add(id):set.delete(id);updateAdminExcelSelectionUi();
+}
+function toggleAdminExcelAll(type,checked){
+  const rows=adminExcelRows(type),set=type==='customer'?state.adminExcel.customerSelection:state.adminExcel.listingSelection;
+  rows.forEach(x=>checked?set.add(x.id):set.delete(x.id));renderAdminExcelList();
+}
+function updateAdminExcelSelectionUi(){
+  const type=state.adminExcel.type,set=type==='customer'?state.adminExcel.customerSelection:state.adminExcel.listingSelection;
+  const count=$('#adminExcelSelectedCount');if(count)count.textContent=`${set.size}개 선택`;
+  const btn=$('#adminExcelSelectedDownload');if(btn)btn.disabled=!set.size;
+}
+function renderAdminExcelList(){
+  const box=$('#adminExcelList');if(!box)return;
+  const type=state.adminExcel.type,rows=adminExcelRows(type),set=type==='customer'?state.adminExcel.customerSelection:state.adminExcel.listingSelection;
+  box.innerHTML=`
+    <div class="excel-list-toolbar">
+      <div class="segmented"><button class="${type==='customer'?'active':''}" onclick="setAdminExcelType('customer')">고객 목록</button><button class="${type==='listing'?'active':''}" onclick="setAdminExcelType('listing')">매물 목록</button></div>
+      <div class="row-actions"><span id="adminExcelSelectedCount" class="muted">${set.size}개 선택</span><button id="adminExcelSelectedDownload" class="primary" ${set.size?'':'disabled'} onclick="downloadAdminExcelSelected()">선택 항목 다운로드</button><button class="ghost" onclick="downloadAdminExcelAllForOwner()">현재 중개사 전체 다운로드</button></div>
+    </div>
+    <div class="table-wrap excel-select-table"><table><thead><tr><th><input type="checkbox" ${rows.length&&rows.every(x=>set.has(x.id))?'checked':''} onchange="toggleAdminExcelAll('${type}',this.checked)"></th>${type==='customer'?'<th>고객명</th><th>연락처</th><th>구분</th><th>거래유형</th><th>희망지역</th><th>금액</th><th>상태</th>':'<th>매물명</th><th>거래유형</th><th>주소</th><th>가격</th><th>방/욕실</th><th>공개</th><th>상태</th>'}</tr></thead><tbody>
+    ${rows.map(x=>type==='customer'?`<tr><td><input type="checkbox" ${set.has(x.id)?'checked':''} onchange="toggleAdminExcelRow('customer','${x.id}',this.checked)"></td><td><strong>${escapeHtml(x.name)}</strong></td><td>${escapeHtml(x.phone||'-')}</td><td>${escapeHtml(x.customer_type||'-')}</td><td>${escapeHtml(x.deal_type||'-')}</td><td>${escapeHtml(x.preferred_area||'-')}</td><td>${customerBudgetText(x)}</td><td>${escapeHtml(x.status||'-')}</td></tr>`:`<tr><td><input type="checkbox" ${set.has(x.id)?'checked':''} onchange="toggleAdminExcelRow('listing','${x.id}',this.checked)"></td><td><strong>${escapeHtml(x.title)}</strong></td><td>${escapeHtml(x.transaction_type||'-')}</td><td>${escapeHtml(x.address||'-')}</td><td>${listingPriceText(x)}</td><td>${x.room_count??'-'} / ${x.bathroom_count??'-'}</td><td>${x.is_public?'공개':'비공개'}</td><td>${escapeHtml(x.status||'-')}</td></tr>`).join('')||`<tr><td colspan="8"><div class="empty">해당 중개사의 ${type==='customer'?'고객':'매물'}이 없습니다.</div></td></tr>`}
+    </tbody></table></div>`;
+}
+function downloadAdminExcelSelected(){
+  if(state.profile.role!=='admin')return toast('관리자만 사용할 수 있습니다.');
+  const type=state.adminExcel.type,set=type==='customer'?state.adminExcel.customerSelection:state.adminExcel.listingSelection;
+  const rows=adminExcelRows(type).filter(x=>set.has(x.id));if(!rows.length)return toast('다운로드할 항목을 선택하세요.');
+  const agent=safeAgentFileName(state.adminExcel.ownerId?excelOwnerName(state.adminExcel.ownerId):'전체중개사');
+  exportRowsExcel(rows.map(type==='customer'?customerExcelRow:listingExcelRow),`${agent}_${type==='customer'?'고객':'매물'}_선택_${rows.length}건.xlsx`);
+}
+function downloadAdminExcelAllForOwner(){
+  if(state.profile.role!=='admin')return toast('관리자만 사용할 수 있습니다.');
+  const type=state.adminExcel.type,rows=adminExcelRows(type);if(!rows.length)return toast('다운로드할 데이터가 없습니다.');
+  const agent=safeAgentFileName(state.adminExcel.ownerId?excelOwnerName(state.adminExcel.ownerId):'전체중개사');
+  exportRowsExcel(rows.map(type==='customer'?customerExcelRow:listingExcelRow),`${agent}_${type==='customer'?'고객':'매물'}_전체_${rows.length}건.xlsx`);
+}
+function downloadAgentBundle(ownerId){
+  if(state.profile.role!=='admin')return toast('관리자만 사용할 수 있습니다.');
+  const member=state.members.find(x=>x.id===ownerId),name=safeAgentFileName(member?.full_name||'중개사');
+  const customers=state.customers.filter(x=>x.owner_id===ownerId),listings=state.listings.filter(x=>x.owner_id===ownerId);
+  if(!customers.length&&!listings.length)return toast('다운로드할 데이터가 없습니다.');
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(customers.map(customerExcelRow)),'고객');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(listings.map(listingExcelRow)),'매물');
+  XLSX.writeFile(wb,`${name}_고객매물_전체.xlsx`);
+}
+
+function openExcelImport(kind){
+  if(state.profile.role!=='admin')return toast('관리자만 엑셀 가져오기를 사용할 수 있습니다.');
+  const input=document.createElement('input');input.type='file';input.accept='.xlsx,.xls,.csv';
+  input.onchange=()=>previewExcelImport(kind,input.files[0]);input.click();
+}
+async function previewExcelImport(kind,file){
+  if(!file)return;
+  try{
+    const buf=await file.arrayBuffer(),wb=XLSX.read(buf),raw=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
+    if(!raw.length)return toast('가져올 데이터가 없습니다.');
+    const parsed=kind==='customer'?raw.map((r,i)=>({rowNo:i+2,data:{name:r.고객명||r.name,phone:r.연락처||r.phone,customer_type:r.구분||r.customer_type||'매수',deal_type:r.거래유형||r.deal_type||'매매',customer_grade:r.등급||r.customer_grade||'C',preferred_area:r.희망지역||r.preferred_area,budget_max:r.희망금액만원||r.budget_max||null,desired_monthly_rent:r.희망월세만원||r.desired_monthly_rent||null,desired_rooms:r.희망방개수||r.desired_rooms||null,status:r.상태||'신규',notes:r.메모||''},valid:!!(r.고객명||r.name),label:r.고객명||r.name||'(고객명 없음)' }))
+      :raw.map((r,i)=>({rowNo:i+2,data:{title:r.매물명||r.title,transaction_type:r.거래유형||r.transaction_type||'매매',property_type:r.부동산유형||r.property_type||'아파트',address:r.주소||r.address||'',price:r.가격만원||r.price||null,monthly_rent:r.월세만원||r.monthly_rent||null,area_m2:r['면적㎡']||r.area_m2||null,room_count:r.방||r.room_count||null,bathroom_count:r.화장실||r.bathroom_count||null,contact_phone:r.연락처||r.contact_phone||'',is_public:String(r.공개||'공개')!=='비공개',status:r.상태||'available',description:r.설명||''},valid:!!(r.매물명||r.title),label:r.매물명||r.title||'(매물명 없음)'}));
+    state.adminExcel.importKind=kind;state.adminExcel.importRows=parsed;state.adminExcel.importSelection=new Set(parsed.map((x,i)=>x.valid?i:null).filter(x=>x!==null));state.adminExcel.importFileName=file.name;
+    renderExcelImportPreview();
+  }catch(e){toast('엑셀 파일을 읽지 못했습니다: '+e.message)}
+}
+function toggleExcelImportRow(index,checked){checked?state.adminExcel.importSelection.add(index):state.adminExcel.importSelection.delete(index);updateExcelImportCount()}
+function toggleExcelImportAll(checked){state.adminExcel.importRows.forEach((x,i)=>{if(x.valid)(checked?state.adminExcel.importSelection.add(i):state.adminExcel.importSelection.delete(i))});renderExcelImportPreview()}
+function updateExcelImportCount(){const el=$('#excelImportSelectedCount');if(el)el.textContent=`${state.adminExcel.importSelection.size}건 선택`;const b=$('#excelImportExecute');if(b)b.disabled=!state.adminExcel.importSelection.size}
+function renderExcelImportPreview(){
+  const box=$('#excelImportPreview');if(!box)return;
+  const kind=state.adminExcel.importKind,rows=state.adminExcel.importRows,set=state.adminExcel.importSelection;
+  box.innerHTML=`<div class="panel import-preview-panel"><div class="panel-head"><div><h3>${kind==='customer'?'고객':'매물'} 가져오기 미리보기</h3><div class="muted">${escapeHtml(state.adminExcel.importFileName)} · 필요한 행만 체크한 뒤 가져오세요.</div></div><button class="icon-btn" onclick="clearExcelImportPreview()">×</button></div><div class="excel-list-toolbar"><label><input type="checkbox" ${rows.filter(x=>x.valid).length&&rows.filter(x=>x.valid).every((x,i)=>set.has(rows.indexOf(x)))?'checked':''} onchange="toggleExcelImportAll(this.checked)"> 유효 행 전체 선택</label><div class="row-actions"><span id="excelImportSelectedCount" class="muted">${set.size}건 선택</span><button id="excelImportExecute" class="primary" ${set.size?'':'disabled'} onclick="executeSelectedExcelImport()">선택 행 가져오기</button></div></div><div class="table-wrap excel-select-table"><table><thead><tr><th>선택</th><th>행</th><th>${kind==='customer'?'고객명':'매물명'}</th><th>${kind==='customer'?'연락처':'주소'}</th><th>구분</th><th>상태</th></tr></thead><tbody>${rows.map((x,i)=>`<tr class="${x.valid?'':'invalid-row'}"><td><input type="checkbox" ${set.has(i)?'checked':''} ${x.valid?'':'disabled'} onchange="toggleExcelImportRow(${i},this.checked)"></td><td>${x.rowNo}</td><td><strong>${escapeHtml(x.label)}</strong>${x.valid?'':' '+badge('필수값 없음','red')}</td><td>${escapeHtml(kind==='customer'?(x.data.phone||'-'):(x.data.address||'-'))}</td><td>${escapeHtml(kind==='customer'?(x.data.customer_type||'-'):(x.data.transaction_type||'-'))}</td><td>${escapeHtml(x.data.status||'-')}</td></tr>`).join('')}</tbody></table></div></div>`;
+}
+function clearExcelImportPreview(){state.adminExcel.importRows=[];state.adminExcel.importSelection.clear();const box=$('#excelImportPreview');if(box)box.innerHTML=''}
+async function executeSelectedExcelImport(){
+  if(state.profile.role!=='admin')return toast('관리자만 사용할 수 있습니다.');
+  const owner=$('#excelImportOwner')?.value;if(!owner)return toast('등록 담당 중개사를 선택하세요.');
+  const kind=state.adminExcel.importKind,selected=[...state.adminExcel.importSelection].sort((a,b)=>a-b).map(i=>state.adminExcel.importRows[i]).filter(x=>x?.valid);
+  if(!selected.length)return toast('가져올 행을 선택하세요.');
+  if(!confirm(`${selected.length}건을 ${excelOwnerName(owner)} 담당으로 가져올까요?`))return;
+  const payload=selected.map(x=>({...x.data,owner_id:owner,original_owner_id:owner}));
+  const {error}=await state.client.from(kind==='customer'?'customers':'listings').insert(payload);
+  if(error)return toast(error.message);
+  toast(`${payload.length}건을 가져왔습니다.`);clearExcelImportPreview();await Promise.all([loadCustomers(),loadListings()]);renderAdminExcelList();
+}
+
+renderAdminData=async function(){
+  if(state.profile.role!=='admin')return toast('관리자만 이용할 수 있습니다.');
+  await Promise.all([loadMembers(),loadCustomers(),loadListings()]);
+  const approved=state.members.filter(x=>x.status==='approved');
+  if(!state.adminExcel.ownerId)state.adminExcel.ownerId=state.profile.id;
+  $('#content').innerHTML=`
+    <section class="panel"><div class="panel-head"><div><h3>중개사별 엑셀 내보내기</h3><p class="muted">중개사를 선택해 목록을 확인하고 일부 항목만 체크하거나, 해당 중개사의 고객·매물을 한 파일로 일괄 다운로드할 수 있습니다.</p></div></div>
+      <div class="excel-agent-bar"><label>중개사 선택<select id="adminExcelOwner" onchange="setAdminExcelOwner(this.value)"><option value="">전체 중개사</option>${approved.map(x=>`<option value="${x.id}" ${x.id===state.adminExcel.ownerId?'selected':''}>${escapeHtml(x.full_name)} · ${escapeHtml(x.office_name||'')}</option>`).join('')}</select></label><button class="primary" onclick="downloadAgentBundle($('#adminExcelOwner').value)" ${state.adminExcel.ownerId?'':'disabled'}>선택 중개사 고객·매물 전체 다운로드</button></div>
+      <div id="adminExcelList" style="margin-top:18px"></div>
+    </section>
+    <section class="panel" style="margin-top:18px"><div class="panel-head"><div><h3>엑셀 선택 가져오기</h3><p class="muted">파일을 먼저 읽어 목록을 확인한 뒤 필요한 행만 체크해서 가져옵니다.</p></div></div>
+      <div class="excel-import-controls"><label>등록 담당 중개사<select id="excelImportOwner">${approved.map(x=>`<option value="${x.id}" ${x.id===state.profile.id?'selected':''}>${escapeHtml(x.full_name)} · ${escapeHtml(x.office_name||'')}</option>`).join('')}</select></label><div class="row-actions"><button class="ghost" onclick="openExcelImport('customer')">고객 엑셀 선택</button><button class="ghost" onclick="openExcelImport('listing')">매물 엑셀 선택</button></div></div>
+      <div class="notice" style="margin-top:14px">가져오기 전 미리보기에서 행별 선택이 가능합니다. 기존 데이터와 자동 병합되지는 않으므로 전화번호와 주소 중복을 확인하세요.</div><div id="excelImportPreview" style="margin-top:18px"></div>
+    </section>`;
+  renderAdminExcelList();
+};
+
+console.info('CRM v3.2 중개사별 엑셀 선택관리 로드 완료');
