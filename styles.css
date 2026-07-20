@@ -1006,3 +1006,14 @@ body.crm3850-calendar-dragging .calendar-day{cursor:copy}
 .crm3851-import-main{min-width:0;display:flex;flex-direction:column;gap:4px}.crm3851-import-main strong{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.crm3851-import-main small{color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .crm3851-import-state{font-size:12px;font-weight:800;color:#64748b;white-space:nowrap}
 @media(max-width:760px){.crm3851-import-row{grid-template-columns:22px 62px minmax(0,1fr)}.crm3851-import-state{grid-column:3}.crm3851-contract-import-btn{width:100%}}
+
+/* ===== CRM v3.8.52 주소·동·호 3칸 배치 ===== */
+.crm3852-address-row{display:grid;grid-template-columns:minmax(0,2.4fr) minmax(105px,.65fr) minmax(105px,.65fr);gap:10px;align-items:end}
+.crm3852-address-row label{min-width:0}
+.crm3852-address-row input{width:100%}
+.crm3852-address-help{grid-column:1/-1;margin-top:-3px;color:#6b778c;font-size:12px;line-height:1.4}
+@media(max-width:720px){
+  .crm3852-address-row{grid-template-columns:minmax(0,1.8fr) minmax(78px,.65fr) minmax(78px,.65fr);gap:7px}
+  .crm3852-address-row label{font-size:12px}
+  .crm3852-address-row input{padding-left:10px;padding-right:10px}
+}

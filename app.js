@@ -3472,3 +3472,122 @@ crm3848RenderCalendar=async function(){
   }
 };
 console.info('CRM v3.8.51 계약진행 일정 캘린더 가져오기 적용 완료');
+
+/* ===== CRM v3.8.52 주소·동·호 분리 및 중복매물 차단 ===== */
+function crm3852Compact(value){return String(value??'').trim().replace(/\s+/g,'')}
+function crm3852NormalizeBuilding(value){
+  const v=crm3852Compact(value);
+  if(!v)return '1동';
+  if(/동$/.test(v))return v;
+  return /^\d+$/.test(v)?`${v}동`:v;
+}
+function crm3852NormalizeUnit(value){
+  const v=crm3852Compact(value);
+  if(!v)return '';
+  if(/호$/.test(v))return v;
+  return /^\d+$/.test(v)?`${v}호`:v;
+}
+function crm3852AddressKey(value){return crm3852Compact(value).toLowerCase()}
+function crm3852SplitLegacyAddress(value){
+  let address=String(value||'').trim(),building='1동',unit='';
+  const unitMatch=address.match(/(?:^|\s)([^\s]+호)$/);
+  if(unitMatch){unit=crm3852NormalizeUnit(unitMatch[1]);address=address.slice(0,unitMatch.index).trim()}
+  const buildingMatch=address.match(/(?:^|\s)([^\s]+동)$/);
+  if(buildingMatch){building=crm3852NormalizeBuilding(buildingMatch[1]);address=address.slice(0,buildingMatch.index).trim()}
+  return {address,building_no:building,unit_no:unit};
+}
+function crm3852FullAddress(listing){
+  const lot=String(listing?.address||listing?.district||'주소 미입력').trim();
+  const building=crm3852NormalizeBuilding(listing?.building_no||'1동');
+  const unit=crm3852NormalizeUnit(listing?.unit_no||'');
+  return [lot,building,unit].filter(Boolean).join(' ');
+}
+async function crm3852FindDuplicate(address,building,unit,id){
+  if(!address||!unit)return null;
+  let q=state.client.from('listings').select('id,title,owner_id,owner:profiles!listings_owner_id_fkey(full_name)').eq('address_normalized',crm3852AddressKey(address)).eq('building_no',building).eq('unit_no',unit);
+  if(id)q=q.neq('id',id);
+  const {data,error}=await q.limit(1);
+  if(error){console.warn('중복매물 조회 실패',error);return null}
+  return data?.[0]||null;
+}
+const crm3852OpenListingModalBase=openListingModal;
+openListingModal=function(id){
+  crm3852OpenListingModalBase(id);
+  const listing=id?state.listings.find(x=>x.id===id):null;
+  const addressInput=document.querySelector('#modalBody [name="address"]');
+  if(!addressInput)return;
+  const oldLabel=addressInput.closest('label');
+  const legacy=crm3852SplitLegacyAddress(listing?.address||addressInput.value||'');
+  const addressValue=listing?.building_no||listing?.unit_no?(listing.address||''):legacy.address;
+  const buildingValue=listing?.building_no||legacy.building_no||'1동';
+  const unitValue=listing?.unit_no||legacy.unit_no||'';
+  const wrap=document.createElement('div');
+  wrap.className='span-2 crm3852-address-row';
+  wrap.innerHTML=`
+    <label class="crm3852-address-main">주소(지번까지)<input name="address" value="${escapeHtml(addressValue)}" placeholder="예: 서울 양천구 신월동 52-13" required></label>
+    <label>동<input name="building_no" value="${escapeHtml(buildingValue)}" placeholder="예: 101동"></label>
+    <label>호수<input name="unit_no" value="${escapeHtml(unitValue)}" placeholder="예: 603호" required></label>
+    <div class="crm3852-address-help">동이 없는 건물은 비워두면 자동으로 <strong>1동</strong>으로 저장됩니다.</div>`;
+  oldLabel.replaceWith(wrap);
+
+  const submit=document.getElementById('modalSubmit');
+  const oldHandler=submit?.onclick;
+  if(!submit||!oldHandler)return;
+  submit.onclick=async function(e){
+    e.preventDefault();
+    const addressEl=document.querySelector('#modalBody [name="address"]');
+    const buildingEl=document.querySelector('#modalBody [name="building_no"]');
+    const unitEl=document.querySelector('#modalBody [name="unit_no"]');
+    const address=String(addressEl?.value||'').trim().replace(/\s+/g,' ');
+    const building=crm3852NormalizeBuilding(buildingEl?.value);
+    const unit=crm3852NormalizeUnit(unitEl?.value);
+    if(!address)return toast('주소를 지번까지 입력하세요.');
+    if(!unit)return toast('호수를 입력하세요.');
+    buildingEl.value=building;unitEl.value=unit;addressEl.value=address;
+    const duplicate=await crm3852FindDuplicate(address,building,unit,id);
+    if(duplicate){
+      const broker=duplicate.owner?.full_name||'다른 중개사';
+      alert(`이미 ${broker} 중개사가 접수한 매물입니다.\n\n${crm3852FullAddress({address,building_no:building,unit_no:unit})}\n매물명: ${duplicate.title||'-'}`);
+      return;
+    }
+    const beforeIds=new Set((state.listings||[]).map(x=>x.id));
+    await oldHandler.call(this,e);
+    if(document.getElementById('modal')?.open)return;
+    let listingId=id;
+    if(!listingId){
+      const {data}=await state.client.from('listings').select('id').eq('owner_id',state.profile.id).eq('address',address).order('created_at',{ascending:false}).limit(5);
+      listingId=(data||[]).find(x=>!beforeIds.has(x.id))?.id||data?.[0]?.id;
+    }
+    if(!listingId)return;
+    const {error}=await state.client.from('listings').update({address,building_no:building,unit_no:unit,address_normalized:crm3852AddressKey(address)}).eq('id',listingId);
+    if(error){
+      if(!id)await state.client.from('listings').delete().eq('id',listingId);
+      alert(error.message.includes('duplicate_listing_address')?'동일한 주소·동·호수의 매물이 이미 등록되어 있어 저장할 수 없습니다.':`주소 정보 저장 실패: ${error.message}`);
+      return;
+    }
+    await loadListings();
+    if(state.view==='network')renderNetwork();else if(state.view==='adminListings')renderAdminListings();else renderMyListings();
+  };
+};
+
+const crm3852RenderListingTableBase=renderListingTable;
+renderListingTable=function(rows,target,mine,adminMode=false){
+  crm3852RenderListingTableBase(rows,target,mine,adminMode);
+  const table=document.querySelector(`#${target} table`);if(!table)return;
+  const addressRows=[...table.querySelectorAll('tbody tr.crm3813-address-row')];
+  addressRows.forEach((row,index)=>{
+    const line=row.querySelector('.crm3829-address-line');
+    const text=line?.querySelector('span:first-child');
+    if(text&&rows[index]){const full=crm3852FullAddress(rows[index]);text.textContent=full;line.title=full}
+  });
+};
+
+// 캘린더로 가져오는 계약 일정에도 분리된 전체 주소를 사용한다.
+const crm3852EventDescriptionBase=typeof crm3851EventDescription==='function'?crm3851EventDescription:null;
+if(crm3852EventDescriptionBase){
+  crm3851EventDescription=function(listing,stage){
+    return crm3852EventDescriptionBase(listing,stage).replace(`주소: ${listing.address||listing.district||'-'}`,`주소: ${crm3852FullAddress(listing)}`);
+  };
+}
+Object.assign(window,{openListingModal,renderListingTable,crm3852FullAddress});
+console.info('CRM v3.8.52 주소·동·호 분리 및 중복매물 차단 적용 완료');
