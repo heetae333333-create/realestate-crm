@@ -2072,3 +2072,30 @@ filterAdminListings=function(){
 };
 Object.assign(window,{openListingModal,filterNetwork,filterAdminListings,crm3818FormatDistrict});
 console.info('CRM v3.8.18 지역 입력 간소화·띄어쓰기 무관 검색 로드 완료');
+
+/* CRM v3.8.19 - 지역은 입력 중 건드리지 않고 저장 시에만 정리 */
+crm3818FormatDistrict=function(value){
+  let text=String(value||'').trim();
+  text=text.replace(/^(서울특별시|서울시|서울)\s*/,'');
+  const compact=text.replace(/\s+/g,'');
+  const match=compact.match(/^(.+?(?:구|군))(.+?(?:동|읍|면|가))$/);
+  if(match)return `${match[1]} ${match[2]}`;
+  return text.replace(/\s+/g,' ').trim();
+};
+crm3818BindDistrictInput=function(){
+  const input=$('#modalBody input[name="district"]');
+  if(!input)return;
+  input.placeholder='예: 강서구 화곡동';
+  // 입력 중에는 값을 절대 변경하지 않습니다.
+};
+if(!window.__crm3819DistrictSaveBound){
+  window.__crm3819DistrictSaveBound=true;
+  document.addEventListener('submit',event=>{
+    const form=event.target;
+    if(form?.id!=='modalForm')return;
+    const input=form.querySelector('input[name="district"]');
+    if(input)input.value=crm3818FormatDistrict(input.value);
+  },true);
+}
+Object.assign(window,{crm3818FormatDistrict,crm3818BindDistrictInput});
+console.info('CRM v3.8.19 지역 저장 시 자동 정리 로드 완료');
