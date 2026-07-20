@@ -3693,3 +3693,155 @@ renderListingTable=function(rows,target,mine,adminMode=false){
 };
 Object.assign(window,{openListingModal,renderListingTable});
 console.info('CRM v3.8.54 등록일시 및 거래유형 기준 중복매물 판정 적용 완료');
+
+/* ===== CRM v3.8.55 구조화 주소키 · 확정/의심 중복매물 판정 ===== */
+function crm3855OnlyDigits(value, fallback=''){
+  const digits=String(value??'').replace(/[^0-9]/g,'').replace(/^0+(?=\d)/,'');
+  return digits||fallback;
+}
+function crm3855ParseLotAddress(value){
+  const display=String(value||'').trim().replace(/\s+/g,' ');
+  const clean=display
+    .replace(/서울특별시|서울시|서울/g,' ')
+    .replace(/[(),]/g,' ')
+    .replace(/번지/g,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+  const compact=clean.replace(/\s+/g,'');
+  const district=(compact.match(/([가-힣]+구)/)||[])[1]||'';
+  const afterDistrict=district?compact.slice(compact.indexOf(district)+district.length):compact;
+  const dong=(afterDistrict.match(/([가-힣0-9]+(?:동|가|읍|면|리))/)||[])[1]||'';
+  const afterDong=dong?afterDistrict.slice(afterDistrict.indexOf(dong)+dong.length):afterDistrict;
+  const lotMatch=afterDong.match(/(산)?\s*(\d+)(?:\s*-\s*(\d+))?/);
+  const mountain=!!lotMatch?.[1];
+  const lotMain=lotMatch?.[2]||'';
+  const lotSub=lotMatch?.[3]||'0';
+  const fallback=compact.toLowerCase();
+  return {
+    display,
+    district_key:district,
+    legal_dong_key:dong,
+    lot_main_key:lotMain?(mountain?`산${lotMain}`:lotMain):'',
+    lot_sub_key:lotSub,
+    fallback_key:fallback,
+    parsed:!!(district&&dong&&lotMain)
+  };
+}
+function crm3855CanonicalInput(address,building,unit){
+  const p=crm3855ParseLotAddress(address);
+  return {
+    ...p,
+    building_key:crm3855OnlyDigits(building,'1'),
+    unit_key:crm3855OnlyDigits(unit,''),
+  };
+}
+function crm3855CanonicalListing(listing){
+  const parsed=crm3855ParseLotAddress(listing?.address||'');
+  return {
+    ...parsed,
+    district_key:listing?.district_key||parsed.district_key,
+    legal_dong_key:listing?.legal_dong_key||parsed.legal_dong_key,
+    lot_main_key:listing?.lot_main_key||parsed.lot_main_key,
+    lot_sub_key:String(listing?.lot_sub_key??parsed.lot_sub_key??'0'),
+    building_key:String(listing?.building_key||crm3855OnlyDigits(listing?.building_no,'1')),
+    unit_key:String(listing?.unit_key||crm3855OnlyDigits(listing?.unit_no,'')),
+  };
+}
+function crm3855SameLotUnit(a,b){
+  if(a.parsed&&b.parsed){
+    return a.district_key===b.district_key&&a.legal_dong_key===b.legal_dong_key&&a.lot_main_key===b.lot_main_key&&String(a.lot_sub_key||'0')===String(b.lot_sub_key||'0')&&a.unit_key===b.unit_key;
+  }
+  return a.fallback_key===b.fallback_key&&a.unit_key===b.unit_key;
+}
+function crm3855BuildingLooksSimilar(a,b){
+  const x=String(a||''),y=String(b||'');
+  if(!x||!y||x===y)return false;
+  // 1동/101동처럼 관행적으로 혼용될 가능성만 경고하고, 자동으로 동일 확정하지 않습니다.
+  return (x==='1'&&y.endsWith('1'))||(y==='1'&&x.endsWith('1'));
+}
+async function crm3855FindCandidates(address,building,unit,id){
+  const key=crm3855CanonicalInput(address,building,unit);
+  if(!key.unit_key)return {key,rows:[]};
+  let q=state.client.from('listings').select('*, owner:profiles!listings_owner_id_fkey(full_name,office_name)');
+  if(id)q=q.neq('id',id);
+  if(key.parsed){
+    q=q.eq('district_key',key.district_key).eq('legal_dong_key',key.legal_dong_key).eq('lot_main_key',key.lot_main_key).eq('lot_sub_key',key.lot_sub_key).eq('unit_key',key.unit_key);
+  }
+  const {data,error}=await q;
+  let candidates=[];
+  if(error){
+    // 새 SQL 적용 전에도 화면이 멈추지 않도록 기존 자료를 읽어 보조 비교합니다.
+    console.warn('구조화 주소 조회 실패, 보조 비교 사용',error);
+    const fallback=await state.client.from('listings').select('*, owner:profiles!listings_owner_id_fkey(full_name,office_name)');
+    candidates=(fallback.data||[]).filter(x=>(!id||x.id!==id)&&crm3855SameLotUnit(key,crm3855CanonicalListing(x)));
+  }else{
+    candidates=(data||[]).filter(x=>crm3855SameLotUnit(key,crm3855CanonicalListing(x)));
+  }
+  if(!candidates.length)return {key,rows:[]};
+  const ids=candidates.map(x=>x.id);
+  const {data:options}=await state.client.from('listing_deal_options').select('*').in('listing_id',ids);
+  return {key,rows:candidates.map(x=>({...x,deal_options:(options||[]).filter(o=>o.listing_id===x.id)}))};
+}
+function crm3855CandidateLine(x){
+  const owner=x.owner?.full_name||'다른 중개사';
+  const office=x.owner?.office_name?` (${x.owner.office_name})`:'';
+  const types=crm3854ListingDealTypes(x).join('·')||x.transaction_type||'-';
+  return `• ${owner}${office} / ${types} / ${x.title||'매물명 없음'}\n  ${crm3852FullAddress(x)}`;
+}
+
+// 하위 버전의 단순 문자열/첫·끝자리 중복검사는 v3.8.55 검사 완료 후 건너뜁니다.
+let crm3855DuplicateCheckPassed=false;
+crm3852FindDuplicate=async function(){return crm3855DuplicateCheckPassed?null:null};
+crm3854FindSameUnitListings=async function(){return crm3855DuplicateCheckPassed?[]:[]};
+
+const crm3855OpenListingModalBase=openListingModal;
+openListingModal=function(id){
+  crm3855OpenListingModalBase(id);
+  const submit=document.getElementById('modalSubmit');
+  if(!submit||submit.dataset.crm3855Bound==='1')return;
+  submit.dataset.crm3855Bound='1';
+  const previous=submit.onclick;
+  submit.onclick=async function(e){
+    e.preventDefault();
+    const address=String(document.querySelector('#modalBody [name="address"]')?.value||'').trim();
+    const building=crm3852NormalizeBuilding(document.querySelector('#modalBody [name="building_no"]')?.value);
+    const unit=crm3852NormalizeUnit(document.querySelector('#modalBody [name="unit_no"]')?.value);
+    const newTypes=crm3854SelectedDealTypes();
+    if(!address||!unit||!newTypes.length)return previous?.call(this,e);
+
+    const {key,rows}=await crm3855FindCandidates(address,building,unit,id);
+    const exact=rows.filter(x=>crm3855CanonicalListing(x).building_key===key.building_key);
+    const exactBlocked=exact.filter(x=>crm3854ListingDealTypes(x).some(t=>newTypes.includes(t)));
+    if(exactBlocked.length){
+      alert(`동일한 지번·동·호수에 같은 거래유형이 이미 등록되어 있습니다.\n\n${exactBlocked.map(crm3855CandidateLine).join('\n\n')}\n\n겹치는 거래유형은 중복 등록할 수 없습니다.`);
+      return;
+    }
+
+    const exactOther=exact.filter(x=>!crm3854ListingDealTypes(x).some(t=>newTypes.includes(t)));
+    if(exactOther.length){
+      const ok=confirm(`동일한 호수에 다른 거래유형 매물이 있습니다.\n\n${exactOther.map(crm3855CandidateLine).join('\n\n')}\n\n새 거래유형(${newTypes.join('·')})은 겹치지 않습니다. 계속 등록하시겠습니까?`);
+      if(!ok)return;
+    }
+
+    const suspicious=rows.filter(x=>{
+      const old=crm3855CanonicalListing(x);
+      return old.building_key!==key.building_key;
+    });
+    if(suspicious.length){
+      const similar=suspicious.some(x=>crm3855BuildingLooksSimilar(crm3855CanonicalListing(x).building_key,key.building_key));
+      const label=similar?'동 표기가 1동/101동처럼 혼용되었을 가능성이 있습니다.':'같은 지번·호수에 동 번호만 다른 매물이 있습니다.';
+      const ok=confirm(`유사 중복매물이 발견되었습니다.\n${label}\n\n${suspicious.map(crm3855CandidateLine).join('\n\n')}\n\n실제로 다른 동인지 확인한 뒤 계속 등록하시겠습니까?`);
+      if(!ok)return;
+    }
+
+    if(!key.parsed){
+      const ok=confirm('주소에서 구·법정동·지번을 정확히 분리하지 못했습니다.\n예: 강서구 화곡동 1039-27 형식인지 확인해 주세요.\n\n그래도 저장하시겠습니까?');
+      if(!ok)return;
+    }
+
+    crm3855DuplicateCheckPassed=true;
+    try{return await previous?.call(this,e)}finally{crm3855DuplicateCheckPassed=false}
+  };
+};
+Object.assign(window,{openListingModal,crm3855ParseLotAddress});
+console.info('CRM v3.8.55 구조화 주소키 및 확정/의심 중복매물 판정 적용 완료');
