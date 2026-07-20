@@ -1877,3 +1877,92 @@ console.info('CRM v3.8.11 예정 FU 직접 반영·거래조건 변경 문구 �
 
 /* CRM v3.8.12 - 매물 목록 상세주소 표시 */
 console.info('CRM v3.8.12 매물 목록 상세주소 표시 로드 완료');
+
+/* ================= CRM v3.8.13 목록·장기미접촉·계약서 관리 ================= */
+
+moveInText=function(x){
+  if(x.move_in_immediate)return '즉시입주';
+  if(x.move_in_date&&x.move_in_negotiable)return `${fmtDate(x.move_in_date)}<br><span class="muted">협의 가능</span>`;
+  if(x.move_in_date)return fmtDate(x.move_in_date);
+  if(x.move_in_negotiable)return '협의 가능';
+  return '-';
+};
+
+crm37DormantInfo=function(customer){
+  const due=customer.next_follow_up_at;
+  if(!due)return {days:0,label:'',color:'gray'};
+  const d=new Date(`${due}T00:00:00`);
+  if(Number.isNaN(d.getTime()))return {days:0,label:'',color:'gray'};
+  const days=Math.floor((new Date(`${today()}T00:00:00`)-d)/86400000);
+  if(days<7)return {days:Math.max(0,days),label:'',color:'gray'};
+  if(days>=30)return {days,label:`FU ${days}일 지연`,color:'red'};
+  if(days>=14)return {days,label:`FU ${days}일 지연`,color:'yellow'};
+  return {days,label:`FU ${days}일 지연`,color:'gray'};
+};
+
+renderListingTable=function(rows,target,mine,adminMode=false){
+  const el=$('#'+target);
+  const totalCols=(adminMode?1:0)+16+(mine?1:0);
+  el.innerHTML=rows.length?`<div class="table-wrap listing-table-wrap"><table class="listing-table crm3813-listing-table"><thead><tr>${adminMode?'<th class="select-col">선택</th>':''}<th>상태</th><th>거래</th><th>유형</th><th>매물명</th><th>지역</th><th>금액</th><th>연락처</th><th>대출</th><th>전용면적</th><th>방/욕실</th><th>입주</th><th>담당</th><th>계약</th><th>최종 FU</th><th>예정 FU</th>${mine?'<th>관리</th>':''}</tr></thead><tbody>${rows.map(x=>`<tr class="crm3813-address-row">${adminMode?'<td></td>':''}<td colspan="3"><div title="${escapeHtml(x.address||x.district||'주소 미입력')}">${escapeHtml(x.address||x.district||'주소 미입력')}</div></td><td colspan="${totalCols-(adminMode?1:0)-3}"></td></tr><tr>${adminMode?`<td><input type="checkbox" class="admin-listing-check" value="${x.id}" onchange="toggleAdminListingSelection('${x.id}',this.checked)"></td>`:''}<td>${badge(x.status==='available'?'거래 가능':x.status==='complete'?'거래 완료':'협의 중',x.status==='available'?'green':x.status==='complete'?'gray':'yellow')}</td><td>${escapeHtml(crm38DealTypeText(x))}</td><td>${escapeHtml(x.property_type)}</td><td><strong>${escapeHtml(x.title)}</strong>${x.is_public?'':' '+badge('비공개','red')}<br><button class="photo-link" onclick="openListingPhotos('${x.id}')">📷 내부사진</button></td><td>${escapeHtml(listingAreaText(x))}</td><td>${listingPriceText(x)}</td><td>${crm382ContactDisplay(x)}</td><td>${x.loan_available===true?badge('O','green'):x.loan_available===false?badge('X','red'):badge('미확인','gray')}</td><td>${x.area_m2?`${x.area_m2}㎡<br><span class="muted">약 ${(Number(x.area_m2)/3.3058).toFixed(2)}평</span>`:'-'}</td><td>${listingRoomText(x)} / ${x.bathroom_count??'-'}</td><td>${moveInText(x)}</td><td>${escapeHtml(x.owner?.full_name||'-')}</td><td>${contractStage(x)}</td><td>${fmtDate(x.last_follow_up_at||x.last_confirmed_at)}</td><td>${dueBadge(x.next_follow_up_at)}</td>${mine?`<td><div class="row-actions"><button class="success" onclick="openFollowUpModal('listing','${x.id}')">FU</button><button class="ghost" onclick="openHistoryModal('listing','${x.id}')">히스토리</button><button class="ghost" onclick="openContractModal('listing','${x.id}')">계약일정</button><button class="ghost" onclick="openListingModal('${x.id}')">수정</button>${adminMode?`<button class="primary" onclick="openSingleListingTransfer('${x.id}')">개별 이관</button>`:''}<button class="danger" onclick="deleteListing('${x.id}')">삭제</button></div></td>`:''}</tr>`).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 매물이 없습니다.</div>';
+  if(adminMode)updateBulkTransferControls();
+};
+
+async function renderDocuments(){
+  await loadListings();
+  $('#content').innerHTML=`<div class="panel"><div class="panel-head"><div><h3>계약서 관리</h3><div class="muted">계약 기본정보와 계약서 파일만 간단히 등록합니다.</div></div><button class="primary" onclick="openContractDocumentForm()">계약서 등록</button></div><div id="documentList"><div class="empty">계약서를 불러오는 중입니다.</div></div></div>`;
+  await loadContractDocuments();
+}
+
+function openContractDocumentForm(){
+  $('#modalTitle').textContent='계약서 등록';
+  $('#modalBody').innerHTML=`<div class="form-grid crm3813-contract-form">
+    <label>매물명<input id="cdListingTitle" placeholder="예: 해성 오피스텔"></label>
+    <label>주소<input id="cdAddress" placeholder="예: 서울 강서구 화곡동 1039-27 203호"></label>
+    <label>거래조건<input id="cdTerms" placeholder="예: 전세 1억7,000만원"></label>
+    <label>중개구분<select id="cdBrokerageType"><option value="단타">단타</option><option value="양타">양타</option></select></label>
+    <label>계약자 1 이름<input id="cdParty1Name"></label>
+    <label>계약자 1 연락처<input id="cdParty1Phone" placeholder="010-0000-0000"></label>
+    <label>계약자 2 이름<input id="cdParty2Name"></label>
+    <label>계약자 2 연락처<input id="cdParty2Phone" placeholder="010-0000-0000"></label>
+    <label>가계약일<input id="cdPrecontractDate" type="date"></label>
+    <label>계약일<input id="cdContractDate" type="date"></label>
+    <label>잔금일<input id="cdBalanceDate" type="date"></label>
+    <label>계약서 파일<input id="cdFile" type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.hwp,.hwpx"></label>
+    <label class="span-2">메모<textarea id="cdNotes" rows="3" placeholder="특약이나 확인할 내용을 간단히 적으세요."></textarea></label>
+  </div>`;
+  ['cdParty1Phone','cdParty2Phone'].forEach(id=>{const e=$('#'+id);e?.addEventListener('input',()=>e.value=formatPhone(e.value))});
+  $('#modalSubmit').style.display='';
+  $('#modalSubmit').textContent='등록';
+  $('#modalSubmit').onclick=saveContractDocument;
+  $('#modal').showModal();
+}
+
+async function saveContractDocument(e){
+  e?.preventDefault();
+  const file=$('#cdFile').files[0];
+  if(!$('#cdListingTitle').value.trim()||!$('#cdAddress').value.trim())return toast('매물명과 주소를 입력하세요.');
+  if(!file)return toast('계약서 파일을 선택하세요.');
+  if(file.size>20*1024*1024)return toast('파일은 20MB 이하만 등록할 수 있습니다.');
+  const path=`contracts/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+  const {error:u}=await state.client.storage.from('contract-documents').upload(path,file);
+  if(u)return toast(u.message);
+  const row={
+    document_type:'계약서',file_name:file.name,storage_path:path,uploaded_by:state.profile.id,
+    listing_title:$('#cdListingTitle').value.trim(),contract_address:$('#cdAddress').value.trim(),deal_terms:$('#cdTerms').value.trim()||null,
+    brokerage_type:$('#cdBrokerageType').value,party1_name:$('#cdParty1Name').value.trim()||null,party1_phone:formatPhone($('#cdParty1Phone').value)||null,
+    party2_name:$('#cdParty2Name').value.trim()||null,party2_phone:formatPhone($('#cdParty2Phone').value)||null,
+    precontract_date:$('#cdPrecontractDate').value||null,contract_date:$('#cdContractDate').value||null,balance_date:$('#cdBalanceDate').value||null,contract_notes:$('#cdNotes').value.trim()||null
+  };
+  const {error}=await state.client.from('contract_documents').insert(row);
+  if(error){await state.client.storage.from('contract-documents').remove([path]);return toast(error.message)}
+  $('#modal').close();toast('계약서를 등록했습니다.');await loadContractDocuments();
+}
+
+async function loadContractDocuments(){
+  const {data,error}=await state.client.from('contract_documents').select('*').order('created_at',{ascending:false});
+  if(error)return toast(error.message);
+  const rows=data||[];
+  $('#documentList').innerHTML=rows.length?`<div class="table-wrap"><table class="crm3813-contract-table"><thead><tr><th>주소</th><th>매물명</th><th>거래조건</th><th>계약</th><th>계약일</th><th>잔금일</th><th>관리</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${escapeHtml(x.contract_address||'-')}</td><td><strong>${escapeHtml(x.listing_title||x.file_name||'-')}</strong></td><td>${escapeHtml(x.deal_terms||'-')}</td><td>${badge('계약서 있음','green')}<br><span class="muted">${escapeHtml(x.brokerage_type||'-')}</span></td><td>${fmtDate(x.contract_date)}</td><td>${fmtDate(x.balance_date)}</td><td><div class="row-actions"><button onclick="downloadContractDocument('${x.storage_path}','${escapeHtml(x.file_name)}')">다운로드</button><button class="danger" onclick="deleteContractDocument('${x.id}','${x.storage_path}')">삭제</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">등록된 계약서가 없습니다.</div>';
+}
+
+console.info('CRM v3.8.13 목록·장기미접촉·계약서 관리 로드 완료');

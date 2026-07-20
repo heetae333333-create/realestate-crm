@@ -260,3 +260,7 @@ input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:
 .crm3812-status-cell{min-width:118px;max-width:145px;vertical-align:middle}
 .crm3812-list-address{font-size:11px;line-height:1.28;color:#667085;font-weight:600;margin-bottom:5px;max-width:140px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:keep-all;overflow-wrap:anywhere}
 @media(max-width:700px){.crm3812-status-cell{min-width:105px}.crm3812-list-address{max-width:120px;font-size:10px}}
+
+/* CRM v3.8.13 */
+.crm3813-listing-table .crm3813-address-row td{padding:5px 8px 2px;border-bottom:0;background:#fbfcfe}.crm3813-listing-table .crm3813-address-row+tr td{padding-top:4px}.crm3813-address-row div{font-size:11px;color:#667085;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:430px}.crm3813-contract-form{align-items:start}.crm3813-contract-table td{vertical-align:middle}.crm3813-contract-table td:first-child{min-width:250px;max-width:360px}.crm3813-contract-table td:nth-child(2){min-width:150px}
+@media(max-width:760px){.crm3813-address-row div{max-width:280px}.crm3813-contract-table td:first-child{min-width:200px}}
