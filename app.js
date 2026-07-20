@@ -3497,9 +3497,13 @@ function crm3852SplitLegacyAddress(value){
   return {address,building_no:building,unit_no:unit};
 }
 function crm3852FullAddress(listing){
-  const lot=String(listing?.address||listing?.district||'주소 미입력').trim();
-  const building=crm3852NormalizeBuilding(listing?.building_no||'1동');
-  const unit=crm3852NormalizeUnit(listing?.unit_no||'');
+  // 기존 주소 칸 끝에 호수가 함께 저장된 자료도 자동 분리해서
+  // 항상 `지번주소 → 동 → 호수` 순서로 표시한다.
+  const raw=String(listing?.address||listing?.district||'주소 미입력').trim();
+  const legacy=crm3852SplitLegacyAddress(raw);
+  const unit=crm3852NormalizeUnit(listing?.unit_no||legacy.unit_no||'');
+  const building=crm3852NormalizeBuilding(listing?.building_no||legacy.building_no||'1동');
+  const lot=unit && legacy.unit_no ? legacy.address : raw;
   return [lot,building,unit].filter(Boolean).join(' ');
 }
 async function crm3852FindDuplicate(address,building,unit,id){
@@ -3518,7 +3522,8 @@ openListingModal=function(id){
   if(!addressInput)return;
   const oldLabel=addressInput.closest('label');
   const legacy=crm3852SplitLegacyAddress(listing?.address||addressInput.value||'');
-  const addressValue=listing?.building_no||listing?.unit_no?(listing.address||''):legacy.address;
+  // 구조화된 호수가 없고 기존 주소 끝에 `603호`처럼 들어 있으면 자동 분리한다.
+  const addressValue=listing?.unit_no?(listing.address||''):legacy.address;
   const buildingValue=listing?.building_no||legacy.building_no||'1동';
   const unitValue=listing?.unit_no||legacy.unit_no||'';
   const wrap=document.createElement('div');
@@ -3591,3 +3596,6 @@ if(crm3852EventDescriptionBase){
 }
 Object.assign(window,{openListingModal,renderListingTable,crm3852FullAddress});
 console.info('CRM v3.8.52 주소·동·호 분리 및 중복매물 차단 적용 완료');
+
+/* ===== CRM v3.8.53 동·호수 표시 순서 보정 ===== */
+console.info('CRM v3.8.53 주소 동·호수 순서 보정 적용 완료');
