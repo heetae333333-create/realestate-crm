@@ -254,3 +254,9 @@ input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:
 
 /* CRM v3.8.9 연락처 구분 옆 이름 */
 .crm389-contact-name{font-size:12px!important;color:#6b7280!important;font-weight:500;margin-left:3px}
+
+
+/* CRM v3.8.12 매물 목록 주소 */
+.crm3812-status-cell{min-width:118px;max-width:145px;vertical-align:middle}
+.crm3812-list-address{font-size:11px;line-height:1.28;color:#667085;font-weight:600;margin-bottom:5px;max-width:140px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:keep-all;overflow-wrap:anywhere}
+@media(max-width:700px){.crm3812-status-cell{min-width:105px}.crm3812-list-address{max-width:120px;font-size:10px}}
