@@ -2107,3 +2107,46 @@ listingAreaText=function(x){
 };
 Object.assign(window,{listingAreaText});
 console.info('CRM v3.8.20 목록 지역은 지역 필드 기준으로 표시');
+
+/* CRM v3.8.21 - 지역 입력은 순수 텍스트, 검색은 띄어쓰기 무관 */
+crm3818FormatDistrict=function(value){
+  // 사용자가 입력한 지역 문구는 임의로 띄어쓰거나 바꾸지 않습니다.
+  // 저장 시에는 앞뒤 공백만 정리하고, 검색 단계에서 공백을 무시합니다.
+  return String(value||'').trim();
+};
+crm3818BindDistrictInput=function(){
+  const input=$('#modalBody input[name="district"]');
+  if(!input)return;
+  input.placeholder='예: 강서구 화곡동';
+  // input/blur 이벤트로 값을 수정하지 않습니다.
+};
+function crm3821RegionSearchKey(value){
+  return normalizeText(String(value||''))
+    .replace(/서울특별시|서울시|서울/g,'')
+    .replace(/\s+/g,'');
+}
+filterNetwork=function(){
+  const q=crm3821RegionSearchKey($('#listingSearch')?.value||''),tx=$('#listingTx')?.value||'',ty=$('#listingType')?.value||'',st=$('#listingStatus')?.value||'',mx=Number($('#listingMax')?.value||0);
+  const rows=state.listings.filter(x=>{
+    if(!x.is_public)return false;
+    const hay=crm3821RegionSearchKey(`${x.title} ${x.address} ${x.district} ${x.owner?.full_name} ${x.owner?.office_name}`);
+    if(q&&!hay.includes(q))return false;
+    if(ty&&x.property_type!==ty)return false;
+    if(st&&x.status!==st)return false;
+    const opts=crm38DealOptions(x),matching=tx?opts.filter(o=>o.deal_type===tx):opts;
+    if(tx&&!matching.length)return false;
+    if(mx&&!matching.some(o=>Number(o.price||0)<=mx))return false;
+    return true;
+  });
+  renderListingTable(rows,'networkTable',false);
+};
+filterAdminListings=function(){
+  const q=crm3821RegionSearchKey($('#adminListingSearch')?.value||''),owner=$('#adminListingOwner')?.value||'',visibility=$('#adminListingVisibility')?.value||'',status=$('#adminListingStatus')?.value||'';
+  const rows=state.listings.filter(x=>{
+    const hay=crm3821RegionSearchKey(`${x.title} ${x.address} ${x.district} ${x.owner?.full_name} ${x.owner?.office_name} ${x.contact_phone||''}`);
+    return (!q||hay.includes(q))&&(!owner||x.owner_id===owner)&&(!status||x.status===status)&&(!visibility||(visibility==='public'?x.is_public:!x.is_public));
+  });
+  renderListingTable(rows,'adminListingTable',true,true);
+};
+Object.assign(window,{crm3818FormatDistrict,crm3818BindDistrictInput,crm3821RegionSearchKey,filterNetwork,filterAdminListings});
+console.info('CRM v3.8.21 지역 순수 텍스트 입력·공백 무관 검색 로드 완료');
