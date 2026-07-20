@@ -324,3 +324,13 @@ input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:
 /* CRM v3.8.28 계약 취소 버튼 */
 .crm3828-contract-cancel{margin-right:auto;background:#ef4444;color:#fff;border-color:#ef4444;font-weight:800}
 .crm3828-contract-cancel:hover{background:#dc2626;border-color:#dc2626}
+
+/* CRM v3.8.29 광고·계약진행 구분 및 광고 배지 */
+.crm3829-ad-section{padding:18px;border:1px solid #dbe5f2;border-radius:15px;background:#f8fbff;margin:0 0 18px}
+.crm3829-section-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:14px}.crm3829-section-head h4,.crm3829-contract-section-title h4{margin:0;font-size:17px}.crm3829-section-head span{font-size:12px;color:#64748b}
+.crm3829-ad-checks{display:grid;grid-template-columns:repeat(4,minmax(110px,1fr));gap:10px}.crm3829-ad-checks label{display:flex;align-items:center;gap:8px;padding:12px 13px;border:1px solid #d8e1ee;border-radius:11px;background:#fff;font-weight:800;white-space:nowrap}.crm3829-ad-checks input{width:17px;height:17px}
+.crm3829-contract-section-title{margin:4px 0 10px;padding:0 2px}
+.crm3829-address-line{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0}.crm3829-address-line>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crm3829-ad-badges{display:inline-flex;align-items:center;justify-content:flex-end;gap:5px;flex:0 0 auto;margin-left:auto}.crm3829-ad-badge{display:inline-flex;align-items:center;justify-content:center;width:21px;height:21px;border-radius:4px;color:#fff;font-size:12px;line-height:1;font-weight:900;font-family:Arial,sans-serif;box-shadow:0 1px 2px rgba(15,23,42,.16)}
+.crm3829-ad-s{background:#111827}.crm3829-ad-d{background:#f59e0b}.crm3829-ad-z{background:#2563eb}.crm3829-ad-b{background:#16a34a}
+@media(max-width:760px){.crm3829-ad-checks{grid-template-columns:repeat(2,1fr)}.crm3829-section-head{align-items:flex-start;flex-direction:column}.crm3829-ad-badge{width:20px;height:20px}}

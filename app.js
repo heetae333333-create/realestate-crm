@@ -2610,3 +2610,113 @@ console.info('CRM v3.8.26 필터 연동 집계 및 상태 2단계 적용 완료'
 
 // ===== CRM v3.8.27 진행상황-매물상태 자동연동 =====
 console.info('CRM v3.8.27 진행상황에 따른 매물 상태 자동연동 적용 완료');
+
+// ===== CRM v3.8.29 매물유형 세분화 · 광고관리 =====
+function crm3829PropertyTypeOptions(selected=''){
+  const types=['아파트','오피스텔','단독','다가구','다세대','원룸','상가','사무실','토지','기타'];
+  return types.map(v=>`<option value="${v}" ${selected===v?'selected':''}>${v}</option>`).join('');
+}
+function crm3829AdBadges(x){
+  const items=[];
+  if(x.ad_naver) items.push('<span class="crm3829-ad-badge crm3829-ad-s" title="네이버">S</span>');
+  if(x.ad_danggeun) items.push('<span class="crm3829-ad-badge crm3829-ad-d" title="당근">D</span>');
+  if(x.ad_zippl) items.push('<span class="crm3829-ad-badge crm3829-ad-z" title="집플 등">Z</span>');
+  if(x.ad_blog) items.push('<span class="crm3829-ad-badge crm3829-ad-b" title="블로그">B</span>');
+  return items.length?`<span class="crm3829-ad-badges">${items.join('')}</span>`:'';
+}
+function crm3829AdHistoryText(newlyChecked){
+  const labels={ad_naver:'네이버',ad_danggeun:'당근',ad_zippl:'집플 등',ad_blog:'블로그'};
+  return `광고 등록\n등록일: ${today()}\n광고 매체: ${newlyChecked.map(k=>labels[k]).join(', ')}`;
+}
+
+// 매물 등록/수정에서 빌라를 제거하고 세부 유형으로 교체한다.
+const crm3829OpenListingModalBase=openListingModal;
+openListingModal=function(id){
+  crm3829OpenListingModalBase(id);
+  const listing=state.listings.find(x=>x.id===id);
+  const select=document.querySelector('#modalBody select[name="property_type"]');
+  if(select){
+    select.innerHTML=crm3829PropertyTypeOptions(listing?.property_type||select.value||'');
+    if(listing?.property_type==='빌라') select.value='다세대';
+  }
+};
+
+// 필터의 매물 유형도 동일하게 구성한다.
+crm3826FilterBar=function(prefix){
+  const handler=prefix==='myListing'?'filterMyListings()':'filterNetwork()';
+  return `<div class="filters crm3826-listing-filters">
+    <input id="${prefix}Search" placeholder="매물명·주소·지역 검색" oninput="${handler}">
+    <select id="${prefix}Tx" onchange="${handler}"><option value="">전체 거래</option><option>매매</option><option>전세</option><option>월세</option></select>
+    <select id="${prefix}Type" onchange="${handler}"><option value="">전체 유형</option>${crm3829PropertyTypeOptions('')}</select>
+    <select id="${prefix}Status" onchange="${handler}"><option value="">전체 상태</option><option value="available">거래 가능</option><option value="complete">거래 완료</option></select>
+    <input id="${prefix}Max" type="number" min="0" placeholder="최대금액(만원)" oninput="${handler}">
+  </div>`;
+};
+
+const crm3829RenderAdminListingsBase=renderAdminListings;
+renderAdminListings=async function(){
+  await crm3829RenderAdminListingsBase();
+  const select=document.getElementById('adminListingType');
+  if(select) select.innerHTML=`<option value="">전체 유형</option>${crm3829PropertyTypeOptions('')}`;
+};
+
+// 진행상황 창을 광고 / 계약진행 두 섹션으로 나눈다.
+const crm3829OpenContractModalBase=openContractModal;
+openContractModal=async function(entityType,id){
+  await crm3829OpenContractModalBase(entityType,id);
+  if(entityType!=='listing') return;
+  const listing=state.listings.find(x=>x.id===id);
+  if(!listing) return;
+  const editor=document.querySelector('#modalBody .contract-editor');
+  const contractBox=document.querySelector('#modalBody .contract-detail-box');
+  if(!editor||!contractBox) return;
+  contractBox.insertAdjacentHTML('beforebegin',`<section class="crm3829-ad-section">
+    <div class="crm3829-section-head"><h4>광고</h4><span>체크 후 저장하면 광고 등록일과 매체가 히스토리에 남습니다.</span></div>
+    <div class="crm3829-ad-checks">
+      <label><input type="checkbox" id="crm3829AdNaver" ${listing.ad_naver?'checked':''}> 네이버</label>
+      <label><input type="checkbox" id="crm3829AdDanggeun" ${listing.ad_danggeun?'checked':''}> 당근</label>
+      <label><input type="checkbox" id="crm3829AdZippl" ${listing.ad_zippl?'checked':''}> 집플 등</label>
+      <label><input type="checkbox" id="crm3829AdBlog" ${listing.ad_blog?'checked':''}> 블로그</label>
+    </div>
+  </section><div class="crm3829-contract-section-title"><h4>계약진행</h4></div>`);
+  const oldHandler=$('#modalSubmit').onclick;
+  $('#modalSubmit').onclick=async function(e){
+    const values={
+      ad_naver:!!document.getElementById('crm3829AdNaver')?.checked,
+      ad_danggeun:!!document.getElementById('crm3829AdDanggeun')?.checked,
+      ad_zippl:!!document.getElementById('crm3829AdZippl')?.checked,
+      ad_blog:!!document.getElementById('crm3829AdBlog')?.checked
+    };
+    const dateMap={ad_naver:'ad_naver_at',ad_danggeun:'ad_danggeun_at',ad_zippl:'ad_zippl_at',ad_blog:'ad_blog_at'};
+    const newlyChecked=Object.keys(values).filter(k=>values[k]&&!listing[k]);
+    const payload={...values};
+    Object.entries(dateMap).forEach(([flag,dateKey])=>{
+      payload[dateKey]=values[flag]?(listing[dateKey]||today()):null;
+    });
+    const changed=Object.keys(values).some(k=>!!listing[k]!==values[k]);
+    if(changed){
+      const {error}=await state.client.from('listings').update(payload).eq('id',id);
+      if(error){e?.preventDefault();return toast(`광고 저장 실패: ${error.message}`)}
+      Object.assign(listing,payload);
+      if(newlyChecked.length){
+        const {error:hErr}=await state.client.from('interaction_history').insert({
+          listing_id:id,customer_id:null,created_by:state.profile.id,follow_up_date:today(),contact_method:'광고',content:crm3829AdHistoryText(newlyChecked),next_follow_up_at:null
+        });
+        if(hErr){e?.preventDefault();return toast(`광고는 저장됐지만 히스토리 기록에 실패했습니다: ${hErr.message}`)}
+      }
+    }
+    return oldHandler?.call(this,e);
+  };
+};
+
+// 주소 오른쪽에 광고 배지를 한 줄로 표시한다.
+renderListingTable=function(rows,target,mine,adminMode=false){
+  const normalized=rows.map(x=>({...x,status:crm3826StatusValue(x)}));
+  const el=$('#'+target);
+  const totalCols=1+(adminMode?1:0)+16+(mine?1:0);
+  el.innerHTML=normalized.length?`<div class="table-wrap listing-table-wrap"><table class="listing-table crm3813-listing-table crm3824-numbered-table"><thead><tr><th class="crm3824-no-col">순번</th>${adminMode?'<th class="select-col">선택</th>':''}<th>상태</th><th>거래</th><th>유형</th><th>매물명</th><th>지역</th><th>금액</th><th>연락처</th><th>대출</th><th>전용면적</th><th>방/욕실</th><th>입주</th><th>담당</th><th>진행상황</th><th>최종 FU</th><th>예정 FU</th>${mine?'<th>관리</th>':''}</tr></thead><tbody>${normalized.map((x,index)=>`<tr class="crm3813-address-row"><td class="crm3825-address-spacer"></td>${adminMode?'<td></td>':''}<td colspan="3"><div class="crm3829-address-line" title="${escapeHtml(x.address||x.district||'주소 미입력')}"><span>${escapeHtml(x.address||x.district||'주소 미입력')}</span>${crm3829AdBadges(x)}</div></td><td colspan="${totalCols-1-(adminMode?1:0)-3}"></td></tr><tr><td class="crm3824-no-cell">${index+1}</td>${adminMode?`<td><input type="checkbox" class="admin-listing-check" value="${x.id}" onchange="toggleAdminListingSelection('${x.id}',this.checked)"></td>`:''}<td>${badge(x.status==='available'?'거래 가능':'거래 완료',x.status==='available'?'green':'gray')}</td><td>${escapeHtml(crm38DealTypeText(x))}</td><td>${escapeHtml(x.property_type==='빌라'?'다세대':x.property_type)}</td><td><button type="button" class="crm3814-listing-title-link" onclick="openListingDetail('${x.id}')" title="매물 상세정보 보기">${escapeHtml(x.title)}</button>${x.is_public?'':' '+badge('비공개','red')}<br><button class="photo-link" onclick="openListingPhotos('${x.id}')">📷 내부사진</button></td><td>${escapeHtml(listingAreaText(x))}</td><td>${listingPriceText(x)}</td><td>${crm382ContactDisplay(x)}</td><td>${x.loan_available===true?badge('O','green'):x.loan_available===false?badge('X','red'):badge('미확인','gray')}</td><td>${x.area_m2?`${x.area_m2}㎡<br><span class="muted">약 ${(Number(x.area_m2)/3.3058).toFixed(2)}평</span>`:'-'}</td><td>${listingRoomText(x)} / ${x.bathroom_count??'-'}</td><td>${moveInText(x)}</td><td>${escapeHtml(x.owner?.full_name||'-')}</td><td>${contractStage(x)}</td><td>${fmtDate(x.last_follow_up_at||x.last_confirmed_at)}</td><td>${dueBadge(x.next_follow_up_at)}</td>${mine?`<td><div class="row-actions"><button class="success" onclick="openFollowUpModal('listing','${x.id}')">FU</button><button class="ghost" onclick="openHistoryModal('listing','${x.id}')">히스토리</button><button class="ghost" onclick="openContractModal('listing','${x.id}')">진행상황</button><button class="ghost" onclick="openListingModal('${x.id}')">수정</button>${adminMode?`<button class="primary" onclick="openSingleListingTransfer('${x.id}')">개별 이관</button>`:''}<button class="danger" onclick="deleteListing('${x.id}')">삭제</button></div></td>`:''}</tr>`).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 매물이 없습니다.</div>';
+  if(adminMode) updateBulkTransferControls();
+};
+
+Object.assign(window,{openListingModal,openContractModal,renderListingTable,renderAdminListings});
+console.info('CRM v3.8.29 매물유형 세분화 및 광고관리 적용 완료');
