@@ -1805,3 +1805,33 @@ console.info('CRM v3.8.7 FU 기록·확인전화 통합 로드 완료');
 
 /* CRM v3.8.8 - FU 예정일 즉시 반영 버그 수정 */
 console.info('CRM v3.8.8 FU 예정일 즉시 반영 로드 완료');
+
+/* ===== CRM v3.8.9 연락처 구분 옆 이름 표시 ===== */
+function crm389ContactDisplay(x){
+  const contacts=[];
+  const seen=new Set();
+  const extras=Array.isArray(x.additional_contacts)?x.additional_contacts:[];
+
+  // 기존 소유주 번호가 별도 칼럼에 남아 있는 경우, 동일 번호의 추가 연락처에서 이름을 찾아 함께 표시합니다.
+  if(x.contact_phone){
+    const phone=crm381FormatPhone(x.contact_phone);
+    const matched=extras.find(c=>c.phone&&crm381FormatPhone(c.phone)===phone);
+    contacts.push({role:'소유주',name:matched?.contact_name||'',phone});
+    seen.add(phone);
+  }
+
+  extras.forEach(c=>{
+    if(!c.phone)return;
+    const phone=crm381FormatPhone(c.phone);
+    if(seen.has(phone))return;
+    contacts.push({role:c.contact_role||'기타',name:c.contact_name||'',phone});
+    seen.add(phone);
+  });
+
+  if(!contacts.length)return '-';
+  return `<div class="crm384-contact-list">${contacts.map(c=>`<div class="crm384-contact-item"><strong>${escapeHtml(c.role)}${c.name?` <span class="crm389-contact-name">${escapeHtml(c.name)}</span>`:''}</strong><span>${escapeHtml(c.phone)}</span></div>`).join('')}</div>`;
+}
+crm382ContactDisplay=crm389ContactDisplay;
+crm384ContactDisplay=crm389ContactDisplay;
+Object.assign(window,{crm382ContactDisplay,crm384ContactDisplay,crm389ContactDisplay});
+console.info('CRM v3.8.9 연락처 이름 표시 개선 로드 완료');
