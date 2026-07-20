@@ -284,3 +284,11 @@ input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:
 }
 .crm3814-listing-title-link:hover{color:#2563eb;text-decoration-color:#2563eb}
 .crm3814-listing-title-link:focus-visible{outline:2px solid #2563eb;outline-offset:3px;border-radius:3px}
+
+/* CRM v3.8.24 순번·매물 집계·고객 진행상황 */
+.crm3824-listing-summary{display:grid;grid-template-columns:repeat(4,minmax(105px,1fr));gap:10px;margin-top:12px;max-width:620px}
+.crm3824-listing-summary>div{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 13px;border:1px solid #cfe0f5;border-radius:12px;background:rgba(255,255,255,.72)}
+.crm3824-listing-summary span{font-size:12px;color:#64748b;font-weight:700}.crm3824-listing-summary strong{font-size:20px;color:#14213d;font-variant-numeric:tabular-nums}
+.crm3824-no-col{width:48px;min-width:48px;text-align:center!important}.crm3824-no-cell,.crm3824-address-no{width:48px;min-width:48px;text-align:center!important;font-weight:800;color:#64748b;font-variant-numeric:tabular-nums}
+.crm3824-address-no{font-size:11px;vertical-align:middle}.crm3824-numbered-table th,.crm3824-numbered-table td{vertical-align:middle}
+@media(max-width:760px){.crm3824-listing-summary{grid-template-columns:repeat(2,1fr);max-width:none}.crm3824-no-col,.crm3824-no-cell,.crm3824-address-no{width:40px;min-width:40px}}

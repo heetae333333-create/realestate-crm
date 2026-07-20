@@ -2318,3 +2318,48 @@ openContractModal=async function(entityType,id){
   };
   $('#modal').showModal();
 };
+
+// ===== CRM v3.8.24 순번·매물 집계·고객 진행상황 =====
+function crm3824PreferredDealType(listing){
+  const options=crm38DealOptions(listing)||[];
+  const preferred=options.find(o=>o.is_preferred);
+  return preferred?.deal_type || options[0]?.deal_type || listing?.transaction_type || '';
+}
+function crm3824ListingSummary(rows){
+  const counts={전체:rows.length,매매:0,전세:0,월세:0};
+  rows.forEach(x=>{const type=crm3824PreferredDealType(x);if(Object.prototype.hasOwnProperty.call(counts,type))counts[type]++});
+  return `<div class="crm3824-listing-summary" aria-label="매물 현황">
+    <div><span>전체 매물</span><strong>${counts.전체}</strong></div>
+    <div><span>매매</span><strong>${counts.매매}</strong></div>
+    <div><span>전세</span><strong>${counts.전세}</strong></div>
+    <div><span>월세</span><strong>${counts.월세}</strong></div>
+  </div>`;
+}
+
+renderMyListings=async function(){
+  await loadListings();
+  state.myListings=state.listings.filter(x=>x.owner_id===state.profile.id);
+  $('#topActions').innerHTML='<button class="primary" onclick="openListingModal()">+ 매물 등록</button>';
+  $('#content').innerHTML=`<div class="notice crm3824-my-listing-head" style="margin-bottom:14px">
+    <div>이 시트에서 등록한 매물은 공개 상태가 ‘공개’인 경우 공동매물망에 자동으로 올라갑니다.</div>
+    ${crm3824ListingSummary(state.myListings)}
+  </div><div class="panel"><div id="myListingTable"></div></div>`;
+  renderListingTable(state.myListings,'myListingTable',true);
+  crm37AddQuickActions();
+};
+
+renderListingTable=function(rows,target,mine,adminMode=false){
+  const el=$('#'+target);
+  const totalCols=1+(adminMode?1:0)+16+(mine?1:0);
+  el.innerHTML=rows.length?`<div class="table-wrap listing-table-wrap"><table class="listing-table crm3813-listing-table crm3824-numbered-table"><thead><tr><th class="crm3824-no-col">순번</th>${adminMode?'<th class="select-col">선택</th>':''}<th>상태</th><th>거래</th><th>유형</th><th>매물명</th><th>지역</th><th>금액</th><th>연락처</th><th>대출</th><th>전용면적</th><th>방/욕실</th><th>입주</th><th>담당</th><th>진행상황</th><th>최종 FU</th><th>예정 FU</th>${mine?'<th>관리</th>':''}</tr></thead><tbody>${rows.map((x,index)=>`<tr class="crm3813-address-row"><td class="crm3824-address-no">${index+1}</td>${adminMode?'<td></td>':''}<td colspan="3"><div title="${escapeHtml(x.address||x.district||'주소 미입력')}">${escapeHtml(x.address||x.district||'주소 미입력')}</div></td><td colspan="${totalCols-1-(adminMode?1:0)-3}"></td></tr><tr><td class="crm3824-no-cell">${index+1}</td>${adminMode?`<td><input type="checkbox" class="admin-listing-check" value="${x.id}" onchange="toggleAdminListingSelection('${x.id}',this.checked)"></td>`:''}<td>${badge(x.status==='available'?'거래 가능':x.status==='complete'?'거래 완료':'협의 중',x.status==='available'?'green':x.status==='complete'?'gray':'yellow')}</td><td>${escapeHtml(crm38DealTypeText(x))}</td><td>${escapeHtml(x.property_type)}</td><td><button type="button" class="crm3814-listing-title-link" onclick="openListingDetail('${x.id}')" title="매물 상세정보 보기">${escapeHtml(x.title)}</button>${x.is_public?'':' '+badge('비공개','red')}<br><button class="photo-link" onclick="openListingPhotos('${x.id}')">📷 내부사진</button></td><td>${escapeHtml(listingAreaText(x))}</td><td>${listingPriceText(x)}</td><td>${crm382ContactDisplay(x)}</td><td>${x.loan_available===true?badge('O','green'):x.loan_available===false?badge('X','red'):badge('미확인','gray')}</td><td>${x.area_m2?`${x.area_m2}㎡<br><span class="muted">약 ${(Number(x.area_m2)/3.3058).toFixed(2)}평</span>`:'-'}</td><td>${listingRoomText(x)} / ${x.bathroom_count??'-'}</td><td>${moveInText(x)}</td><td>${escapeHtml(x.owner?.full_name||'-')}</td><td>${contractStage(x)}</td><td>${fmtDate(x.last_follow_up_at||x.last_confirmed_at)}</td><td>${dueBadge(x.next_follow_up_at)}</td>${mine?`<td><div class="row-actions"><button class="success" onclick="openFollowUpModal('listing','${x.id}')">FU</button><button class="ghost" onclick="openHistoryModal('listing','${x.id}')">히스토리</button><button class="ghost" onclick="openContractModal('listing','${x.id}')">진행상황</button><button class="ghost" onclick="openListingModal('${x.id}')">수정</button>${adminMode?`<button class="primary" onclick="openSingleListingTransfer('${x.id}')">개별 이관</button>`:''}<button class="danger" onclick="deleteListing('${x.id}')">삭제</button></div></td>`:''}</tr>`).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 매물이 없습니다.</div>';
+  if(adminMode)updateBulkTransferControls();
+};
+
+filterCustomers=function(){
+  const q=($('#customerSearch')?.value||'').toLowerCase(),t=$('#customerType')?.value||'',s=$('#customerStatus')?.value||'',d=$('#customerDealType')?.value||'',g=$('#customerGrade')?.value||'';
+  const rows=state.customers.filter(x=>(!q||`${x.name} ${x.phone}`.toLowerCase().includes(q))&&(!t||x.customer_type===t)&&(!s||x.status===s)&&(!d||x.deal_type===d)&&(!g||x.customer_grade===g));
+  state.filteredCustomers=rows;
+  $('#customerTable').innerHTML=rows.length?`<div class="table-wrap"><table class="customer-table crm3824-numbered-table"><thead><tr><th class="crm3824-no-col">순번</th><th>고객명</th><th>연락처</th><th>단계</th><th>미접촉</th><th>거래유형</th><th>등급</th><th>희망지역</th><th>방</th><th>희망금액/월세</th><th>진행상황</th><th>최종 FU</th><th>예정 FU</th><th>관리</th></tr></thead><tbody>${rows.map((x,index)=>{const dorm=crm37DormantInfo(x);return `<tr><td class="crm3824-no-cell">${index+1}</td><td><strong>${escapeHtml(x.name)}</strong></td><td>${escapeHtml(x.phone||'-')}</td><td>${badge(x.status||'신규 문의','blue')}</td><td>${dorm.label?badge(dorm.label,dorm.color):badge('최근 연락','green')}</td><td>${escapeHtml(x.deal_type||'-')}</td><td>${gradeBadge(x.customer_grade)}</td><td>${escapeHtml(x.preferred_area||'-')}</td><td>${customerRoomText(x)}</td><td>${customerBudgetText(x)}</td><td>${contractStage(x)}</td><td>${fmtDate(x.last_follow_up_at)}</td><td>${dueBadge(x.next_follow_up_at)}</td><td><div class="row-actions"><button class="success" onclick="openFollowUpModal('customer','${x.id}')">FU</button><button class="ghost" onclick="openHistoryModal('customer','${x.id}')">히스토리</button><button class="ghost" onclick="openContractModal('customer','${x.id}')">진행상황</button><button class="ghost" onclick="openCustomerModal('${x.id}')">수정</button><button class="danger" onclick="deleteCustomer('${x.id}')">삭제</button></div></td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 고객이 없습니다.</div>';
+};
+
+Object.assign(window,{renderMyListings,renderListingTable,filterCustomers});
