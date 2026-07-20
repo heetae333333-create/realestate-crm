@@ -2010,3 +2010,65 @@ runGlobalSearch=function(){
 };
 Object.assign(window,{crm3810ApplyReadOnlyListing,runGlobalSearch});
 console.info('CRM v3.8.15 타인 매물 비밀메모 숨김 로드 완료');
+
+console.info('CRM v3.8.17 매물 목록 주소 상단 표시 복원 완료');
+
+/* CRM v3.8.18 - 지역 입력 간소화 및 띄어쓰기 무관 검색 */
+function crm3818FormatDistrict(value){
+  let text=String(value||'').trim().replace(/\s+/g,' ');
+  // 지역 칸에는 시·도 대신 구와 동 중심으로 저장합니다.
+  text=text.replace(/^(서울특별시|서울시|서울)\s*/,'');
+  // 붙여 쓴 구/군 + 동/읍/면을 보기 좋게 자동 분리합니다.
+  text=text
+    .replace(/([가-힣0-9·-]+(?:구|군))\s*([가-힣0-9·-]+(?:동|읍|면|가))(?=\s|$)/g,'$1 $2')
+    .replace(/([가-힣0-9·-]+(?:구|군))(?=[가-힣])/g,'$1 ')
+    .replace(/\s+/g,' ')
+    .trim();
+  return text;
+}
+function crm3818CompactSearch(value){
+  return normalizeText(String(value||'')).replace(/\s+/g,'');
+}
+function crm3818BindDistrictInput(){
+  const input=$('#modalBody input[name="district"]');
+  if(!input)return;
+  input.placeholder='예: 강서구 화곡동';
+  const format=()=>{
+    const formatted=crm3818FormatDistrict(input.value);
+    if(input.value!==formatted)input.value=formatted;
+  };
+  input.addEventListener('input',format);
+  input.addEventListener('blur',format);
+  format();
+}
+const crm3818BaseOpenListingModal=openListingModal;
+openListingModal=function(id){
+  const result=crm3818BaseOpenListingModal(id);
+  [0,50,150].forEach(ms=>setTimeout(crm3818BindDistrictInput,ms));
+  return result;
+};
+filterNetwork=function(){
+  const q=crm3818CompactSearch($('#listingSearch')?.value||''),tx=$('#listingTx')?.value||'',ty=$('#listingType')?.value||'',st=$('#listingStatus')?.value||'',mx=Number($('#listingMax')?.value||0);
+  const rows=state.listings.filter(x=>{
+    if(!x.is_public)return false;
+    const hay=crm3818CompactSearch(`${x.title} ${x.address} ${x.district} ${x.owner?.full_name} ${x.owner?.office_name}`);
+    if(q&&!hay.includes(q))return false;
+    if(ty&&x.property_type!==ty)return false;
+    if(st&&x.status!==st)return false;
+    const opts=crm38DealOptions(x),matching=tx?opts.filter(o=>o.deal_type===tx):opts;
+    if(tx&&!matching.length)return false;
+    if(mx&&!matching.some(o=>Number(o.price||0)<=mx))return false;
+    return true;
+  });
+  renderListingTable(rows,'networkTable',false);
+};
+filterAdminListings=function(){
+  const q=crm3818CompactSearch($('#adminListingSearch')?.value||''),owner=$('#adminListingOwner')?.value||'',visibility=$('#adminListingVisibility')?.value||'',status=$('#adminListingStatus')?.value||'';
+  const rows=state.listings.filter(x=>{
+    const hay=crm3818CompactSearch(`${x.title} ${x.address} ${x.district} ${x.owner?.full_name} ${x.owner?.office_name} ${x.contact_phone||''}`);
+    return (!q||hay.includes(q))&&(!owner||x.owner_id===owner)&&(!status||x.status===status)&&(!visibility||(visibility==='public'?x.is_public:!x.is_public));
+  });
+  renderListingTable(rows,'adminListingTable',true,true);
+};
+Object.assign(window,{openListingModal,filterNetwork,filterAdminListings,crm3818FormatDistrict});
+console.info('CRM v3.8.18 지역 입력 간소화·띄어쓰기 무관 검색 로드 완료');
