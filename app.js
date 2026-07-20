@@ -2720,3 +2720,156 @@ renderListingTable=function(rows,target,mine,adminMode=false){
 
 Object.assign(window,{openListingModal,openContractModal,renderListingTable,renderAdminListings});
 console.info('CRM v3.8.29 매물유형 세분화 및 광고관리 적용 완료');
+
+/* ===== CRM v3.8.30 매물유형·주소·예정 FU 분리 ===== */
+function crm3830PropertyTypeOptions(selected=''){
+  const normalized=selected==='원룸'?'기타':selected;
+  const types=['아파트','오피스텔','단독','다가구','다세대','상가','사무실','토지','기타'];
+  return types.map(v=>`<option value="${v}" ${normalized===v?'selected':''}>${v}</option>`).join('');
+}
+crm3829PropertyTypeOptions=crm3830PropertyTypeOptions;
+
+// 매물 등록·수정과 필터에서 원룸 유형을 제거한다.
+const crm3830OpenListingModalBase=openListingModal;
+openListingModal=function(id){
+  crm3830OpenListingModalBase(id);
+  const listing=state.listings.find(x=>x.id===id);
+  const select=document.querySelector('#modalBody select[name="property_type"]');
+  if(select){
+    select.innerHTML=crm3830PropertyTypeOptions(listing?.property_type||select.value||'');
+    if(listing?.property_type==='원룸') select.value='기타';
+  }
+};
+
+crm3826FilterBar=function(prefix){
+  const handler=prefix==='myListing'?'filterMyListings()':'filterNetwork()';
+  return `<div class="filters crm3826-listing-filters">
+    <input id="${prefix}Search" placeholder="매물명·주소·지역 검색" oninput="${handler}">
+    <select id="${prefix}Tx" onchange="${handler}"><option value="">전체 거래</option><option>매매</option><option>전세</option><option>월세</option></select>
+    <select id="${prefix}Type" onchange="${handler}"><option value="">전체 유형</option>${crm3830PropertyTypeOptions('')}</select>
+    <select id="${prefix}Status" onchange="${handler}"><option value="">전체 상태</option><option value="available">거래 가능</option><option value="complete">거래 완료</option></select>
+    <input id="${prefix}Max" type="number" min="0" placeholder="최대금액(만원)" oninput="${handler}">
+  </div>`;
+};
+
+const crm3830RenderAdminListingsBase=renderAdminListings;
+renderAdminListings=async function(){
+  await crm3830RenderAdminListingsBase();
+  const select=document.getElementById('adminListingType');
+  if(select) select.innerHTML=`<option value="">전체 유형</option>${crm3830PropertyTypeOptions('')}`;
+};
+
+function crm3830RefreshListingScreen(){
+  if(state.view==='adminListings') return renderAdminListings();
+  if(state.view==='network') return renderNetwork();
+  return renderMyListings();
+}
+
+crm361SetFuTab=function(tab){
+  $$('.crm361-fu-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+  $$('.crm361-fu-panel').forEach(p=>p.classList.toggle('hidden',p.dataset.panel!==tab));
+  const submit=$('#modalSubmit');
+  if(!submit)return;
+  submit.style.display=tab==='history'?'none':'';
+  submit.textContent=tab==='schedule'?'예정 FU 저장':'저장';
+  if(tab==='history')crm361LoadPriceHistory($('#crm361ListingId').value);
+};
+
+crm361OpenListingFu=async function(id){
+  const item=state.listings.find(x=>x.id===id);if(!item)return toast('매물을 찾지 못했습니다.');
+  const oldOpts=crm38DealOptions(item).map(o=>({...o}));
+  const map=Object.fromEntries(oldOpts.map(o=>[o.deal_type,{...o,checked:true}]));
+  $('#modalTitle').textContent=`${item.title} · FU 관리`;
+  $('#modalBody').innerHTML=`<input id="crm361ListingId" type="hidden" value="${id}">
+  <div class="crm361-fu-tabs crm3830-fu-tabs">
+    <button type="button" class="crm361-fu-tab active" data-tab="record" onclick="crm361SetFuTab('record')">FU 기록</button>
+    <button type="button" class="crm361-fu-tab" data-tab="schedule" onclick="crm361SetFuTab('schedule')">예정 FU</button>
+    <button type="button" class="crm361-fu-tab" data-tab="history" onclick="crm361SetFuTab('history')">가격 이력</button>
+  </div>
+  <section class="crm361-fu-panel" data-panel="record">
+    <div class="form-grid">
+      <label>기록 일자<input id="crm361FuDate" type="date" value="${today()}" required></label>
+      <label>상담 종류<select id="crm361FuMethod"><option>전화</option><option>대면투어</option><option>촬영</option><option>문자/톡 발송</option><option>문자/톡 수신</option><option>부재중</option><option>가계약</option><option>본계약</option><option>중도금</option><option>잔금</option><option>기타</option></select></label>
+      <label class="span-2">상담·진행 내용<textarea id="crm361FuContent" rows="6" placeholder="통화 내용, 조건 변경, 다음 조치 등을 구체적으로 기록하세요."></textarea></label>
+    </div>
+    <div class="crm387-confirm-wrap">
+      <label class="inline-check crm387-confirm-toggle"><input id="crm387UseConfirm" type="checkbox" onchange="crm387ToggleConfirmBlock()"> 거래조건 변경</label>
+      <div id="crm387ConfirmBlock" hidden>
+        <div class="notice">현재 가능한 거래유형과 가격을 저장합니다. 추가·종료·가격변경 내용은 매물 정보, 가격 이력, FU 히스토리에 함께 반영됩니다.</div>
+        <div class="form-grid" style="margin-top:14px">
+          <label>확인 결과<select id="crm361ConfirmResult"><option>거래 가능</option><option>가격 변경</option><option>거래 완료</option><option>연락 안 됨</option><option>재확인 필요</option></select></label>
+          <div></div>
+          <div class="span-2 crm386-fu-deals">${crm386FuDealCard('매매',map['매매']||{})}${crm386FuDealCard('전세',map['전세']||{})}${crm386FuDealCard('월세',map['월세']||{})}</div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="crm361-fu-panel hidden" data-panel="schedule">
+    <div class="crm3830-schedule-card">
+      <div>
+        <h4>예정 FU 일정</h4>
+        <p>이 날짜는 FU 히스토리와 최종 FU에 영향을 주지 않고, 매물 리스트의 예정 FU에만 반영됩니다.</p>
+      </div>
+      <label>예정 FU<input id="crm3830ScheduleDate" type="date" value="${item.next_follow_up_at?item.next_follow_up_at.slice(0,10):''}"></label>
+      <button type="button" class="ghost crm3830-clear-schedule" onclick="document.getElementById('crm3830ScheduleDate').value=''">일정 지우기</button>
+    </div>
+  </section>
+  <section class="crm361-fu-panel hidden" data-panel="history"><div id="crm361PriceHistory"></div></section>`;
+  $('#modalSubmit').style.display='';
+  $('#modalSubmit').textContent='저장';
+  $('#modalSubmit').onclick=async e=>{
+    e.preventDefault();
+    const active=$('.crm361-fu-tab.active')?.dataset.tab||'record';
+    if(active==='history')return;
+    if(active==='schedule'){
+      const next=$('#crm3830ScheduleDate').value||null;
+      const {error}=await state.client.from('listings').update({next_follow_up_at:next}).eq('id',id);
+      if(error)return toast(`예정 FU 저장 실패: ${error.message}`);
+      item.next_follow_up_at=next;
+      $('#modal').close();
+      toast(next?'예정 FU 일정을 변경했습니다.':'예정 FU 일정을 삭제했습니다.');
+      return crm3830RefreshListingScreen();
+    }
+    const content=$('#crm361FuContent').value.trim();
+    const useConfirm=!!$('#crm387UseConfirm')?.checked;
+    if(!content&&!useConfirm)return toast('FU 내용 또는 거래조건 변경 내용을 입력하세요.');
+    const fuDate=$('#crm361FuDate').value||today();
+    let diffText='',result='';
+    if(useConfirm){
+      const newOpts=crm386CollectFuDeals();if(!newOpts.length)return toast('거래유형을 하나 이상 체크하세요.');
+      const preferred=newOpts.find(o=>o.is_preferred)||newOpts[0];preferred.is_preferred=true;
+      result=$('#crm361ConfirmResult').value;
+      const {error:logErr}=await state.client.from('listing_confirmation_logs').insert({listing_id:id,confirmed_by:state.profile.id,result,note:null,confirmed_price:preferred.price??null,confirmed_monthly_rent:preferred.monthly_rent??null,next_confirm_at:null});if(logErr)return toast(logErr.message);
+      const {error:delErr}=await state.client.from('listing_deal_options').delete().eq('listing_id',id);if(delErr)return toast(delErr.message);
+      const {error:insErr}=await state.client.from('listing_deal_options').insert(newOpts.map(o=>({...o,listing_id:id})));if(insErr)return toast(insErr.message);
+      const update={last_confirmed_at:fuDate,next_confirm_at:null,transaction_type:preferred.deal_type,price:preferred.price,monthly_rent:preferred.monthly_rent,last_follow_up_at:fuDate};
+      if(result==='거래 완료')update.status='complete';else if(result==='거래 가능')update.status='available';
+      const {error:uErr}=await state.client.from('listings').update(update).eq('id',id);if(uErr)return toast(uErr.message);
+      const diff=crm385DiffDealOptions(oldOpts,newOpts);
+      diffText=diff.map(c=>c.kind==='add'?`${c.type} 조건 추가 · ${crm385DealValueText(c.newO)}`:c.kind==='remove'?`${c.type} 조건 종료 · ${crm385DealValueText(c.oldO)}`:`${c.type} 가격 변경 · ${crm385DealValueText(c.oldO)} → ${crm385DealValueText(c.newO)}`).join('\n');
+      const priceRows=diff.map(c=>({listing_id:id,changed_by:state.profile.id,transaction_type:c.type,old_price:c.oldO?.price??null,new_price:c.newO?.price??null,old_monthly_rent:c.oldO?.monthly_rent??null,new_monthly_rent:c.newO?.monthly_rent??null}));
+      if(priceRows.length){const {error:priceErr}=await state.client.from('listing_price_history').insert(priceRows);if(priceErr)toast(`가격 이력 저장 실패: ${priceErr.message}`)}
+    }
+    const parts=[];
+    if(content)parts.push(content);
+    if(useConfirm)parts.push(`확인 결과: ${result}${diffText?`\n${diffText}`:''}`);
+    const {error:hErr}=await state.client.from('interaction_history').insert({created_by:state.profile.id,follow_up_date:fuDate,contact_method:useConfirm?'매물확인':$('#crm361FuMethod').value,content:parts.join('\n\n'),next_follow_up_at:null,listing_id:id});
+    if(hErr)return toast(hErr.message);
+    if(!useConfirm){const {error:uErr}=await state.client.from('listings').update({last_follow_up_at:fuDate}).eq('id',id);if(uErr)return toast(uErr.message)}
+    await loadListings();
+    $('#modal').close();
+    toast(useConfirm?'FU와 거래조건 변경을 저장했습니다. 예정 FU는 변경되지 않았습니다.':'FU 기록을 저장했습니다. 예정 FU는 변경되지 않았습니다.');
+    return crm3830RefreshListingScreen();
+  };
+  $('#modal').showModal();
+};
+openFollowUpModal=function(entityType,id){return entityType==='listing'?crm361OpenListingFu(id):crm361BaseOpenFollowUpModal(entityType,id)};
+
+// 기존 원룸 데이터는 목록에서 기타로 표시한다.
+const crm3830RenderListingTableBase=renderListingTable;
+renderListingTable=function(rows,target,mine,adminMode=false){
+  crm3830RenderListingTableBase(rows.map(x=>x.property_type==='원룸'?{...x,property_type:'기타'}:x),target,mine,adminMode);
+};
+
+Object.assign(window,{openListingModal,renderAdminListings,crm361SetFuTab,crm361OpenListingFu,openFollowUpModal,renderListingTable});
+console.info('CRM v3.8.30 매물유형 원룸 제거·주소 확대·예정 FU 분리 적용 완료');

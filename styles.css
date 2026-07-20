@@ -334,3 +334,12 @@ input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:
 .crm3829-ad-badges{display:inline-flex;align-items:center;justify-content:flex-end;gap:5px;flex:0 0 auto;margin-left:auto}.crm3829-ad-badge{display:inline-flex;align-items:center;justify-content:center;width:21px;height:21px;border-radius:4px;color:#fff;font-size:12px;line-height:1;font-weight:900;font-family:Arial,sans-serif;box-shadow:0 1px 2px rgba(15,23,42,.16)}
 .crm3829-ad-s{background:#111827}.crm3829-ad-d{background:#f59e0b}.crm3829-ad-z{background:#2563eb}.crm3829-ad-b{background:#16a34a}
 @media(max-width:760px){.crm3829-ad-checks{grid-template-columns:repeat(2,1fr)}.crm3829-section-head{align-items:flex-start;flex-direction:column}.crm3829-ad-badge{width:20px;height:20px}}
+
+/* CRM v3.8.30 주소 크기·예정 FU 독립 탭 */
+.crm3813-listing-table .crm3813-address-row div,
+.crm3829-address-line{font-size:13px!important;line-height:1.35;font-weight:750;color:#475569}
+.crm3829-address-line>span{font-size:13px!important;line-height:21px}
+.crm3830-fu-tabs{grid-template-columns:repeat(3,minmax(0,auto))}
+.crm3830-schedule-card{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,300px) auto;align-items:end;gap:16px;padding:20px;border:1px solid #dbe5f2;border-radius:14px;background:#f8fbff}
+.crm3830-schedule-card h4{margin:0 0 6px;font-size:17px}.crm3830-schedule-card p{margin:0;color:#64748b;font-size:13px;line-height:1.5}.crm3830-schedule-card label{margin:0}.crm3830-clear-schedule{height:46px;white-space:nowrap}
+@media(max-width:720px){.crm3813-listing-table .crm3813-address-row div,.crm3829-address-line,.crm3829-address-line>span{font-size:12px!important}.crm3830-schedule-card{grid-template-columns:1fr}.crm3830-clear-schedule{width:100%}}
