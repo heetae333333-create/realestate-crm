@@ -3599,3 +3599,97 @@ console.info('CRM v3.8.52 주소·동·호 분리 및 중복매물 차단 적용
 
 /* ===== CRM v3.8.53 동·호수 표시 순서 보정 ===== */
 console.info('CRM v3.8.53 주소 동·호수 순서 보정 적용 완료');
+
+/* ===== CRM v3.8.54 등록일시 표시 · 거래유형 기준 중복매물 판정 ===== */
+function crm3854AddressMatchKey(value){
+  const compact=String(value||'').toLowerCase().replace(/서울특별시|서울시|서울/g,'').replace(/\s+/g,'');
+  const m=compact.match(/([가-힣]+구)([가-힣0-9]+동)(산?\d+(?:-\d+)?)/);
+  return m?`${m[1]}|${m[2]}|${m[3]}`:compact;
+}
+function crm3854BuildingSignature(value){
+  const digits=String(value||'1').replace(/\D/g,'')||'1';
+  return `${digits[0]}${digits[digits.length-1]}`;
+}
+function crm3854UnitKey(value){return String(value||'').replace(/\D/g,'')}
+function crm3854SelectedDealTypes(){
+  const cards=[...document.querySelectorAll('#modalBody .crm38-deal-card')];
+  const selected=cards.filter(c=>c.querySelector('.crm38-deal-check')?.checked).map(c=>c.dataset.type).filter(Boolean);
+  const fallback=document.querySelector('#modalBody [name="transaction_type"]')?.value;
+  return [...new Set(selected.length?selected:(fallback?[fallback]:[]))];
+}
+function crm3854ListingDealTypes(listing){return [...new Set(crm38DealOptions(listing).map(o=>o.deal_type).filter(Boolean))]}
+async function crm3854FindSameUnitListings(address,building,unit,id){
+  if(!address||!unit)return [];
+  const key=crm3854AddressMatchKey(address),bSig=crm3854BuildingSignature(building),uKey=crm3854UnitKey(unit);
+  let q=state.client.from('listings').select('*, owner:profiles!listings_owner_id_fkey(full_name,office_name)');
+  if(id)q=q.neq('id',id);
+  const {data,error}=await q;
+  if(error){console.warn('동일 호수 조회 실패',error);return []}
+  const candidates=(data||[]).filter(x=>crm3854AddressMatchKey(x.address)===key&&crm3854BuildingSignature(x.building_no||'1동')===bSig&&crm3854UnitKey(x.unit_no)===uKey);
+  if(!candidates.length)return [];
+  const ids=candidates.map(x=>x.id);
+  const {data:options}=await state.client.from('listing_deal_options').select('*').in('listing_id',ids);
+  return candidates.map(x=>({...x,deal_options:(options||[]).filter(o=>o.listing_id===x.id)}));
+}
+function crm3854ExistingSummary(listing){
+  const broker=listing.owner?.full_name||'다른 중개사';
+  const office=listing.owner?.office_name?` (${listing.owner.office_name})`:'';
+  const types=crm3854ListingDealTypes(listing).join('·')||listing.transaction_type||'-';
+  return `${broker}${office} 중개사 · ${types} · ${listing.title||'매물명 없음'}`;
+}
+
+const crm3854OpenListingModalBase=openListingModal;
+openListingModal=function(id){
+  crm3854OpenListingModalBase(id);
+  const submit=document.getElementById('modalSubmit');
+  if(!submit||submit.dataset.crm3854Bound==='1')return;
+  submit.dataset.crm3854Bound='1';
+  const previous=submit.onclick;
+  submit.onclick=async function(e){
+    e.preventDefault();
+    const address=String(document.querySelector('#modalBody [name="address"]')?.value||'').trim();
+    const building=crm3852NormalizeBuilding(document.querySelector('#modalBody [name="building_no"]')?.value);
+    const unit=crm3852NormalizeUnit(document.querySelector('#modalBody [name="unit_no"]')?.value);
+    const newTypes=crm3854SelectedDealTypes();
+    if(!id&&address&&unit&&newTypes.length){
+      const same=await crm3854FindSameUnitListings(address,building,unit,null);
+      const blocked=same.filter(x=>crm3854ListingDealTypes(x).some(t=>newTypes.includes(t)));
+      if(blocked.length){
+        const lines=blocked.map(crm3854ExistingSummary).join('\n');
+        alert(`동일한 주소·동·호수에 같은 거래유형 매물이 이미 등록되어 있습니다.\n\n${lines}\n\n같은 거래유형은 중복 등록할 수 없습니다.`);
+        return;
+      }
+      const other=same.filter(x=>!crm3854ListingDealTypes(x).some(t=>newTypes.includes(t)));
+      if(other.length){
+        const lines=other.map(crm3854ExistingSummary).join('\n');
+        alert(`해당 호수에는 다른 거래유형의 매물이 이미 등록되어 있습니다.\n\n${lines}\n\n현재 선택한 거래유형(${newTypes.join('·')})은 달라서 계속 등록할 수 있습니다.`);
+      }
+    }
+    return previous?.call(this,e);
+  };
+};
+
+function crm3854CreatedAtText(value){
+  if(!value)return '등록일시 -';
+  const d=new Date(value);
+  if(Number.isNaN(d.getTime()))return '등록일시 -';
+  return `등록 ${d.toLocaleDateString('ko-KR',{year:'2-digit',month:'2-digit',day:'2-digit'})} ${d.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false})}`;
+}
+const crm3854RenderListingTableBase=renderListingTable;
+renderListingTable=function(rows,target,mine,adminMode=false){
+  crm3854RenderListingTableBase(rows,target,mine,adminMode);
+  const root=document.getElementById(target),table=root?.querySelector('table');
+  if(!table)return;
+  const headers=[...table.querySelectorAll('thead th')];
+  const manageIndex=headers.findIndex(th=>th.textContent.trim()==='관리');
+  if(manageIndex<0)return;
+  const dataRows=[...table.querySelectorAll('tbody tr:not(.crm3813-address-row)')];
+  dataRows.forEach((tr,i)=>{
+    const cell=tr.children[manageIndex],item=rows[i];
+    if(!cell||!item||cell.querySelector('.crm3854-created-at'))return;
+    const stamp=document.createElement('div');stamp.className='crm3854-created-at';stamp.textContent=crm3854CreatedAtText(item.created_at);
+    const actions=cell.querySelector('.row-actions');cell.insertBefore(stamp,actions||cell.firstChild);
+  });
+};
+Object.assign(window,{openListingModal,renderListingTable});
+console.info('CRM v3.8.54 등록일시 및 거래유형 기준 중복매물 판정 적용 완료');
