@@ -2327,8 +2327,65 @@ openContractModal=async function(entityType,id){
     $('#modal').close();toast('진행상황을 저장하고 최종 FU를 오늘 날짜로 갱신했습니다.');
     entityType==='customer'?renderCustomers():(state.view==='adminListings'?renderAdminListings():renderMyListings());
   };
+  // 계약 취소 버튼: 기존 히스토리는 유지하고 현재 계약 입력값만 초기화한다.
+  const modalActions=$('#modalForm .modal-actions');
+  const oldCancel=$('#contractCancelBtn');
+  if(oldCancel) oldCancel.remove();
+  const contractCancelBtn=document.createElement('button');
+  contractCancelBtn.type='button';
+  contractCancelBtn.id='contractCancelBtn';
+  contractCancelBtn.className='danger crm3828-contract-cancel';
+  contractCancelBtn.textContent='계약 취소';
+  modalActions.prepend(contractCancelBtn);
+  contractCancelBtn.onclick=async()=>{
+    if(!confirm('현재 계약 진행정보를 모두 초기화하고 계약 파기 이력을 남길까요?')) return;
+    const resetPayload={
+      provisional_contract_date:null,
+      provisional_contract_amount:null,
+      provisional_contract_completed:false,
+      contract_date:null,
+      contract_amount:null,
+      contract_completed:false,
+      interim_payment_date:null,
+      interim_payment_amount:null,
+      interim_payment_completed:false,
+      interim_payment_not_applicable:false,
+      final_payment_date:null,
+      final_payment_amount:null,
+      final_payment_completed:false,
+      contracted_property_name:null,
+      contracted_transaction_type:null,
+      contracted_amount:null,
+      contracted_monthly_rent:null,
+      counterparty_name:null,
+      counterparty_phone:null,
+      last_follow_up_at:today()
+    };
+    if(entityType==='listing') resetPayload.status='available';
+    const table=entityType==='customer'?'customers':'listings';
+    const {error}=await state.client.from(table).update(resetPayload).eq('id',id);
+    if(error) return toast(error.message);
+    const target={customer_id:entityType==='customer'?id:null,listing_id:entityType==='listing'?id:null};
+    const previousStage=(contractStage(item).replace(/<[^>]+>/g,'').trim()||'미진행');
+    const {error:hErr}=await state.client.from('interaction_history').insert({
+      ...target,
+      created_by:state.profile.id,
+      follow_up_date:today(),
+      contact_method:'계약 취소',
+      content:`계약 파기됨\n이전 진행상황: ${previousStage}`,
+      next_follow_up_at:null
+    });
+    if(hErr) return toast(`계약정보는 초기화됐지만 히스토리 기록에 실패했습니다: ${hErr.message}`);
+    if(entityType==='customer') await loadCustomers(); else await loadListings();
+    $('#modal').close();
+    toast('계약정보를 초기화하고 계약 파기 이력을 남겼습니다.');
+    entityType==='customer'?renderCustomers():(state.view==='adminListings'?renderAdminListings():renderMyListings());
+  };
   $('#modal').showModal();
 };
+
+// ===== CRM v3.8.28 계약 취소 및 계약정보 초기화 =====
+console.info('CRM v3.8.28 계약 취소 기능 적용 완료');
 
 // ===== CRM v3.8.24 순번·매물 집계·고객 진행상황 =====
 function crm3824PreferredDealType(listing){

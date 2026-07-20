@@ -319,3 +319,8 @@ input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:
   .crm3826-filter-summary{align-items:stretch;flex-direction:column;gap:9px}
   .crm3826-filter-summary-grid{grid-template-columns:repeat(2,1fr)}
 }
+
+
+/* CRM v3.8.28 계약 취소 버튼 */
+.crm3828-contract-cancel{margin-right:auto;background:#ef4444;color:#fff;border-color:#ef4444;font-weight:800}
+.crm3828-contract-cancel:hover{background:#dc2626;border-color:#dc2626}
