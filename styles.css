@@ -373,3 +373,17 @@ input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:
   .crm3832-announcement-actions button{padding:8px 10px;font-size:12px}
   .crm3832-announcement-preview{max-height:420px}
 }
+
+/* CRM v3.8.33 주소행과 매물정보행 간격 축소 */
+.crm3813-listing-table .crm3813-address-row td{
+  padding-top:5px;
+  padding-bottom:0;
+  line-height:21px;
+}
+.crm3813-listing-table .crm3813-address-row + tr td{
+  vertical-align:top;
+  padding-top:5px;
+}
+.crm3813-listing-table .crm3813-address-row + tr .crm3824-no-cell{
+  padding-top:8px;
+}

@@ -2942,3 +2942,5 @@ Object.assign(window,{renderListingTable});
 console.info('CRM v3.8.31 리스트 FU 및 관리영역 압축 적용 완료');
 
 console.info('CRM v3.8.32 공지사항 압축 및 광고 변경이력 적용 완료');
+
+console.info('CRM v3.8.33 주소행 간격 축소 적용 완료');
