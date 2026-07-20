@@ -2983,3 +2983,46 @@ renderListingTable=function(rows,target,mine,adminMode=false){
 };
 Object.assign(window,{renderListingTable});
 console.info('CRM v3.8.41 공동매물망 열간격 통일 및 광고 아이콘 주소 옆 배치 완료');
+
+/* ===== CRM v3.8.42 내 매물·공동매물망 열 정렬 통일 / 내부사진 간격 축소 ===== */
+const crm3842RenderListingTableBase=renderListingTable;
+renderListingTable=function(rows,target,mine,adminMode=false){
+  crm3842RenderListingTableBase(rows,target,mine,adminMode);
+  const root=document.getElementById(target);
+  const table=root?.querySelector('table.crm3839-reordered-table');
+  if(!table)return;
+
+  const alignByHeader={
+    '순번':['crm3842-center','crm3842-nowrap'],
+    '선택':['crm3842-center','crm3842-nowrap'],
+    '상태':['crm3842-center','crm3842-nowrap'],
+    '매물명':['crm3842-left','crm3842-title-cell'],
+    '거래':['crm3842-center','crm3842-nowrap'],
+    '유형':['crm3842-center','crm3842-nowrap'],
+    '지역':['crm3842-center','crm3842-nowrap'],
+    '금액':['crm3842-left','crm3842-price-cell'],
+    '연락처':['crm3842-left','crm3842-contact-cell'],
+    '대출':['crm3842-center','crm3842-nowrap'],
+    '전용면적':['crm3842-center','crm3842-nowrap'],
+    '방/욕실':['crm3842-center','crm3842-nowrap'],
+    '입주':['crm3842-center'],
+    '담당':['crm3842-center','crm3842-nowrap'],
+    '진행상황':['crm3842-center','crm3842-nowrap'],
+    '최종 FU':['crm3842-center','crm3842-nowrap'],
+    '예정 FU':['crm3842-center','crm3842-nowrap'],
+    '관리':['crm3842-center']
+  };
+
+  const headers=[...table.querySelectorAll('thead th')];
+  const dataRows=[...table.querySelectorAll('tbody tr:not(.crm3813-address-row)')];
+  headers.forEach((th,index)=>{
+    const classes=alignByHeader[th.textContent.trim()]||[];
+    classes.forEach(cls=>th.classList.add(cls));
+    dataRows.forEach(tr=>{
+      const td=tr.children[index];
+      if(td)classes.forEach(cls=>td.classList.add(cls));
+    });
+  });
+};
+Object.assign(window,{renderListingTable});
+console.info('CRM v3.8.42 매물표 열 정렬 및 내부사진 간격 개선 완료');

@@ -440,3 +440,41 @@ input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:
 .crm3839-reordered-table .crm3841-address-line{justify-content:flex-start!important;gap:7px!important;width:max-content;max-width:560px}
 .crm3839-reordered-table .crm3841-address-line>span{flex:0 1 auto;max-width:390px}
 .crm3839-reordered-table .crm3841-address-badges{margin-left:0!important;justify-content:flex-start!important;gap:5px!important}
+
+/* ===== CRM v3.8.42 매물표 열 제목·데이터 정렬 통일 ===== */
+.crm3839-reordered-table th,
+.crm3839-reordered-table td{
+  box-sizing:border-box;
+  line-height:1.35;
+}
+.crm3839-reordered-table thead th{
+  vertical-align:middle;
+}
+.crm3839-reordered-table .crm3842-center{
+  text-align:center!important;
+}
+.crm3839-reordered-table .crm3842-left{
+  text-align:left!important;
+}
+.crm3839-reordered-table .crm3842-nowrap{
+  white-space:nowrap;
+}
+.crm3839-reordered-table .crm3842-title-cell{
+  vertical-align:middle!important;
+}
+.crm3839-reordered-table .crm3842-title-cell .crm3814-listing-title-link{
+  line-height:1.2;
+  margin:0;
+}
+.crm3839-reordered-table .crm3842-title-cell .photo-link{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  margin-top:1px!important;
+  padding:2px 6px;
+  line-height:1.15;
+}
+.crm3839-reordered-table .crm3842-price-cell,
+.crm3839-reordered-table .crm3842-contact-cell{
+  line-height:1.42;
+}
