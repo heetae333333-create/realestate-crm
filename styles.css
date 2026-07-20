@@ -682,3 +682,57 @@ input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:
 .crm3839-reordered-table .crm3842-contact-cell .crm384-contact-list{
   width:100%!important;
 }
+
+/* ===== CRM v3.8.48 매물명-내부사진 밀착 / 개인·전체 캘린더 ===== */
+.crm3848-title-stack{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:1px;
+  width:100%;
+  line-height:1;
+}
+.crm3848-title-stack .crm3814-listing-title-link{
+  margin:0!important;
+  line-height:1.08!important;
+}
+.crm3848-title-stack .photo-link{
+  margin:0!important;
+  padding:1px 7px!important;
+  min-height:21px!important;
+  line-height:1!important;
+}
+.crm3848-title-stack .badge{margin:0 0 1px!important}
+
+.calendar-shell{display:flex;flex-direction:column;gap:14px}
+.calendar-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.calendar-nav-group,.calendar-action-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.calendar-month-title{font-size:24px;font-weight:900;min-width:150px;text-align:center}
+.calendar-view-toggle.active{background:#2563eb;color:#fff;border-color:#2563eb}
+.calendar-filter-panel{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:12px 16px}
+.calendar-filter-label{font-weight:900;margin-right:4px}
+.calendar-filter-item{display:inline-flex;align-items:center;gap:7px;font-weight:700;cursor:pointer}
+.calendar-filter-dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+.calendar-filter-dot.contract{background:#2563eb}.calendar-filter-dot.balance{background:#16a34a}.calendar-filter-dot.holiday{background:#ef4444}.calendar-filter-dot.other{background:#7c3aed}
+.calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(110px,1fr));border:1px solid #dbe2ea;border-radius:14px;overflow:hidden;background:#fff;min-width:820px}
+.calendar-weekday{padding:10px 6px;text-align:center;font-weight:900;background:#f5f7fb;border-right:1px solid #e5e7eb}
+.calendar-weekday:nth-child(7){border-right:0}.calendar-weekday.sun{color:#dc2626}.calendar-weekday.sat{color:#2563eb}
+.calendar-day{min-height:118px;padding:7px;border-top:1px solid #e5e7eb;border-right:1px solid #e5e7eb;background:#fff;cursor:pointer;overflow:hidden}
+.calendar-day:nth-child(7n){border-right:0}.calendar-day.outside{background:#f8fafc;color:#9ca3af}.calendar-day.today{box-shadow:inset 0 0 0 2px #2563eb}
+.calendar-day-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;font-weight:800}
+.calendar-day-number{display:inline-flex;width:25px;height:25px;align-items:center;justify-content:center;border-radius:50%}
+.calendar-day.today .calendar-day-number{background:#2563eb;color:#fff}
+.calendar-day-add{opacity:0;font-size:18px;color:#2563eb}.calendar-day:hover .calendar-day-add{opacity:1}
+.calendar-events{display:flex;flex-direction:column;gap:3px}
+.calendar-event{display:block;width:100%;border:0;border-radius:5px;padding:4px 6px;text-align:left;font-size:12px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.calendar-event.contract{background:#dbeafe;color:#1d4ed8}.calendar-event.balance{background:#dcfce7;color:#15803d}.calendar-event.holiday{background:#fee2e2;color:#b91c1c}.calendar-event.other{background:#ede9fe;color:#6d28d9}
+.calendar-more{font-size:11px;color:#64748b;padding-left:3px}
+.calendar-legend-note{font-size:13px;color:#64748b}
+.calendar-event-owner{font-size:12px;color:#64748b;margin-top:4px}
+.calendar-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.calendar-form-grid .span-2{grid-column:1/-1}
+.calendar-category-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.calendar-category-choice{border:1px solid #dbe2ea;border-radius:10px;padding:11px;display:flex;align-items:center;gap:8px;font-weight:800}
+.calendar-readonly-box{padding:14px;border-radius:12px;background:#f8fafc;border:1px solid #e5e7eb}
+@media(max-width:900px){.calendar-grid-wrap{overflow-x:auto}.calendar-form-grid{grid-template-columns:1fr}.calendar-form-grid .span-2{grid-column:auto}.calendar-category-grid{grid-template-columns:1fr 1fr}.calendar-month-title{font-size:20px}}

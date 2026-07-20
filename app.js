@@ -3066,3 +3066,124 @@ renderListingTable=function(rows,target,mine,adminMode=false){
 };
 Object.assign(window,{renderListingTable});
 console.info('CRM v3.8.43 매물표 열 폭과 간격 균형 정리 완료');
+
+/* ===== CRM v3.8.48 개인·전체 일정 캘린더 / 매물명-사진 밀착 ===== */
+state.calendarEvents=[];
+state.calendarMonth='2026-07-01';
+state.calendarShowAll=false;
+state.calendarFilters=new Set(['계약일정','잔금일정','휴무일정','기타일정']);
+
+const crm3848RenderViewBase=renderView;
+renderView=async function(view){
+  if(view==='calendar'){
+    state.view=view;
+    $$('.nav').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
+    $('#pageTitle').textContent='캘린더';
+    $('#pageSubtitle').textContent='내 일정 등록 및 중개사 전체 일정 확인';
+    $('#topActions').innerHTML='';
+    await crm3848RenderCalendar();
+    return;
+  }
+  await crm3848RenderViewBase(view);
+};
+
+function crm3848CategoryClass(category){return {'계약일정':'contract','잔금일정':'balance','휴무일정':'holiday','기타일정':'other'}[category]||'other'}
+function crm3848DateLocal(date){const y=date.getFullYear(),m=String(date.getMonth()+1).padStart(2,'0'),d=String(date.getDate()).padStart(2,'0');return `${y}-${m}-${d}`}
+function crm3848ClampMonth(date){const min=new Date(2026,6,1),max=new Date(2030,11,1);return date<min?min:date>max?max:date}
+function crm3848FormatTime(v){return v?String(v).slice(0,5):''}
+function crm3848EventTimeText(ev){const time=crm3848FormatTime(ev.start_time);return time?`${time} `:''}
+
+async function crm3848LoadCalendar(){
+  let q=state.client.from('calendar_events').select('*, owner:profiles!calendar_events_owner_id_fkey(full_name,office_name)').order('start_date',{ascending:true}).order('start_time',{ascending:true});
+  if(!state.calendarShowAll)q=q.eq('owner_id',state.profile.id);
+  const {data,error}=await q;
+  if(error){toast(error.message);state.calendarEvents=[];return}
+  state.calendarEvents=data||[];
+}
+
+async function crm3848RenderCalendar(){
+  await crm3848LoadCalendar();
+  const current=crm3848ClampMonth(new Date(state.calendarMonth+'T00:00:00'));
+  state.calendarMonth=crm3848DateLocal(new Date(current.getFullYear(),current.getMonth(),1));
+  const year=current.getFullYear(),month=current.getMonth();
+  const first=new Date(year,month,1),start=new Date(year,month,1-first.getDay());
+  const filtered=state.calendarEvents.filter(e=>state.calendarFilters.has(e.category));
+  const cells=[];
+  for(let i=0;i<42;i++){
+    const date=new Date(start);date.setDate(start.getDate()+i);
+    const ds=crm3848DateLocal(date),outside=date.getMonth()!==month;
+    const events=filtered.filter(e=>e.start_date<=ds&&e.end_date>=ds);
+    const visible=events.slice(0,4);
+    cells.push(`<div class="calendar-day ${outside?'outside':''} ${ds===today()?'today':''}" onclick="crm3848OpenCalendarEvent(null,'${ds}')">
+      <div class="calendar-day-head"><span class="calendar-day-number">${date.getDate()}</span><span class="calendar-day-add">＋</span></div>
+      <div class="calendar-events">${visible.map(ev=>`<button type="button" class="calendar-event ${crm3848CategoryClass(ev.category)}" title="${escapeHtml(ev.title)}" onclick="event.stopPropagation();crm3848OpenCalendarEvent('${ev.id}')">${crm3848EventTimeText(ev)}${escapeHtml(ev.title)}${state.calendarShowAll&&ev.owner?.full_name?` · ${escapeHtml(ev.owner.full_name)}`:''}</button>`).join('')}${events.length>4?`<div class="calendar-more">+${events.length-4}개 더보기</div>`:''}</div>
+    </div>`);
+  }
+  const canPrev=year>2026||month>6,canNext=year<2030||month<11;
+  $('#content').innerHTML=`<div class="calendar-shell">
+    <div class="panel calendar-toolbar">
+      <div class="calendar-nav-group"><button class="ghost" onclick="crm3848MoveMonth(-1)" ${canPrev?'':'disabled'}>‹</button><button class="ghost" onclick="crm3848GoToday()">오늘</button><div class="calendar-month-title">${year}년 ${month+1}월</div><button class="ghost" onclick="crm3848MoveMonth(1)" ${canNext?'':'disabled'}>›</button></div>
+      <div class="calendar-action-group"><button class="ghost calendar-view-toggle ${state.calendarShowAll?'active':''}" onclick="crm3848ToggleAll()">${state.calendarShowAll?'내 일정만 보기':'전체 일정 보기'}</button><button class="primary" onclick="crm3848OpenCalendarEvent(null,'${crm3848DateLocal(current)}')">+ 일정 등록</button></div>
+    </div>
+    <div class="panel calendar-filter-panel"><span class="calendar-filter-label">표시할 일정</span>${['계약일정','잔금일정','휴무일정','기타일정'].map(c=>`<label class="calendar-filter-item"><input type="checkbox" ${state.calendarFilters.has(c)?'checked':''} onchange="crm3848ToggleFilter('${c}',this.checked)"><span class="calendar-filter-dot ${crm3848CategoryClass(c)}"></span>${c}</label>`).join('')}<span class="calendar-legend-note">체크된 카테고리만 달력에 표시됩니다.</span></div>
+    <div class="calendar-grid-wrap"><div class="calendar-grid">${['일','월','화','수','목','금','토'].map((d,i)=>`<div class="calendar-weekday ${i===0?'sun':i===6?'sat':''}">${d}</div>`).join('')}${cells.join('')}</div></div>
+  </div>`;
+}
+
+function crm3848MoveMonth(delta){const d=new Date(state.calendarMonth+'T00:00:00');d.setMonth(d.getMonth()+delta);state.calendarMonth=crm3848DateLocal(crm3848ClampMonth(d));crm3848RenderCalendar()}
+function crm3848GoToday(){const t=new Date();const clamped=crm3848ClampMonth(new Date(t.getFullYear(),t.getMonth(),1));state.calendarMonth=crm3848DateLocal(clamped);crm3848RenderCalendar()}
+function crm3848ToggleAll(){state.calendarShowAll=!state.calendarShowAll;crm3848RenderCalendar()}
+function crm3848ToggleFilter(category,checked){if(checked)state.calendarFilters.add(category);else state.calendarFilters.delete(category);crm3848RenderCalendar()}
+
+async function crm3848OpenCalendarEvent(id=null,dateValue=''){
+  let ev=id?state.calendarEvents.find(x=>x.id===id):null;
+  if(id&&!ev){const {data,error}=await state.client.from('calendar_events').select('*, owner:profiles!calendar_events_owner_id_fkey(full_name,office_name)').eq('id',id).single();if(error)return toast(error.message);ev=data}
+  const own=!ev||ev.owner_id===state.profile.id||state.profile.role==='admin';
+  const baseDate=dateValue||ev?.start_date||today();
+  if(baseDate<'2026-07-01'||baseDate>'2030-12-31')return toast('캘린더 일정은 2026년 7월부터 2030년 12월까지만 등록할 수 있습니다.');
+  $('#modalTitle').textContent=ev?(own?'일정 수정':'일정 보기'):'일정 등록';
+  $('#modalBody').innerHTML=own?`<div class="calendar-form-grid">
+    <div class="span-2"><div class="calendar-category-grid">${['계약일정','잔금일정','휴무일정','기타일정'].map(c=>`<label class="calendar-category-choice"><input type="radio" name="calCategory" value="${c}" ${(ev?.category||'기타일정')===c?'checked':''}><span class="calendar-filter-dot ${crm3848CategoryClass(c)}"></span>${c}</label>`).join('')}</div></div>
+    <label class="span-2">일정 제목<input id="calTitle" maxlength="100" value="${escapeHtml(ev?.title||'')}" placeholder="일정 제목을 입력하세요"></label>
+    <label>시작일<input id="calStartDate" type="date" min="2026-07-01" max="2030-12-31" value="${ev?.start_date||baseDate}"></label>
+    <label>종료일<input id="calEndDate" type="date" min="2026-07-01" max="2030-12-31" value="${ev?.end_date||baseDate}"></label>
+    <label>시작 시간<input id="calStartTime" type="time" value="${crm3848FormatTime(ev?.start_time)}"></label>
+    <label>종료 시간<input id="calEndTime" type="time" value="${crm3848FormatTime(ev?.end_time)}"></label>
+    <label class="span-2">메모<textarea id="calDescription" rows="5" placeholder="장소, 상대방, 준비사항 등을 기록하세요.">${escapeHtml(ev?.description||'')}</textarea></label>
+    ${ev?`<div class="span-2"><button type="button" class="danger" onclick="crm3848DeleteCalendarEvent('${ev.id}')">일정 삭제</button></div>`:''}
+  </div>`:`<div class="calendar-readonly-box"><h3>${escapeHtml(ev.title)}</h3><p><strong>카테고리</strong> ${escapeHtml(ev.category)}</p><p><strong>기간</strong> ${fmtDate(ev.start_date)}${ev.end_date!==ev.start_date?` ~ ${fmtDate(ev.end_date)}`:''}</p>${ev.start_time?`<p><strong>시간</strong> ${crm3848FormatTime(ev.start_time)}${ev.end_time?` ~ ${crm3848FormatTime(ev.end_time)}`:''}</p>`:''}<p><strong>등록자</strong> ${escapeHtml(ev.owner?.full_name||'-')}</p>${ev.description?`<p><strong>메모</strong><br>${escapeHtml(ev.description).replace(/\n/g,'<br>')}</p>`:''}</div>`;
+  $('#modalSubmit').style.display=own?'':'none';
+  $('#modalSubmit').textContent=ev?'수정 저장':'일정 저장';
+  $('#modalSubmit').onclick=own?async e=>{e.preventDefault();await crm3848SaveCalendarEvent(ev?.id||null)}:null;
+  $('#modal').showModal();
+}
+
+async function crm3848SaveCalendarEvent(id){
+  const title=$('#calTitle').value.trim(),category=document.querySelector('input[name="calCategory"]:checked')?.value,start=$('#calStartDate').value,end=$('#calEndDate').value;
+  if(!title||!category||!start||!end)return toast('카테고리, 제목, 시작일과 종료일을 입력하세요.');
+  if(start<'2026-07-01'||end>'2030-12-31'||end<start)return toast('일정 기간을 2026년 7월부터 2030년 12월 범위로 확인하세요.');
+  const payload={owner_id:id?undefined:state.profile.id,category,title,description:$('#calDescription').value.trim()||null,start_date:start,end_date:end,start_time:$('#calStartTime').value||null,end_time:$('#calEndTime').value||null,updated_at:new Date().toISOString()};
+  if(id)delete payload.owner_id;
+  const {error}=id?await state.client.from('calendar_events').update(payload).eq('id',id):await state.client.from('calendar_events').insert(payload);
+  if(error)return toast(error.message);
+  $('#modal').close();toast(id?'일정을 수정했습니다.':'일정을 등록했습니다.');await crm3848RenderCalendar();
+}
+async function crm3848DeleteCalendarEvent(id){if(!confirm('이 일정을 삭제할까요?'))return;const {error}=await state.client.from('calendar_events').delete().eq('id',id);if(error)return toast(error.message);$('#modal').close();toast('일정을 삭제했습니다.');await crm3848RenderCalendar()}
+
+const crm3848RenderListingTableBase=renderListingTable;
+renderListingTable=function(rows,target,mine,adminMode=false){
+  crm3848RenderListingTableBase(rows,target,mine,adminMode);
+  const root=document.getElementById(target);
+  root?.querySelectorAll('td.crm3843-col-title').forEach(td=>{
+    if(td.querySelector('.crm3848-title-stack'))return;
+    const link=td.querySelector('.crm3814-listing-title-link');
+    const photo=td.querySelector('.photo-link');
+    if(!link||!photo)return;
+    const wrapper=document.createElement('div');wrapper.className='crm3848-title-stack';
+    const badgeEl=td.querySelector('.badge');
+    td.innerHTML='';wrapper.appendChild(link);if(badgeEl)wrapper.appendChild(badgeEl);wrapper.appendChild(photo);td.appendChild(wrapper);
+  });
+};
+
+Object.assign(window,{renderView,crm3848RenderCalendar,crm3848MoveMonth,crm3848GoToday,crm3848ToggleAll,crm3848ToggleFilter,crm3848OpenCalendarEvent,crm3848SaveCalendarEvent,crm3848DeleteCalendarEvent,renderListingTable});
+console.info('CRM v3.8.48 캘린더 및 매물명-내부사진 밀착 적용 완료');
