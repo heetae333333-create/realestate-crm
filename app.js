@@ -1789,8 +1789,12 @@ crm361OpenListingFu=async function(id){
     const history={created_by:state.profile.id,follow_up_date:fuDate,contact_method:useConfirm?'매물확인':$('#crm361FuMethod').value,content:parts.join('\n\n'),next_follow_up_at:next,listing_id:id};
     const {error:hErr}=await state.client.from('interaction_history').insert(history);if(hErr)return toast(hErr.message);
     if(!useConfirm)await state.client.from('listings').update({last_follow_up_at:fuDate}).eq('id',id);
-    await crm385RecalcNextFu(id);await loadListings();
-    $('#modal').close();toast(useConfirm?'FU·확인전화·가격변경을 히스토리에 함께 저장했습니다.':'FU 내용을 히스토리에 저장했습니다.');
+    // 방금 저장한 FU의 예정일을 현재 매물 일정으로 즉시 반영합니다.
+    // 과거 히스토리에 남아 있는 더 빠른 예정일 때문에 새 일정이 무시되는 문제를 방지합니다.
+    const {error:nextFuErr}=await state.client.from('listings').update({next_follow_up_at:next}).eq('id',id);
+    if(nextFuErr)return toast(`예정 FU 반영 실패: ${nextFuErr.message}`);
+    await loadListings();
+    $('#modal').close();toast(useConfirm?'FU·확인전화·가격변경을 히스토리에 함께 저장했습니다.':'FU 내용과 예정 일정을 반영했습니다.');
     return state.view==='adminListings'?renderAdminListings():renderMyListings();
   };
   $('#modal').showModal();
@@ -1798,3 +1802,6 @@ crm361OpenListingFu=async function(id){
 openFollowUpModal=function(entityType,id){return entityType==='listing'?crm361OpenListingFu(id):crm361BaseOpenFollowUpModal(entityType,id)};
 Object.assign(window,{crm361OpenListingFu,openFollowUpModal,crm387ToggleConfirmBlock});
 console.info('CRM v3.8.7 FU 기록·확인전화 통합 로드 완료');
+
+/* CRM v3.8.8 - FU 예정일 즉시 반영 버그 수정 */
+console.info('CRM v3.8.8 FU 예정일 즉시 반영 로드 완료');
