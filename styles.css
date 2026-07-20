@@ -405,3 +405,45 @@ input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:
   align-items:center;
   min-height:22px;
 }
+
+
+/* CRM v3.8.35 주소·광고를 동일 매물행 안에 2번째 줄로 배치 */
+.crm3813-listing-table td.crm3835-status-with-address{
+  position:relative;
+  padding-bottom:30px!important;
+  overflow:visible!important;
+}
+.crm3835-inline-address{
+  position:absolute;
+  left:0;
+  bottom:5px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  width:max-content;
+  max-width:430px;
+  min-height:21px;
+  font-size:13px;
+  line-height:21px;
+  font-weight:750;
+  color:#475569;
+  white-space:nowrap;
+  z-index:2;
+}
+.crm3835-inline-address>span:first-child{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  max-width:330px;
+}
+.crm3835-inline-address .crm3829-ad-badges{
+  margin-left:0;
+  flex:0 0 auto;
+}
+.crm3813-listing-table tr:has(td.crm3835-status-with-address) td{
+  vertical-align:top;
+}
+@media(max-width:760px){
+  .crm3835-inline-address{font-size:12px;max-width:330px}
+  .crm3835-inline-address>span:first-child{max-width:245px}
+}

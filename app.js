@@ -2963,3 +2963,33 @@ renderListingTable=function(rows,target,mine,adminMode=false){
 };
 Object.assign(window,{renderListingTable});
 console.info('CRM v3.8.34 주소·광고 행 하단 배치 적용 완료');
+
+
+/* ===== CRM v3.8.35 주소·광고를 동일 매물행 안에 배치 ===== */
+const crm3835RenderListingTableBase=renderListingTable;
+renderListingTable=function(rows,target,mine,adminMode=false){
+  crm3835RenderListingTableBase(rows,target,mine,adminMode);
+  const root=document.getElementById(target);
+  if(!root)return;
+  const table=root.querySelector('.crm3813-listing-table');
+  if(!table)return;
+  const headers=[...table.querySelectorAll('thead th')];
+  const statusIndex=headers.findIndex(th=>th.textContent.trim()==='상태');
+  if(statusIndex<0)return;
+  [...table.querySelectorAll('tbody tr.crm3813-address-row')].forEach(addressRow=>{
+    const dataRow=addressRow.previousElementSibling;
+    if(!dataRow||dataRow.classList.contains('crm3813-address-row'))return;
+    const statusCell=dataRow.children[statusIndex];
+    const addressLine=addressRow.querySelector('.crm3829-address-line')||addressRow.querySelector('div');
+    if(!statusCell||!addressLine)return;
+    const inline=document.createElement('div');
+    inline.className='crm3835-inline-address';
+    inline.innerHTML=addressLine.innerHTML;
+    inline.title=addressLine.title||'';
+    statusCell.classList.add('crm3835-status-with-address');
+    statusCell.appendChild(inline);
+    addressRow.remove();
+  });
+};
+Object.assign(window,{renderListingTable});
+console.info('CRM v3.8.35 주소·광고 동일 행 배치 적용 완료');
