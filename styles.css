@@ -389,3 +389,15 @@ input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:
 }
 
 /* CRM v3.8.38: v3.8.33 주소·광고 상단 배치 복원 */
+
+/* ===== CRM v3.8.39 매물명 우선 배치·열 정렬 ===== */
+.crm3839-reordered-table th,
+.crm3839-reordered-table td{vertical-align:middle}
+.crm3839-reordered-table th{white-space:nowrap;text-align:center;font-weight:800}
+.crm3839-reordered-table .crm3839-title-col{min-width:150px;text-align:left}
+.crm3839-reordered-table .crm3839-title-cell{min-width:150px;text-align:left}
+.crm3839-reordered-table .crm3839-title-cell .crm3814-listing-title-link{font-weight:800;line-height:1.35;text-align:left}
+.crm3839-reordered-table .crm3839-center-cell{text-align:center;white-space:nowrap}
+.crm3839-reordered-table .crm3839-date-cell{min-width:82px}
+.crm3839-reordered-table .crm3813-address-row td{vertical-align:middle}
+.crm3839-reordered-table .crm3829-address-line{justify-content:flex-start;gap:10px}
