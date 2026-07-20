@@ -136,7 +136,7 @@ function listingRoomValue(x){return x?.is_one_point_five_room?1.5:moneyNumber(x?
 function filterCustomers(){
   const q=($('#customerSearch')?.value||'').toLowerCase(), t=$('#customerType')?.value||'', s=$('#customerStatus')?.value||'', d=$('#customerDealType')?.value||'', g=$('#customerGrade')?.value||'';
   const rows=state.customers.filter(x=>(!q||`${x.name} ${x.phone}`.toLowerCase().includes(q))&&(!t||x.customer_type===t)&&(!s||x.status===s)&&(!d||x.deal_type===d)&&(!g||x.customer_grade===g));
-  $('#customerTable').innerHTML=rows.length?`<div class="table-wrap"><table class="customer-table"><thead><tr><th>고객명</th><th>연락처</th><th>구분</th><th>상태</th><th>거래유형</th><th>등급</th><th>희망지역</th><th>방개수</th><th>희망금액/월세</th><th>계약단계</th><th>최종 FU</th><th>예정 FU</th><th>관리</th></tr></thead><tbody>${rows.map(x=>`<tr><td><strong>${escapeHtml(x.name)}</strong></td><td>${escapeHtml(x.phone||'-')}</td><td>${escapeHtml(x.customer_type)}</td><td>${badge(x.status||'신규','blue')}</td><td>${escapeHtml(x.deal_type||'-')}</td><td>${gradeBadge(x.customer_grade)}</td><td>${escapeHtml(x.preferred_area||'-')}</td><td>${customerRoomText(x)}</td><td>${customerBudgetText(x)}</td><td>${contractStage(x)}</td><td>${fmtDate(x.last_follow_up_at)}</td><td>${dueBadge(x.next_follow_up_at)}</td><td><div class="row-actions"><button class="success" onclick="openFollowUpModal('customer','${x.id}')">FU</button><button class="ghost" onclick="openHistoryModal('customer','${x.id}')">히스토리</button><button class="ghost" onclick="openContractModal('customer','${x.id}')">계약일정</button><button class="ghost" onclick="openCustomerModal('${x.id}')">수정</button><button class="danger" onclick="deleteCustomer('${x.id}')">삭제</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 고객이 없습니다.</div>';
+  $('#customerTable').innerHTML=rows.length?`<div class="table-wrap"><table class="customer-table"><thead><tr><th>고객명</th><th>연락처</th><th>구분</th><th>상태</th><th>거래유형</th><th>등급</th><th>희망지역</th><th>방개수</th><th>희망금액/월세</th><th>계약단계</th><th>최종 FU</th><th>예정 FU</th><th>관리</th></tr></thead><tbody>${rows.map(x=>`<tr><td><strong>${escapeHtml(x.name)}</strong></td><td>${escapeHtml(x.phone||'-')}</td><td>${escapeHtml(x.customer_type)}</td><td>${badge(x.status||'신규','blue')}</td><td>${escapeHtml(x.deal_type||'-')}</td><td>${gradeBadge(x.customer_grade)}</td><td>${escapeHtml(x.preferred_area||'-')}</td><td>${customerRoomText(x)}</td><td>${customerBudgetText(x)}</td><td>${contractStage(x)}</td><td>${fmtDate(x.last_follow_up_at)}</td><td>${dueBadge(x.next_follow_up_at)}</td><td><div class="row-actions"><button class="success" onclick="openFollowUpModal('customer','${x.id}')">FU</button><button class="ghost" onclick="openHistoryModal('customer','${x.id}')">히스토리</button><button class="ghost" onclick="openContractModal('customer','${x.id}')">진행상황</button><button class="ghost" onclick="openCustomerModal('${x.id}')">수정</button><button class="danger" onclick="deleteCustomer('${x.id}')">삭제</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 고객이 없습니다.</div>';
 }
 function openCustomerModal(id){
   const x=state.customers.find(v=>v.id===id)||{};$('#modalTitle').textContent=id?'고객 수정':'고객 등록';
@@ -173,7 +173,7 @@ function listingAreaText(x){
   return [...new Set([district,dong].filter(Boolean))].join(' ')||x.district||'-';
 }
 function renderListingTable(rows,target,mine,adminMode=false){
-  const el=$('#'+target);el.innerHTML=rows.length?`<div class="table-wrap listing-table-wrap"><table class="listing-table"><thead><tr>${adminMode?'<th class="select-col">선택</th>':''}<th>상태</th><th>거래</th><th>유형</th><th>매물명</th><th>지역</th><th>금액/월세</th><th>연락처</th><th>대출</th><th>전용면적</th><th>방/욕실</th><th>입주</th><th>담당</th><th>계약</th><th>최종 FU</th><th>예정 FU</th>${mine?'<th>관리</th>':''}</tr></thead><tbody>${rows.map(x=>`<tr>${adminMode?`<td class="select-col"><input type="checkbox" class="admin-listing-check" value="${x.id}" ${state.adminSelectedListings.has(x.id)?'checked':''} onchange="toggleAdminListingSelection('${x.id}',this.checked)"></td>`:''}<td class="crm3812-status-cell"><div class="crm3812-list-address" title="${escapeHtml(x.address||x.district||'주소 미입력')}">${escapeHtml(x.address||x.district||'주소 미입력')}</div>${badge(x.status==='available'?'거래 가능':x.status==='complete'?'거래 완료':'협의 중',x.status==='available'?'green':x.status==='complete'?'gray':'yellow')}</td><td>${escapeHtml(x.transaction_type)}</td><td>${escapeHtml(x.property_type)}</td><td class="listing-title-cell"><strong>${escapeHtml(x.title)}</strong>${x.is_public?'':' '+badge('비공개','red')}<br><button type="button" class="photo-link" onclick="openListingPhotos('${x.id}')">📷 내부사진</button></td><td>${escapeHtml(listingAreaText(x))}</td><td>${listingPriceText(x)}</td><td>${escapeHtml(x.contact_phone||'-')}</td><td>${x.loan_available===true?badge('O','green'):x.loan_available===false?badge('X','red'):badge('미확인','gray')}${x.loan_available===true&&x.official_price?`<br><span class="muted">기준 ${fmtMoney(x.official_price)}</span>`:''}</td><td>${x.area_m2?`${x.area_m2}㎡<br><span class="muted">약 ${(Number(x.area_m2)/3.3058).toFixed(2)}평</span>`:'-'}</td><td>${listingRoomText(x)} / ${x.bathroom_count!==null&&x.bathroom_count!==undefined?escapeHtml(String(x.bathroom_count)):'-'}</td><td>${moveInText(x)}</td><td>${escapeHtml(x.owner?.full_name||'-')}</td><td>${contractStage(x)}</td><td>${fmtDate(x.last_follow_up_at||x.last_confirmed_at)}</td><td>${dueBadge(x.next_follow_up_at)}</td>${mine?`<td><div class="row-actions"><button class="success" onclick="openFollowUpModal('listing','${x.id}')">FU</button><button class="ghost" onclick="openHistoryModal('listing','${x.id}')">히스토리</button><button class="ghost" onclick="openContractModal('listing','${x.id}')">계약일정</button><button class="ghost" onclick="openListingModal('${x.id}')">수정</button>${adminMode?`<button class="primary" onclick="openSingleListingTransfer('${x.id}')">개별 이관</button>`:''}<button class="danger" onclick="deleteListing('${x.id}')">삭제</button></div></td>`:''}</tr>`).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 매물이 없습니다.</div>';
+  const el=$('#'+target);el.innerHTML=rows.length?`<div class="table-wrap listing-table-wrap"><table class="listing-table"><thead><tr>${adminMode?'<th class="select-col">선택</th>':''}<th>상태</th><th>거래</th><th>유형</th><th>매물명</th><th>지역</th><th>금액/월세</th><th>연락처</th><th>대출</th><th>전용면적</th><th>방/욕실</th><th>입주</th><th>담당</th><th>진행상황</th><th>최종 FU</th><th>예정 FU</th>${mine?'<th>관리</th>':''}</tr></thead><tbody>${rows.map(x=>`<tr>${adminMode?`<td class="select-col"><input type="checkbox" class="admin-listing-check" value="${x.id}" ${state.adminSelectedListings.has(x.id)?'checked':''} onchange="toggleAdminListingSelection('${x.id}',this.checked)"></td>`:''}<td class="crm3812-status-cell"><div class="crm3812-list-address" title="${escapeHtml(x.address||x.district||'주소 미입력')}">${escapeHtml(x.address||x.district||'주소 미입력')}</div>${badge(x.status==='available'?'거래 가능':x.status==='complete'?'거래 완료':'협의 중',x.status==='available'?'green':x.status==='complete'?'gray':'yellow')}</td><td>${escapeHtml(x.transaction_type)}</td><td>${escapeHtml(x.property_type)}</td><td class="listing-title-cell"><strong>${escapeHtml(x.title)}</strong>${x.is_public?'':' '+badge('비공개','red')}<br><button type="button" class="photo-link" onclick="openListingPhotos('${x.id}')">📷 내부사진</button></td><td>${escapeHtml(listingAreaText(x))}</td><td>${listingPriceText(x)}</td><td>${escapeHtml(x.contact_phone||'-')}</td><td>${x.loan_available===true?badge('O','green'):x.loan_available===false?badge('X','red'):badge('미확인','gray')}${x.loan_available===true&&x.official_price?`<br><span class="muted">기준 ${fmtMoney(x.official_price)}</span>`:''}</td><td>${x.area_m2?`${x.area_m2}㎡<br><span class="muted">약 ${(Number(x.area_m2)/3.3058).toFixed(2)}평</span>`:'-'}</td><td>${listingRoomText(x)} / ${x.bathroom_count!==null&&x.bathroom_count!==undefined?escapeHtml(String(x.bathroom_count)):'-'}</td><td>${moveInText(x)}</td><td>${escapeHtml(x.owner?.full_name||'-')}</td><td>${contractStage(x)}</td><td>${fmtDate(x.last_follow_up_at||x.last_confirmed_at)}</td><td>${dueBadge(x.next_follow_up_at)}</td>${mine?`<td><div class="row-actions"><button class="success" onclick="openFollowUpModal('listing','${x.id}')">FU</button><button class="ghost" onclick="openHistoryModal('listing','${x.id}')">히스토리</button><button class="ghost" onclick="openContractModal('listing','${x.id}')">진행상황</button><button class="ghost" onclick="openListingModal('${x.id}')">수정</button>${adminMode?`<button class="primary" onclick="openSingleListingTransfer('${x.id}')">개별 이관</button>`:''}<button class="danger" onclick="deleteListing('${x.id}')">삭제</button></div></td>`:''}</tr>`).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 매물이 없습니다.</div>';
   if(adminMode) updateBulkTransferControls();
 }
 function openListingModal(id){
@@ -1183,7 +1183,7 @@ renderCustomers=async function(){await crm37BaseRenderCustomers();const filter=$
 filterCustomers=function(){
   const q=($('#customerSearch')?.value||'').toLowerCase(),t=$('#customerType')?.value||'',s=$('#customerStatus')?.value||'',d=$('#customerDealType')?.value||'',g=$('#customerGrade')?.value||'';
   const rows=state.customers.filter(x=>(!q||`${x.name} ${x.phone}`.toLowerCase().includes(q))&&(!t||x.customer_type===t)&&(!s||x.status===s)&&(!d||x.deal_type===d)&&(!g||x.customer_grade===g));
-  $('#customerTable').innerHTML=rows.length?`<div class="table-wrap"><table class="customer-table"><thead><tr><th>고객명</th><th>연락처</th><th>단계</th><th>미접촉</th><th>거래유형</th><th>등급</th><th>희망지역</th><th>방</th><th>희망금액/월세</th><th>예정 FU</th><th>관리</th></tr></thead><tbody>${rows.map(x=>{const dorm=crm37DormantInfo(x);return `<tr><td><strong>${escapeHtml(x.name)}</strong></td><td>${escapeHtml(x.phone||'-')}</td><td>${badge(x.status||'신규 문의','blue')}</td><td>${dorm.label?badge(dorm.label,dorm.color):badge('최근 연락','green')}</td><td>${escapeHtml(x.deal_type||'-')}</td><td>${gradeBadge(x.customer_grade)}</td><td>${escapeHtml(x.preferred_area||'-')}</td><td>${customerRoomText(x)}</td><td>${customerBudgetText(x)}</td><td>${dueBadge(x.next_follow_up_at)}</td><td><div class="row-actions"><button class="success" onclick="openFollowUpModal('customer','${x.id}')">FU</button><button class="ghost" onclick="openHistoryModal('customer','${x.id}')">히스토리</button><button class="ghost" onclick="openContractModal('customer','${x.id}')">계약일정</button><button class="ghost" onclick="openCustomerModal('${x.id}')">수정</button><button class="danger" onclick="deleteCustomer('${x.id}')">삭제</button></div></td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 고객이 없습니다.</div>';
+  $('#customerTable').innerHTML=rows.length?`<div class="table-wrap"><table class="customer-table"><thead><tr><th>고객명</th><th>연락처</th><th>단계</th><th>미접촉</th><th>거래유형</th><th>등급</th><th>희망지역</th><th>방</th><th>희망금액/월세</th><th>예정 FU</th><th>관리</th></tr></thead><tbody>${rows.map(x=>{const dorm=crm37DormantInfo(x);return `<tr><td><strong>${escapeHtml(x.name)}</strong></td><td>${escapeHtml(x.phone||'-')}</td><td>${badge(x.status||'신규 문의','blue')}</td><td>${dorm.label?badge(dorm.label,dorm.color):badge('최근 연락','green')}</td><td>${escapeHtml(x.deal_type||'-')}</td><td>${gradeBadge(x.customer_grade)}</td><td>${escapeHtml(x.preferred_area||'-')}</td><td>${customerRoomText(x)}</td><td>${customerBudgetText(x)}</td><td>${dueBadge(x.next_follow_up_at)}</td><td><div class="row-actions"><button class="success" onclick="openFollowUpModal('customer','${x.id}')">FU</button><button class="ghost" onclick="openHistoryModal('customer','${x.id}')">히스토리</button><button class="ghost" onclick="openContractModal('customer','${x.id}')">진행상황</button><button class="ghost" onclick="openCustomerModal('${x.id}')">수정</button><button class="danger" onclick="deleteCustomer('${x.id}')">삭제</button></div></td></tr>`}).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 고객이 없습니다.</div>';
 };
 
 async function crm37ManageAnnouncements(){
@@ -1282,7 +1282,7 @@ openListingPhotos=async function(listingId){
   $('#modalBody').innerHTML=`<div class="photo-toolbar"><div><strong>${photos.length}장</strong><div class="muted">사진을 누르면 원본 크기로 볼 수 있습니다.</div></div><div><button class="ghost" onclick="crm38TogglePhotoManage(this)">사진 관리</button><button class="ghost" onclick="downloadAllListingPhotos('${listing.id}')">전체 ZIP 다운로드</button>${canManageListing(listing)?`<button class="primary" onclick="addListingPhotos('${listing.id}')">사진 추가</button>`:''}</div></div><div class="photo-grid crm38-photo-grid">${cards.join('')||'<div class="empty">등록된 사진이 없습니다.</div>'}</div>`;$('#modalSubmit').style.display='none';const reset=()=>{$('#modalSubmit').style.display='';$('#modal').removeEventListener('close',reset)};$('#modal').addEventListener('close',reset);$('#modal').showModal();
 };
 function crm38TogglePhotoManage(btn){const on=$('#modalBody').classList.toggle('photo-manage-on');btn.textContent=on?'사진만 보기':'사진 관리'}
-renderListingTable=function(rows,target,mine,adminMode=false){const el=$('#'+target);el.innerHTML=rows.length?`<div class="table-wrap listing-table-wrap"><table class="listing-table"><thead><tr>${adminMode?'<th class="select-col">선택</th>':''}<th>상태</th><th>거래</th><th>유형</th><th>매물명</th><th>지역</th><th>금액</th><th>연락처</th><th>대출</th><th>전용면적</th><th>방/욕실</th><th>입주</th><th>담당</th><th>계약</th><th>최종 FU</th><th>예정 FU</th>${mine?'<th>관리</th>':''}</tr></thead><tbody>${rows.map(x=>`<tr>${adminMode?`<td><input type="checkbox" class="admin-listing-check" value="${x.id}" onchange="toggleAdminListingSelection('${x.id}',this.checked)"></td>`:''}<td class="crm3812-status-cell"><div class="crm3812-list-address" title="${escapeHtml(x.address||x.district||'주소 미입력')}">${escapeHtml(x.address||x.district||'주소 미입력')}</div>${badge(x.status==='available'?'거래 가능':x.status==='complete'?'거래 완료':'협의 중',x.status==='available'?'green':x.status==='complete'?'gray':'yellow')}</td><td>${escapeHtml(crm38DealTypeText(x))}</td><td>${escapeHtml(x.property_type)}</td><td><button type="button" class="crm3814-listing-title-link" onclick="openListingDetail('${x.id}')" title="매물 상세정보 보기">${escapeHtml(x.title)}</button>${x.is_public?'':' '+badge('비공개','red')}<br><button class="photo-link" onclick="openListingPhotos('${x.id}')">📷 내부사진</button></td><td>${escapeHtml(listingAreaText(x))}</td><td>${listingPriceText(x)}</td><td>${crm382ContactDisplay(x)}</td><td>${x.loan_available===true?badge('O','green'):x.loan_available===false?badge('X','red'):badge('미확인','gray')}</td><td>${x.area_m2?`${x.area_m2}㎡<br><span class="muted">약 ${(Number(x.area_m2)/3.3058).toFixed(2)}평</span>`:'-'}</td><td>${listingRoomText(x)} / ${x.bathroom_count??'-'}</td><td>${moveInText(x)}</td><td>${escapeHtml(x.owner?.full_name||'-')}</td><td>${contractStage(x)}</td><td>${fmtDate(x.last_follow_up_at||x.last_confirmed_at)}</td><td>${dueBadge(x.next_follow_up_at)}</td>${mine?`<td><div class="row-actions"><button class="success" onclick="openFollowUpModal('listing','${x.id}')">FU</button><button class="ghost" onclick="openHistoryModal('listing','${x.id}')">히스토리</button><button class="ghost" onclick="openContractModal('listing','${x.id}')">계약일정</button><button class="ghost" onclick="openListingModal('${x.id}')">수정</button>${adminMode?`<button class="primary" onclick="openSingleListingTransfer('${x.id}')">개별 이관</button>`:''}<button class="danger" onclick="deleteListing('${x.id}')">삭제</button></div></td>`:''}</tr>`).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 매물이 없습니다.</div>';if(adminMode)updateBulkTransferControls()};
+renderListingTable=function(rows,target,mine,adminMode=false){const el=$('#'+target);el.innerHTML=rows.length?`<div class="table-wrap listing-table-wrap"><table class="listing-table"><thead><tr>${adminMode?'<th class="select-col">선택</th>':''}<th>상태</th><th>거래</th><th>유형</th><th>매물명</th><th>지역</th><th>금액</th><th>연락처</th><th>대출</th><th>전용면적</th><th>방/욕실</th><th>입주</th><th>담당</th><th>진행상황</th><th>최종 FU</th><th>예정 FU</th>${mine?'<th>관리</th>':''}</tr></thead><tbody>${rows.map(x=>`<tr>${adminMode?`<td><input type="checkbox" class="admin-listing-check" value="${x.id}" onchange="toggleAdminListingSelection('${x.id}',this.checked)"></td>`:''}<td class="crm3812-status-cell"><div class="crm3812-list-address" title="${escapeHtml(x.address||x.district||'주소 미입력')}">${escapeHtml(x.address||x.district||'주소 미입력')}</div>${badge(x.status==='available'?'거래 가능':x.status==='complete'?'거래 완료':'협의 중',x.status==='available'?'green':x.status==='complete'?'gray':'yellow')}</td><td>${escapeHtml(crm38DealTypeText(x))}</td><td>${escapeHtml(x.property_type)}</td><td><button type="button" class="crm3814-listing-title-link" onclick="openListingDetail('${x.id}')" title="매물 상세정보 보기">${escapeHtml(x.title)}</button>${x.is_public?'':' '+badge('비공개','red')}<br><button class="photo-link" onclick="openListingPhotos('${x.id}')">📷 내부사진</button></td><td>${escapeHtml(listingAreaText(x))}</td><td>${listingPriceText(x)}</td><td>${crm382ContactDisplay(x)}</td><td>${x.loan_available===true?badge('O','green'):x.loan_available===false?badge('X','red'):badge('미확인','gray')}</td><td>${x.area_m2?`${x.area_m2}㎡<br><span class="muted">약 ${(Number(x.area_m2)/3.3058).toFixed(2)}평</span>`:'-'}</td><td>${listingRoomText(x)} / ${x.bathroom_count??'-'}</td><td>${moveInText(x)}</td><td>${escapeHtml(x.owner?.full_name||'-')}</td><td>${contractStage(x)}</td><td>${fmtDate(x.last_follow_up_at||x.last_confirmed_at)}</td><td>${dueBadge(x.next_follow_up_at)}</td>${mine?`<td><div class="row-actions"><button class="success" onclick="openFollowUpModal('listing','${x.id}')">FU</button><button class="ghost" onclick="openHistoryModal('listing','${x.id}')">히스토리</button><button class="ghost" onclick="openContractModal('listing','${x.id}')">진행상황</button><button class="ghost" onclick="openListingModal('${x.id}')">수정</button>${adminMode?`<button class="primary" onclick="openSingleListingTransfer('${x.id}')">개별 이관</button>`:''}<button class="danger" onclick="deleteListing('${x.id}')">삭제</button></div></td>`:''}</tr>`).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 매물이 없습니다.</div>';if(adminMode)updateBulkTransferControls()};
 Object.assign(window,{openListingModal,openListingPhotos,crm38AddContactRow,crm38SyncDealCards,crm38TogglePhotoManage,renderListingTable});
 console.info('CRM v3.8 매물 입력·사진·복수거래 개선 로드 완료');
 
@@ -1903,7 +1903,7 @@ crm37DormantInfo=function(customer){
 renderListingTable=function(rows,target,mine,adminMode=false){
   const el=$('#'+target);
   const totalCols=(adminMode?1:0)+16+(mine?1:0);
-  el.innerHTML=rows.length?`<div class="table-wrap listing-table-wrap"><table class="listing-table crm3813-listing-table"><thead><tr>${adminMode?'<th class="select-col">선택</th>':''}<th>상태</th><th>거래</th><th>유형</th><th>매물명</th><th>지역</th><th>금액</th><th>연락처</th><th>대출</th><th>전용면적</th><th>방/욕실</th><th>입주</th><th>담당</th><th>계약</th><th>최종 FU</th><th>예정 FU</th>${mine?'<th>관리</th>':''}</tr></thead><tbody>${rows.map(x=>`<tr class="crm3813-address-row">${adminMode?'<td></td>':''}<td colspan="3"><div title="${escapeHtml(x.address||x.district||'주소 미입력')}">${escapeHtml(x.address||x.district||'주소 미입력')}</div></td><td colspan="${totalCols-(adminMode?1:0)-3}"></td></tr><tr>${adminMode?`<td><input type="checkbox" class="admin-listing-check" value="${x.id}" onchange="toggleAdminListingSelection('${x.id}',this.checked)"></td>`:''}<td>${badge(x.status==='available'?'거래 가능':x.status==='complete'?'거래 완료':'협의 중',x.status==='available'?'green':x.status==='complete'?'gray':'yellow')}</td><td>${escapeHtml(crm38DealTypeText(x))}</td><td>${escapeHtml(x.property_type)}</td><td><button type="button" class="crm3814-listing-title-link" onclick="openListingDetail('${x.id}')" title="매물 상세정보 보기">${escapeHtml(x.title)}</button>${x.is_public?'':' '+badge('비공개','red')}<br><button class="photo-link" onclick="openListingPhotos('${x.id}')">📷 내부사진</button></td><td>${escapeHtml(listingAreaText(x))}</td><td>${listingPriceText(x)}</td><td>${crm382ContactDisplay(x)}</td><td>${x.loan_available===true?badge('O','green'):x.loan_available===false?badge('X','red'):badge('미확인','gray')}</td><td>${x.area_m2?`${x.area_m2}㎡<br><span class="muted">약 ${(Number(x.area_m2)/3.3058).toFixed(2)}평</span>`:'-'}</td><td>${listingRoomText(x)} / ${x.bathroom_count??'-'}</td><td>${moveInText(x)}</td><td>${escapeHtml(x.owner?.full_name||'-')}</td><td>${contractStage(x)}</td><td>${fmtDate(x.last_follow_up_at||x.last_confirmed_at)}</td><td>${dueBadge(x.next_follow_up_at)}</td>${mine?`<td><div class="row-actions"><button class="success" onclick="openFollowUpModal('listing','${x.id}')">FU</button><button class="ghost" onclick="openHistoryModal('listing','${x.id}')">히스토리</button><button class="ghost" onclick="openContractModal('listing','${x.id}')">계약일정</button><button class="ghost" onclick="openListingModal('${x.id}')">수정</button>${adminMode?`<button class="primary" onclick="openSingleListingTransfer('${x.id}')">개별 이관</button>`:''}<button class="danger" onclick="deleteListing('${x.id}')">삭제</button></div></td>`:''}</tr>`).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 매물이 없습니다.</div>';
+  el.innerHTML=rows.length?`<div class="table-wrap listing-table-wrap"><table class="listing-table crm3813-listing-table"><thead><tr>${adminMode?'<th class="select-col">선택</th>':''}<th>상태</th><th>거래</th><th>유형</th><th>매물명</th><th>지역</th><th>금액</th><th>연락처</th><th>대출</th><th>전용면적</th><th>방/욕실</th><th>입주</th><th>담당</th><th>진행상황</th><th>최종 FU</th><th>예정 FU</th>${mine?'<th>관리</th>':''}</tr></thead><tbody>${rows.map(x=>`<tr class="crm3813-address-row">${adminMode?'<td></td>':''}<td colspan="3"><div title="${escapeHtml(x.address||x.district||'주소 미입력')}">${escapeHtml(x.address||x.district||'주소 미입력')}</div></td><td colspan="${totalCols-(adminMode?1:0)-3}"></td></tr><tr>${adminMode?`<td><input type="checkbox" class="admin-listing-check" value="${x.id}" onchange="toggleAdminListingSelection('${x.id}',this.checked)"></td>`:''}<td>${badge(x.status==='available'?'거래 가능':x.status==='complete'?'거래 완료':'협의 중',x.status==='available'?'green':x.status==='complete'?'gray':'yellow')}</td><td>${escapeHtml(crm38DealTypeText(x))}</td><td>${escapeHtml(x.property_type)}</td><td><button type="button" class="crm3814-listing-title-link" onclick="openListingDetail('${x.id}')" title="매물 상세정보 보기">${escapeHtml(x.title)}</button>${x.is_public?'':' '+badge('비공개','red')}<br><button class="photo-link" onclick="openListingPhotos('${x.id}')">📷 내부사진</button></td><td>${escapeHtml(listingAreaText(x))}</td><td>${listingPriceText(x)}</td><td>${crm382ContactDisplay(x)}</td><td>${x.loan_available===true?badge('O','green'):x.loan_available===false?badge('X','red'):badge('미확인','gray')}</td><td>${x.area_m2?`${x.area_m2}㎡<br><span class="muted">약 ${(Number(x.area_m2)/3.3058).toFixed(2)}평</span>`:'-'}</td><td>${listingRoomText(x)} / ${x.bathroom_count??'-'}</td><td>${moveInText(x)}</td><td>${escapeHtml(x.owner?.full_name||'-')}</td><td>${contractStage(x)}</td><td>${fmtDate(x.last_follow_up_at||x.last_confirmed_at)}</td><td>${dueBadge(x.next_follow_up_at)}</td>${mine?`<td><div class="row-actions"><button class="success" onclick="openFollowUpModal('listing','${x.id}')">FU</button><button class="ghost" onclick="openHistoryModal('listing','${x.id}')">히스토리</button><button class="ghost" onclick="openContractModal('listing','${x.id}')">진행상황</button><button class="ghost" onclick="openListingModal('${x.id}')">수정</button>${adminMode?`<button class="primary" onclick="openSingleListingTransfer('${x.id}')">개별 이관</button>`:''}<button class="danger" onclick="deleteListing('${x.id}')">삭제</button></div></td>`:''}</tr>`).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 매물이 없습니다.</div>';
   if(adminMode)updateBulkTransferControls();
 };
 
@@ -1962,7 +1962,7 @@ async function loadContractDocuments(){
   const {data,error}=await state.client.from('contract_documents').select('*').order('created_at',{ascending:false});
   if(error)return toast(error.message);
   const rows=data||[];
-  $('#documentList').innerHTML=rows.length?`<div class="table-wrap"><table class="crm3813-contract-table"><thead><tr><th>주소</th><th>매물명</th><th>거래조건</th><th>계약</th><th>계약일</th><th>잔금일</th><th>관리</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${escapeHtml(x.contract_address||'-')}</td><td><strong>${escapeHtml(x.listing_title||x.file_name||'-')}</strong></td><td>${escapeHtml(x.deal_terms||'-')}</td><td>${badge('계약서 있음','green')}<br><span class="muted">${escapeHtml(x.brokerage_type||'-')}</span></td><td>${fmtDate(x.contract_date)}</td><td>${fmtDate(x.balance_date)}</td><td><div class="row-actions"><button onclick="downloadContractDocument('${x.storage_path}','${escapeHtml(x.file_name)}')">다운로드</button><button class="danger" onclick="deleteContractDocument('${x.id}','${x.storage_path}')">삭제</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">등록된 계약서가 없습니다.</div>';
+  $('#documentList').innerHTML=rows.length?`<div class="table-wrap"><table class="crm3813-contract-table"><thead><tr><th>주소</th><th>매물명</th><th>거래조건</th><th>진행상황</th><th>계약일</th><th>잔금일</th><th>관리</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${escapeHtml(x.contract_address||'-')}</td><td><strong>${escapeHtml(x.listing_title||x.file_name||'-')}</strong></td><td>${escapeHtml(x.deal_terms||'-')}</td><td>${badge('계약서 있음','green')}<br><span class="muted">${escapeHtml(x.brokerage_type||'-')}</span></td><td>${fmtDate(x.contract_date)}</td><td>${fmtDate(x.balance_date)}</td><td><div class="row-actions"><button onclick="downloadContractDocument('${x.storage_path}','${escapeHtml(x.file_name)}')">다운로드</button><button class="danger" onclick="deleteContractDocument('${x.id}','${x.storage_path}')">삭제</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">등록된 계약서가 없습니다.</div>';
 }
 
 console.info('CRM v3.8.13 목록·장기미접촉·계약서 관리 로드 완료');
@@ -2176,3 +2176,145 @@ crm3818BindDistrictInput=function(){
 };
 Object.assign(window,{crm3818FormatDistrict,crm3818BindDistrictInput});
 console.info('CRM v3.8.22 지역 저장 시 구·동 띄어쓰기 정리 로드 완료');
+
+
+// ===== CRM v3.8.23 진행상황/계약 일정 분리 =====
+function contractStage(x){
+  const stages=[
+    ['잔금',!!x.final_payment_completed],
+    ['중도금',!x.interim_payment_not_applicable&&!!x.interim_payment_completed],
+    ['본계약',!!x.contract_completed],
+    ['가계약',!!x.provisional_contract_completed]
+  ];
+  const hit=stages.find(v=>v[1]);
+  return hit?badge(hit[0],'blue'):'-';
+}
+
+function crm3823Money(v){
+  return v===null||v===undefined||v===''?'-':`${Number(v).toLocaleString('ko-KR')}만원`;
+}
+function crm3823StageLine(label, completed, date, amountLabel, amount){
+  const status=completed?'완료':'예정';
+  return `${label} ${status} · 일정 ${date?fmtDate(date):'미정'} · ${amountLabel} ${crm3823Money(amount)}`;
+}
+function crm3823ContractSnapshot(x, entityType){
+  const lines=[];
+  const detail=contractDetailText(x,entityType);
+  if(detail) lines.push(detail);
+  const latest=contractStage(x).replace(/<[^>]+>/g,'')||'-';
+  lines.push(`현재 진행상황: ${latest==='-'?'미진행':latest}`);
+  lines.push(crm3823StageLine('가계약',!!x.provisional_contract_completed,x.provisional_contract_date,'가계약금',x.provisional_contract_amount));
+  lines.push(crm3823StageLine('본계약',!!x.contract_completed,x.contract_date,'계약금',x.contract_amount));
+  if(!x.interim_payment_not_applicable){
+    lines.push(crm3823StageLine('중도금',!!x.interim_payment_completed,x.interim_payment_date,'중도금',x.interim_payment_amount));
+  }
+  lines.push(crm3823StageLine('잔금',!!x.final_payment_completed,x.final_payment_date,'잔금',x.final_payment_amount));
+  return lines.join('\n');
+}
+
+openContractModal=async function(entityType,id){
+  const item=entityType==='customer'?state.customers.find(x=>x.id===id):state.listings.find(x=>x.id===id);
+  if(!item)return toast('대상을 찾지 못했습니다.');
+  $('#modalTitle').textContent=`${entityType==='customer'?item.name:item.title} · 진행상황`;
+  const steps=[
+    ['provisional_contract_date','가계약','provisional_contract_amount','가계약금','provisional_contract_completed'],
+    ['contract_date','본계약','contract_amount','계약금','contract_completed'],
+    ['interim_payment_date','중도금','interim_payment_amount','중도금','interim_payment_completed'],
+    ['final_payment_date','잔금','final_payment_amount','잔금','final_payment_completed']
+  ];
+  const demandSide=entityType==='customer'&&['매수','임차'].includes(item.customer_type);
+  const defaultProperty=entityType==='listing'?item.title:(item.contracted_property_name||'');
+  const defaultType=entityType==='listing'?item.transaction_type:(item.contracted_transaction_type||'');
+  const defaultAmount=entityType==='listing'?(item.contracted_amount??item.price??''):(item.contracted_amount??'');
+  const defaultMonthlyRent=entityType==='listing'?(item.contracted_monthly_rent??item.monthly_rent??''):(item.contracted_monthly_rent??'');
+  const detailFields=demandSide?`
+    <div class="contract-detail-grid">
+      <label>계약 매물명<input name="contracted_property_name" value="${escapeHtml(defaultProperty)}" placeholder="예: 철산자이 101동 1203호"></label>
+      <label>거래유형<select name="contracted_transaction_type"><option value="">선택</option><option>매매</option><option>전세</option><option>월세</option></select></label>
+      <label id="contractAmountLabel">거래금액/보증금(만원)<input name="contracted_amount" type="number" value="${defaultAmount}"></label>
+      <label id="contractMonthlyRentWrap">월세(만원)<input name="contracted_monthly_rent" type="number" min="0" value="${defaultMonthlyRent}"></label>
+      <label>상대방 연락처<input name="counterparty_phone" value="${escapeHtml(item.counterparty_phone||'')}" placeholder="010-0000-0000"></label>
+    </div>`:`
+    <div class="contract-detail-grid">
+      ${entityType==='listing'?`<label>계약 매물명<input name="contracted_property_name" value="${escapeHtml(defaultProperty)}"></label><label>거래유형<select name="contracted_transaction_type"><option value="">선택</option><option>매매</option><option>전세</option><option>월세</option></select></label>`:''}
+      <label id="contractAmountLabel">거래금액/보증금(만원)<input name="contracted_amount" type="number" value="${defaultAmount}"></label>
+      <label id="contractMonthlyRentWrap">월세(만원)<input name="contracted_monthly_rent" type="number" min="0" value="${defaultMonthlyRent}"></label>
+      <label>거래 고객명<input name="counterparty_name" value="${escapeHtml(item.counterparty_name||'')}" placeholder="매수인 또는 임차인 이름"></label>
+      <label>거래 고객 연락처<input name="counterparty_phone" value="${escapeHtml(item.counterparty_phone||'')}" placeholder="010-0000-0000"></label>
+    </div>`;
+  $('#modalBody').innerHTML=`<div class="contract-editor">
+    <p class="muted">체크박스는 해당 단계를 실제로 완료했을 때만 체크하세요. 날짜와 금액은 체크하지 않아도 미리 입력할 수 있습니다.</p>
+    <section class="contract-detail-box"><h4>계약 정보</h4>${detailFields}</section>
+    ${steps.map(([key,label,amountKey,amountLabel,completedKey],i)=>{
+      const isInterim=key==='interim_payment_date',na=isInterim&&!!item.interim_payment_not_applicable;
+      return `<div class="contract-edit-row ${na?'not-applicable':''}" data-contract-row="${key}">
+        <div class="step-no">${i+1}</div>
+        <label class="check-label"><input type="checkbox" name="${completedKey}" ${item[completedKey]?'checked':''} ${na?'disabled':''}> ${label} 완료</label>
+        <input type="date" name="${key}" value="${item[key]||''}" ${na?'disabled':''}>
+        <label class="stage-amount-label">${amountLabel}(만원)<input type="number" min="0" step="1" name="${amountKey}" value="${item[amountKey]??''}" ${na?'disabled':''} placeholder="금액"></label>
+        ${isInterim?`<label class="na-label"><input type="checkbox" id="interimNotApplicable" ${na?'checked':''}> 해당없음</label>`:''}
+      </div>`
+    }).join('')}
+  </div>`;
+  const typeSelect=$('#modalBody [name=contracted_transaction_type]');
+  if(typeSelect)typeSelect.value=defaultType||'';
+  const contractMonthlyWrap=$('#contractMonthlyRentWrap'),contractAmountLabel=$('#contractAmountLabel');
+  const syncContractMonthly=()=>{
+    const isMonthly=typeSelect?.value==='월세';
+    if(contractMonthlyWrap){contractMonthlyWrap.style.display=isMonthly?'':'none';if(!isMonthly)contractMonthlyWrap.querySelector('input').value=''}
+    if(contractAmountLabel)contractAmountLabel.firstChild.textContent=isMonthly?'보증금(만원)':'거래금액(만원)';
+  };
+  if(typeSelect)typeSelect.onchange=syncContractMonthly;syncContractMonthly();
+  const syncInterim=()=>{
+    const na=$('#interimNotApplicable')?.checked||false;
+    const row=$('[data-contract-row="interim_payment_date"]');
+    row?.classList.toggle('not-applicable',na);
+    ['interim_payment_date','interim_payment_amount','interim_payment_completed'].forEach(name=>{
+      const el=$(`#modalBody [name=${name}]`);if(!el)return;
+      el.disabled=na;
+      if(na){if(el.type==='checkbox')el.checked=false;else el.value=''}
+    });
+  };
+  if($('#interimNotApplicable'))$('#interimNotApplicable').onchange=syncInterim;
+  syncInterim();
+  $('#modalSubmit').onclick=async(e)=>{
+    e.preventDefault();
+    const fd=new FormData($('#modalForm')),payload={};
+    steps.forEach(([key,,, ,completedKey])=>{
+      const step=steps.find(s=>s[0]===key);const amountKey=step[2];
+      payload[key]=fd.get(key)||null;
+      payload[amountKey]=fd.get(amountKey)?Number(fd.get(amountKey)):null;
+      payload[completedKey]=fd.get(completedKey)==='on';
+    });
+    payload.interim_payment_not_applicable=$('#interimNotApplicable')?.checked||false;
+    if(payload.interim_payment_not_applicable){
+      payload.interim_payment_date=null;payload.interim_payment_amount=null;payload.interim_payment_completed=false;
+    }
+    payload.contracted_property_name=fd.get('contracted_property_name')||null;
+    payload.contracted_transaction_type=fd.get('contracted_transaction_type')||null;
+    payload.contracted_amount=fd.get('contracted_amount')?Number(fd.get('contracted_amount')):null;
+    payload.contracted_monthly_rent=payload.contracted_transaction_type==='월세'&&fd.get('contracted_monthly_rent')?Number(fd.get('contracted_monthly_rent')):null;
+    payload.counterparty_name=fd.get('counterparty_name')||null;
+    payload.counterparty_phone=fd.get('counterparty_phone')||null;
+    payload.last_follow_up_at=today();
+    const table=entityType==='customer'?'customers':'listings';
+    const {error}=await state.client.from(table).update(payload).eq('id',id);
+    if(error)return toast(error.message);
+    const tracked=[...steps.flatMap(([key,,amountKey,,completedKey])=>[key,amountKey,completedKey]),'interim_payment_not_applicable','contracted_property_name','contracted_transaction_type','contracted_amount','contracted_monthly_rent','counterparty_name','counterparty_phone'];
+    const changed=tracked.some(k=>String(item[k]??'')!==String(payload[k]??''));
+    if(changed){
+      const updated={...item,...payload};
+      const target={customer_id:entityType==='customer'?id:null,listing_id:entityType==='listing'?id:null};
+      const {error:hErr}=await state.client.from('interaction_history').insert({
+        ...target,created_by:state.profile.id,follow_up_date:today(),contact_method:'진행상황',
+        content:crm3823ContractSnapshot(updated,entityType),next_follow_up_at:null
+      });
+      if(hErr)return toast(`진행상황은 저장됐지만 히스토리 기록에 실패했습니다: ${hErr.message}`);
+    }
+    // 예정 FU는 절대 변경하지 않는다.
+    if(entityType==='customer') await loadCustomers(); else await loadListings();
+    $('#modal').close();toast('진행상황을 저장하고 최종 FU를 오늘 날짜로 갱신했습니다.');
+    entityType==='customer'?renderCustomers():(state.view==='adminListings'?renderAdminListings():renderMyListings());
+  };
+  $('#modal').showModal();
+};
