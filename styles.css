@@ -447,3 +447,26 @@ input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:
   .crm3835-inline-address{font-size:12px;max-width:330px}
   .crm3835-inline-address>span:first-child{max-width:245px}
 }
+
+/* CRM v3.8.36 주소·광고를 상태 바로 아래에 밀착 배치 */
+.crm3813-listing-table td.crm3835-status-with-address{
+  position:relative;
+  padding-bottom:12px!important;
+  overflow:visible!important;
+}
+.crm3835-inline-address{
+  position:static!important;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  width:max-content;
+  max-width:430px;
+  min-height:21px;
+  margin-top:4px;
+  font-size:13px;
+  line-height:21px;
+  font-weight:750;
+  color:#475569;
+  white-space:nowrap;
+  z-index:2;
+}
