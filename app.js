@@ -1499,3 +1499,92 @@ crm36KakaoMessage=async function(customerId){
 
 Object.assign(window,{crm384ContactDisplay,crm384CopyText,crm36KakaoMessage});
 console.info('CRM v3.8.4 연락처 정렬·폼 정렬·카카오톡 직접복사 로드 완료');
+
+/* ===== CRM v3.8.5 FU 일정·복수 거래 가격이력 통합 ===== */
+function crm385Num(v){return v===''||v===undefined||v===null?null:Number(v)}
+function crm385Same(a,b){return crm385Num(a)===crm385Num(b)}
+function crm385DealValueText(o){
+  if(!o)return '없음';
+  if(o.deal_type==='월세')return `${fmtMoney(o.price)} / 월 ${fmtMoney(o.monthly_rent)}`;
+  return fmtMoney(o.price);
+}
+function crm385CollectDealOptions(){
+  return [...document.querySelectorAll('.crm38-deal-card')]
+    .filter(c=>c.querySelector('.crm38-deal-check')?.checked)
+    .map((c,i)=>({deal_type:c.dataset.type,price:crm385Num(c.querySelector('.crm38-deal-price')?.value),monthly_rent:c.dataset.type==='월세'?crm385Num(c.querySelector('.crm38-deal-rent')?.value):null,is_preferred:!!c.querySelector('input[type=radio]')?.checked,sort_order:i}));
+}
+function crm385DiffDealOptions(oldOpts=[],newOpts=[]){
+  const types=['매매','전세','월세'];const out=[];
+  for(const type of types){
+    const oldO=oldOpts.find(o=>o.deal_type===type)||null,newO=newOpts.find(o=>o.deal_type===type)||null;
+    if(!oldO&&newO){out.push({kind:'add',type,oldO:null,newO});continue}
+    if(oldO&&!newO){out.push({kind:'remove',type,oldO,newO:null});continue}
+    if(oldO&&newO&&(!crm385Same(oldO.price,newO.price)||!crm385Same(oldO.monthly_rent,newO.monthly_rent))){out.push({kind:'change',type,oldO,newO})}
+  }
+  return out;
+}
+async function crm385RecordDealChanges(listingId,oldOpts,newOpts){
+  const changes=crm385DiffDealOptions(oldOpts,newOpts);if(!changes.length)return;
+  const rows=changes.map(c=>({listing_id:listingId,changed_by:state.profile.id,transaction_type:c.type,old_price:c.oldO?.price??null,new_price:c.newO?.price??null,old_monthly_rent:c.oldO?.monthly_rent??null,new_monthly_rent:c.newO?.monthly_rent??null}));
+  const {error:pErr}=await state.client.from('listing_price_history').insert(rows);if(pErr)toast(`가격 이력 저장 실패: ${pErr.message}`);
+  const lines=changes.map(c=>c.kind==='add'?`${c.type} 조건 추가 · ${crm385DealValueText(c.newO)}`:c.kind==='remove'?`${c.type} 조건 종료 · ${crm385DealValueText(c.oldO)}`:`${c.type} 가격 변경 · ${crm385DealValueText(c.oldO)} → ${crm385DealValueText(c.newO)}`);
+  const {error:hErr}=await state.client.from('interaction_history').insert({created_by:state.profile.id,follow_up_date:today(),contact_method:'가격변동',content:lines.join('\n'),listing_id:listingId,next_follow_up_at:null});
+  if(hErr)toast(`히스토리 저장 실패: ${hErr.message}`);else await state.client.from('listings').update({last_follow_up_at:today()}).eq('id',listingId);
+}
+async function crm385RecalcNextFu(listingId){
+  const {data}=await state.client.from('interaction_history').select('next_follow_up_at').eq('listing_id',listingId).not('next_follow_up_at','is',null).gte('next_follow_up_at',today()).order('next_follow_up_at',{ascending:true}).limit(1);
+  const next=data?.[0]?.next_follow_up_at||null;
+  await state.client.from('listings').update({next_follow_up_at:next,next_confirm_at:null}).eq('id',listingId);
+  return next;
+}
+
+const crm385BaseOpenListingModal=openListingModal;
+openListingModal=function(id){
+  const oldOpts=id?crm38DealOptions(state.listings.find(x=>x.id===id)).map(o=>({...o})):[];
+  crm385BaseOpenListingModal(id);
+  const nextInput=document.querySelector('#modalBody input[name="next_confirm_at"]');
+  if(nextInput){const label=nextInput.closest('label');label?.nextElementSibling?.classList?.contains('field-help')&&label.nextElementSibling.remove();label?.remove()}
+  const original=$('#modalSubmit').onclick;
+  $('#modalSubmit').onclick=async e=>{
+    const newOpts=crm385CollectDealOptions();
+    await original(e);
+    if(id&&!$('#modal').open){await crm385RecordDealChanges(id,oldOpts,newOpts);await loadListings()}
+  };
+};
+
+crm361OpenListingFu=async function(id){
+  const item=state.listings.find(x=>x.id===id);if(!item)return toast('매물을 찾지 못했습니다.');
+  const opts=crm38DealOptions(item);
+  $('#modalTitle').textContent=`${item.title} · FU 관리`;
+  $('#modalBody').innerHTML=`<input id="crm361ListingId" type="hidden" value="${id}"><div class="crm361-fu-tabs"><button type="button" class="crm361-fu-tab active" data-tab="record" onclick="crm361SetFuTab('record')">FU 기록</button><button type="button" class="crm361-fu-tab" data-tab="confirm" onclick="crm361SetFuTab('confirm')">확인 전화</button><button type="button" class="crm361-fu-tab" data-tab="history" onclick="crm361SetFuTab('history')">가격 이력</button></div>
+  <section class="crm361-fu-panel" data-panel="record"><div class="form-grid"><label>기록 일자<input id="crm361FuDate" type="date" value="${today()}" required></label><label>상담 종류<select id="crm361FuMethod"><option>전화</option><option>대면투어</option><option>촬영</option><option>문자/톡 발송</option><option>문자/톡 수신</option><option>부재중</option><option>가계약</option><option>본계약</option><option>중도금</option><option>잔금</option><option>기타</option></select></label><label class="span-2">상담·진행 내용<textarea id="crm361FuContent" rows="7" placeholder="통화 내용, 조건 변경, 다음 조치 등을 구체적으로 기록하세요."></textarea></label><label>예정 FU<input id="crm361FuNext" type="date" value="${item.next_follow_up_at?item.next_follow_up_at.slice(0,10):''}"></label><div class="field-help span-2">이미 더 빠른 예정 FU가 있으면 기존의 빠른 일정이 유지됩니다.</div></div></section>
+  <section class="crm361-fu-panel hidden" data-panel="confirm"><div class="notice">확인 내용을 FU 히스토리에 저장합니다. 거래유형별 가격을 수정하면 가격 이력과 히스토리에 함께 기록됩니다.</div><div class="form-grid" style="margin-top:14px"><label>확인 결과<select id="crm361ConfirmResult"><option>거래 가능</option><option>가격 변경</option><option>협의 중</option><option>거래 완료</option><option>연락 안 됨</option><option>재확인 필요</option></select></label><label>예정 FU<input id="crm361NextConfirm" type="date" value="${item.next_follow_up_at?item.next_follow_up_at.slice(0,10):''}"></label><div class="span-2 crm385-confirm-deals">${opts.map(o=>`<div class="crm385-confirm-deal" data-type="${o.deal_type}" data-id="${o.id||''}"><strong>${o.deal_type}</strong><label>${o.deal_type==='매매'?'매매가':o.deal_type==='전세'?'전세금':'보증금'}(만원)<input class="crm385-confirm-price" type="number" value="${o.price??''}"></label>${o.deal_type==='월세'?`<label>월세(만원)<input class="crm385-confirm-rent" type="number" value="${o.monthly_rent??''}"></label>`:''}</div>`).join('')}</div><label class="span-2">통화 내용<textarea id="crm361ConfirmNote" rows="7" placeholder="거래 가능 여부, 가격 협의, 입주 가능일, 추가 확인사항 등을 기록하세요."></textarea></label></div></section>
+  <section class="crm361-fu-panel hidden" data-panel="history"><div id="crm361PriceHistory"></div></section>`;
+  $('#modalSubmit').style.display='';
+  $('#modalSubmit').onclick=async e=>{e.preventDefault();const active=$('.crm361-fu-tab.active')?.dataset.tab||'record';
+    if(active==='record'){
+      const content=$('#crm361FuContent').value.trim();if(!content)return toast('FU 내용을 입력하세요.');
+      const history={created_by:state.profile.id,follow_up_date:$('#crm361FuDate').value,contact_method:$('#crm361FuMethod').value,content,next_follow_up_at:$('#crm361FuNext').value||null,listing_id:id};
+      const {error}=await state.client.from('interaction_history').insert(history);if(error)return toast(error.message);
+      await state.client.from('listings').update({last_follow_up_at:history.follow_up_date}).eq('id',id);await crm385RecalcNextFu(id);
+      $('#modal').close();toast('FU 내용과 예정 일정을 히스토리에 저장했습니다.');return state.view==='adminListings'?renderAdminListings():renderMyListings();
+    }
+    if(active==='confirm'){
+      const oldOpts=opts.map(o=>({...o}));const newOpts=[...document.querySelectorAll('.crm385-confirm-deal')].map((row,i)=>({id:row.dataset.id||null,deal_type:row.dataset.type,price:crm385Num(row.querySelector('.crm385-confirm-price').value),monthly_rent:row.dataset.type==='월세'?crm385Num(row.querySelector('.crm385-confirm-rent')?.value):null,is_preferred:oldOpts.find(o=>o.deal_type===row.dataset.type)?.is_preferred||false,sort_order:i}));
+      const result=$('#crm361ConfirmResult').value,note=$('#crm361ConfirmNote').value.trim(),next=$('#crm361NextConfirm').value||null;
+      const preferred=newOpts.find(o=>o.is_preferred)||newOpts[0];
+      const {error}=await state.client.from('listing_confirmation_logs').insert({listing_id:id,confirmed_by:state.profile.id,result,note:note||null,confirmed_price:preferred?.price??null,confirmed_monthly_rent:preferred?.monthly_rent??null,next_confirm_at:next});if(error)return toast(error.message);
+      for(const o of newOpts){if(o.id)await state.client.from('listing_deal_options').update({price:o.price,monthly_rent:o.monthly_rent}).eq('id',o.id)}
+      const update={last_confirmed_at:today(),next_confirm_at:null};if(preferred){update.transaction_type=preferred.deal_type;update.price=preferred.price;update.monthly_rent=preferred.monthly_rent}if(result==='거래 완료')update.status='complete';else if(result==='협의 중')update.status='hold';else if(result==='거래 가능')update.status='available';
+      const {error:uErr}=await state.client.from('listings').update(update).eq('id',id);if(uErr)return toast(uErr.message);
+      await state.client.from('interaction_history').insert({created_by:state.profile.id,follow_up_date:today(),contact_method:'매물확인',content:`확인 결과: ${result}${note?`\n${note}`:''}`,listing_id:id,next_follow_up_at:next});
+      await crm385RecordDealChanges(id,oldOpts,newOpts);await crm385RecalcNextFu(id);
+      $('#modal').close();toast('확인 전화, 가격 이력, FU 히스토리를 함께 저장했습니다.');return state.view==='adminListings'?renderAdminListings():renderMyListings();
+    }
+  };$('#modal').showModal();
+};
+openFollowUpModal=function(entityType,id){return entityType==='listing'?crm361OpenListingFu(id):crm361BaseOpenFollowUpModal(entityType,id)};
+const crm385BaseDeleteHistoryItem=deleteHistoryItem;
+deleteHistoryItem=async function(historyId,entityType,entityId){await crm385BaseDeleteHistoryItem(historyId,entityType,entityId);if(entityType==='listing')await crm385RecalcNextFu(entityId)};
+Object.assign(window,{openListingModal,openFollowUpModal,crm361OpenListingFu,deleteHistoryItem});
+console.info('CRM v3.8.5 FU 일정·복수 거래 가격이력 통합 로드 완료');

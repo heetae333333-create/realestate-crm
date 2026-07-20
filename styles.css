@@ -229,3 +229,9 @@ input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:
   #modalBody .crm38-contact-row button{grid-column:1/-1;width:100%}
   .crm384-contact-list{min-width:105px}
 }
+
+/* CRM v3.8.5 */
+.crm385-confirm-deals{display:grid;gap:10px}
+.crm385-confirm-deal{display:grid;grid-template-columns:minmax(80px,.5fr) repeat(2,minmax(160px,1fr));gap:12px;align-items:end;padding:14px;border:1px solid var(--line,#dbe2ea);border-radius:12px;background:#f8fafc}
+.crm385-confirm-deal strong{align-self:center}
+@media(max-width:700px){.crm385-confirm-deal{grid-template-columns:1fr}.crm385-confirm-deal label{width:100%}}
