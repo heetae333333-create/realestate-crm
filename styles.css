@@ -235,3 +235,14 @@ input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:
 .crm385-confirm-deal{display:grid;grid-template-columns:minmax(80px,.5fr) repeat(2,minmax(160px,1fr));gap:12px;align-items:end;padding:14px;border:1px solid var(--line,#dbe2ea);border-radius:12px;background:#f8fafc}
 .crm385-confirm-deal strong{align-self:center}
 @media(max-width:700px){.crm385-confirm-deal{grid-template-columns:1fr}.crm385-confirm-deal label{width:100%}}
+
+/* CRM v3.8.6 */
+.crm386-contact-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px dashed #cbd5e1;border-radius:12px;background:#f8fafc}
+.crm386-contact-box{grid-column:1/-1;display:grid;gap:10px}
+.crm386-contact-empty{padding:12px;text-align:center;border:1px dashed #dbe3ee;border-radius:10px}
+.crm386-fu-deals{display:grid;gap:10px}
+.crm386-fu-deal{border:1px solid #dbe3ee;border-radius:12px;padding:12px;background:#f8fafc}
+.crm386-fu-deal-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.crm386-fu-deal-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:10px}
+.crm386-fu-deal-fields[hidden]{display:none}
+@media(max-width:700px){.crm386-contact-toolbar{align-items:flex-start}.crm386-fu-deal-fields{grid-template-columns:1fr}}
