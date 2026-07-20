@@ -470,3 +470,38 @@ input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:
   white-space:nowrap;
   z-index:2;
 }
+
+/* CRM v3.8.37 상태와 주소 사이 간격을 모든 행에서 동일하게 고정 */
+.crm3813-listing-table td.crm3835-status-with-address{
+  padding-top:9px!important;
+  padding-bottom:9px!important;
+  vertical-align:top!important;
+}
+.crm3837-status-stack{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  justify-content:flex-start;
+  gap:4px;
+  width:max-content;
+  min-width:0;
+}
+.crm3837-status-line{
+  display:flex;
+  align-items:center;
+  min-height:28px;
+  margin:0;
+  padding:0;
+  white-space:nowrap;
+}
+.crm3837-status-stack .crm3835-inline-address{
+  position:static!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:8px!important;
+  margin:0!important;
+  padding:0!important;
+  min-height:21px!important;
+  line-height:21px!important;
+  transform:none!important;
+}

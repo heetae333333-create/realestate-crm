@@ -2993,3 +2993,27 @@ renderListingTable=function(rows,target,mine,adminMode=false){
 };
 Object.assign(window,{renderListingTable});
 console.info('CRM v3.8.35 주소·광고 동일 행 배치 적용 완료');
+
+/* ===== CRM v3.8.37 주소 간격 고정 ===== */
+const crm3837RenderListingTableBase=renderListingTable;
+renderListingTable=function(rows,target,mine,adminMode=false){
+  crm3837RenderListingTableBase(rows,target,mine,adminMode);
+  const root=document.getElementById(target);
+  if(!root)return;
+  root.querySelectorAll('td.crm3835-status-with-address').forEach(cell=>{
+    const address=cell.querySelector('.crm3835-inline-address');
+    if(!address||cell.querySelector('.crm3837-status-stack'))return;
+    const stack=document.createElement('div');
+    stack.className='crm3837-status-stack';
+    const statusLine=document.createElement('div');
+    statusLine.className='crm3837-status-line';
+    [...cell.childNodes].forEach(node=>{
+      if(node!==address)statusLine.appendChild(node);
+    });
+    stack.appendChild(statusLine);
+    stack.appendChild(address);
+    cell.appendChild(stack);
+  });
+};
+Object.assign(window,{renderListingTable});
+console.info('CRM v3.8.37 주소 간격 고정 적용 완료');
