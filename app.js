@@ -1120,8 +1120,18 @@ async function crm37LoadAnnouncements(){
   if(error){console.warn(error.message);state.announcements=[];return []}
   state.announcements=data||[];return state.announcements;
 }
+function crm37AnnouncementCard(a){
+  return `<article class="announcement-card ${a.is_pinned?'pinned':''}"><div class="announcement-title">${a.is_pinned?'📌 ':''}${escapeHtml(a.title)}</div><div class="announcement-body">${escapeHtml(a.content||'').replace(/\n/g,'<br>')}</div><div class="muted">${escapeHtml(a.author?.full_name||'관리자')} · ${fmtDate(a.created_at)}</div></article>`;
+}
 function crm37AnnouncementCards(){
-  return state.announcements.length?`<div class="announcement-list">${state.announcements.map(a=>`<article class="announcement-card ${a.is_pinned?'pinned':''}"><div class="announcement-title">${a.is_pinned?'📌 ':''}${escapeHtml(a.title)}</div><div class="announcement-body">${escapeHtml(a.content||'').replace(/\n/g,'<br>')}</div><div class="muted">${escapeHtml(a.author?.full_name||'관리자')} · ${fmtDate(a.created_at)}</div></article>`).join('')}</div>`:'<div class="empty">등록된 공지사항이 없습니다.</div>';
+  if(!state.announcements.length) return '<div class="empty">등록된 공지사항이 없습니다.</div>';
+  return `<div class="announcement-list crm3832-announcement-preview">${state.announcements.map(crm37AnnouncementCard).join('')}</div>`;
+}
+function crm3832OpenAnnouncementList(){
+  $('#modalTitle').textContent='공지사항 전체보기';
+  $('#modalBody').innerHTML=state.announcements.length?`<div class="announcement-list crm3832-announcement-all">${state.announcements.map(crm37AnnouncementCard).join('')}</div>`:'<div class="empty">등록된 공지사항이 없습니다.</div>';
+  $('#modalSubmit').style.display='none';
+  $('#modal').showModal();
 }
 
 async function crm37OpenQuickCustomer(){
@@ -1160,7 +1170,7 @@ renderDashboard=async function(){
   <div class="dashboard-three"><section class="panel"><div class="panel-head"><h3>오늘 처리할 FU</h3></div>${[...dueCustomers.map(x=>({name:x.name,type:'고객',date:x.next_follow_up_at,id:x.id})),...dueListings.map(x=>({name:x.title,type:'매물',date:x.next_follow_up_at,id:x.id}))].slice(0,12).map(x=>`<div class="list-item"><div><strong>${escapeHtml(x.name)}</strong><div class="muted">${x.type}</div></div><div class="row-actions">${dueBadge(x.date)}<button class="success" onclick="openFollowUpModal('${x.type==='고객'?'customer':'listing'}','${x.id}')">FU</button></div></div>`).join('')||'<div class="empty">오늘 처리할 FU가 없습니다.</div>'}</section>
   <section class="panel"><div class="panel-head"><h3>방문·계약 일정</h3></div>${[...(visits||[]).map(v=>({date:v.visit_at?.slice(0,10),label:'방문',name:`${v.customer?.name||'고객'} · ${v.listing?.title||'매물'}`})),...contracts].sort((a,b)=>(a.date||'').localeCompare(b.date||'')).slice(0,12).map(x=>`<div class="list-item"><div><strong>${escapeHtml(x.name)}</strong><div class="muted">${escapeHtml(x.label)}</div></div>${dueBadge(x.date)}</div>`).join('')||'<div class="empty">7일 내 일정이 없습니다.</div>'}</section>
   <section class="panel"><div class="panel-head"><h3>장기 미접촉 고객</h3><button class="ghost" onclick="renderView('customers')">고객목록</button></div>${dormant.slice(0,12).map(c=>`<div class="list-item"><div><strong>${escapeHtml(c.name)}</strong><div class="muted">${escapeHtml(c.phone||'')} · ${escapeHtml(c.status||'')}</div></div><div class="row-actions">${badge(crm37DormantInfo(c).label,crm37DormantInfo(c).color)}<button class="success" onclick="openFollowUpModal('customer','${c.id}')">연락 기록</button></div></div>`).join('')||'<div class="empty">7일 이상 미접촉 고객이 없습니다.</div>'}</section></div>
-  <div class="split" style="margin-top:16px"><section class="panel"><div class="panel-head"><h3>신규 매물 알림·재매칭</h3><button class="ghost" onclick="renderView('smartMatch')">자동매칭</button></div>${matchingPairs.slice(0,12).map(p=>`<div class="list-item"><div><strong>${escapeHtml(p.l.title)}</strong><div class="muted">${escapeHtml(p.c.name)} 고객 · ${escapeHtml(p.m.category)}</div></div><button class="success" onclick="crm36SaveRecommendation('${p.c.id}','${p.l.id}')">FU 저장</button></div>`).join('')||'<div class="empty">최근 7일 신규 매칭 후보가 없습니다.</div>'}</section><section class="panel"><div class="panel-head"><h3>공지사항</h3>${state.profile?.role==='admin'?'<button class="primary" onclick="crm37ManageAnnouncements()">공지 관리</button>':''}</div>${crm37AnnouncementCards()}</section></div>`;
+  <div class="split" style="margin-top:16px"><section class="panel"><div class="panel-head"><h3>신규 매물 알림·재매칭</h3><button class="ghost" onclick="renderView('smartMatch')">자동매칭</button></div>${matchingPairs.slice(0,12).map(p=>`<div class="list-item"><div><strong>${escapeHtml(p.l.title)}</strong><div class="muted">${escapeHtml(p.c.name)} 고객 · ${escapeHtml(p.m.category)}</div></div><button class="success" onclick="crm36SaveRecommendation('${p.c.id}','${p.l.id}')">FU 저장</button></div>`).join('')||'<div class="empty">최근 7일 신규 매칭 후보가 없습니다.</div>'}</section><section class="panel crm3832-announcement-panel"><div class="panel-head"><h3>공지사항</h3><div class="crm3832-announcement-actions"><button class="ghost" onclick="crm3832OpenAnnouncementList()">더보기</button>${state.profile?.role==='admin'?'<button class="primary" onclick="crm37ManageAnnouncements()">공지 관리</button>':''}</div></div>${crm37AnnouncementCards()}</section></div>`;
   crm37AddQuickActions();
 };
 
@@ -1190,12 +1200,12 @@ async function crm37ManageAnnouncements(){
   if(state.profile?.role!=='admin')return;
   await crm37LoadAnnouncements();$('#modalTitle').textContent='공지사항 관리';$('#modalBody').innerHTML=`<div class="form-grid"><label class="span-2">제목<input id="annTitle" maxlength="100"></label><label class="span-2">내용<textarea id="annContent" rows="6"></textarea></label><label class="inline-check"><input id="annPinned" type="checkbox"> 상단 고정</label></div><div class="panel" style="margin-top:16px"><h4>현재 공지</h4>${state.announcements.map(a=>`<div class="list-item"><div><strong>${escapeHtml(a.title)}</strong><div class="muted">${escapeHtml((a.content||'').slice(0,80))}</div></div><button class="danger" onclick="crm37DeleteAnnouncement('${a.id}')">삭제</button></div>`).join('')||'<div class="empty">공지 없음</div>'}</div>`;$('#modalSubmit').style.display='';$('#modalSubmit').onclick=async e=>{e.preventDefault();const title=$('#annTitle').value.trim(),content=$('#annContent').value.trim();if(!title||!content)return toast('제목과 내용을 입력하세요.');const {error}=await state.client.from('announcements').insert({title,content,is_pinned:$('#annPinned').checked,created_by:state.profile.id,is_active:true});if(error)return toast(error.message);$('#modal').close();toast('공지사항을 등록했습니다.');renderDashboard()};$('#modal').showModal();
 }
-async function crm37DeleteAnnouncement(id){if(!confirm('공지사항을 삭제할까요?'))return;const {error}=await state.client.from('announcements').update({is_active:false}).eq('id',id);if(error)return toast(error.message);$('#modal').close();toast('공지사항을 삭제했습니다.');renderDashboard()}
+async function crm37DeleteAnnouncement(id){if(state.profile?.role!=='admin')return toast('관리자만 공지사항을 삭제할 수 있습니다.');if(!confirm('공지사항을 삭제할까요?'))return;const {error}=await state.client.from('announcements').update({is_active:false}).eq('id',id);if(error)return toast(error.message);$('#modal').close();toast('공지사항을 삭제했습니다.');renderDashboard()}
 
 const crm37BaseRenderAdminStats=renderAdminStats;
 renderAdminStats=async function(){await crm37BaseRenderAdminStats();await Promise.all([loadCustomers(),loadListings(),loadMembers()]);const now=today();const rows=state.members.filter(m=>m.status==='approved').map(m=>{const cs=state.customers.filter(c=>c.owner_id===m.id),ls=state.listings.filter(l=>l.owner_id===m.id);return {m,customers:cs.length,listings:ls.length,due:cs.filter(c=>c.next_follow_up_at&&c.next_follow_up_at<=now).length,dormant:cs.filter(c=>crm37DormantInfo(c).days>=14).length,contracts:[...cs,...ls].filter(x=>x.contract_date||x.final_payment_date).length}});$('#content').insertAdjacentHTML('afterbegin',`<div class="panel" style="margin-bottom:16px"><div class="panel-head"><div><h3>담당 중개사 업무량</h3><div class="muted">업무 누락과 담당 편중을 확인하는 관리용 화면입니다.</div></div></div><div class="table-wrap"><table><thead><tr><th>중개사</th><th>고객</th><th>매물</th><th>오늘·지연 FU</th><th>14일+ 미접촉</th><th>계약 진행/완료</th></tr></thead><tbody>${rows.map(r=>`<tr><td><strong>${escapeHtml(r.m.full_name||'-')}</strong></td><td>${r.customers}</td><td>${r.listings}</td><td>${r.due?badge(String(r.due),'red'):'0'}</td><td>${r.dormant?badge(String(r.dormant),'yellow'):'0'}</td><td>${r.contracts}</td></tr>`).join('')}</tbody></table></div></div>`);crm37AddQuickActions();};
 
-Object.assign(window,{renderView,renderDashboard,renderCustomers,filterCustomers,openCustomerModal,crm37OpenQuickCustomer,crm37OpenQuickListing,crm37ManageAnnouncements,crm37DeleteAnnouncement});
+Object.assign(window,{renderView,renderDashboard,renderCustomers,filterCustomers,openCustomerModal,crm37OpenQuickCustomer,crm37OpenQuickListing,crm37ManageAnnouncements,crm37DeleteAnnouncement,crm3832OpenAnnouncementList});
 console.info('CRM v3.7 업무 통합 기능 로드 완료');
 
 /* ===== CRM v3.8 매물 입력·사진·복수거래 개선 ===== */
@@ -2624,9 +2634,15 @@ function crm3829AdBadges(x){
   if(x.ad_blog) items.push('<span class="crm3829-ad-badge crm3829-ad-b" title="블로그">B</span>');
   return items.length?`<span class="crm3829-ad-badges">${items.join('')}</span>`:'';
 }
-function crm3829AdHistoryText(newlyChecked){
+function crm3829AdHistoryText(before,after){
   const labels={ad_naver:'네이버',ad_danggeun:'당근',ad_zippl:'집플 등',ad_blog:'블로그'};
-  return `광고 등록\n등록일: ${today()}\n광고 매체: ${newlyChecked.map(k=>labels[k]).join(', ')}`;
+  const lines=['광고 변경',`변경일: ${today()}`];
+  Object.keys(labels).forEach(k=>{
+    if(!before[k]&&after[k]) lines.push(`${labels[k]} 광고 등록`);
+    else if(before[k]&&!after[k]) lines.push(`${labels[k]} 광고 내림`);
+    else if(before[k]&&after[k]) lines.push(`${labels[k]} 광고 유지`);
+  });
+  return lines.join('\n');
 }
 
 // 매물 등록/수정에서 빌라를 제거하고 세부 유형으로 교체한다.
@@ -2688,7 +2704,7 @@ openContractModal=async function(entityType,id){
       ad_blog:!!document.getElementById('crm3829AdBlog')?.checked
     };
     const dateMap={ad_naver:'ad_naver_at',ad_danggeun:'ad_danggeun_at',ad_zippl:'ad_zippl_at',ad_blog:'ad_blog_at'};
-    const newlyChecked=Object.keys(values).filter(k=>values[k]&&!listing[k]);
+    const before={ad_naver:!!listing.ad_naver,ad_danggeun:!!listing.ad_danggeun,ad_zippl:!!listing.ad_zippl,ad_blog:!!listing.ad_blog};
     const payload={...values};
     Object.entries(dateMap).forEach(([flag,dateKey])=>{
       payload[dateKey]=values[flag]?(listing[dateKey]||today()):null;
@@ -2698,12 +2714,10 @@ openContractModal=async function(entityType,id){
       const {error}=await state.client.from('listings').update(payload).eq('id',id);
       if(error){e?.preventDefault();return toast(`광고 저장 실패: ${error.message}`)}
       Object.assign(listing,payload);
-      if(newlyChecked.length){
-        const {error:hErr}=await state.client.from('interaction_history').insert({
-          listing_id:id,customer_id:null,created_by:state.profile.id,follow_up_date:today(),contact_method:'광고',content:crm3829AdHistoryText(newlyChecked),next_follow_up_at:null
-        });
-        if(hErr){e?.preventDefault();return toast(`광고는 저장됐지만 히스토리 기록에 실패했습니다: ${hErr.message}`)}
-      }
+      const {error:hErr}=await state.client.from('interaction_history').insert({
+        listing_id:id,customer_id:null,created_by:state.profile.id,follow_up_date:today(),contact_method:'광고',content:crm3829AdHistoryText(before,values),next_follow_up_at:null
+      });
+      if(hErr){e?.preventDefault();return toast(`광고는 저장됐지만 히스토리 기록에 실패했습니다: ${hErr.message}`)}
     }
     return oldHandler?.call(this,e);
   };
@@ -2926,3 +2940,5 @@ renderListingTable=function(rows,target,mine,adminMode=false){
 };
 Object.assign(window,{renderListingTable});
 console.info('CRM v3.8.31 리스트 FU 및 관리영역 압축 적용 완료');
+
+console.info('CRM v3.8.32 공지사항 압축 및 광고 변경이력 적용 완료');
