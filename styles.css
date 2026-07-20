@@ -622,3 +622,63 @@ input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:
   justify-content:center!important;
   text-align:center!important;
 }
+
+/* ===== CRM v3.8.46 강제 적용: 주소 좌측, 제목/데이터 기준선, 사진 밀착 ===== */
+.crm3839-reordered-table{table-layout:fixed!important;border-collapse:collapse!important}
+.crm3839-reordered-table thead th{box-sizing:border-box!important;text-align:center!important;vertical-align:middle!important;padding:10px 4px!important}
+.crm3839-reordered-table tbody td{box-sizing:border-box!important;text-align:center!important;vertical-align:middle!important;padding:7px 4px!important}
+.crm3839-reordered-table .crm3813-address-row td{padding:4px 10px 2px!important;text-align:left!important}
+.crm3839-reordered-table .crm3829-address-line,
+.crm3839-reordered-table .crm3841-address-line{display:flex!important;justify-content:flex-start!important;align-items:center!important;text-align:left!important;margin:0!important;width:100%!important;max-width:none!important;gap:7px!important}
+.crm3839-reordered-table .crm3829-address-text,
+.crm3839-reordered-table .crm3841-address-text{text-align:left!important;margin:0!important}
+.crm3839-reordered-table td.crm3843-col-title .crm3814-listing-title-link{font-size:17px!important;line-height:1.12!important;margin:0 auto!important}
+.crm3839-reordered-table td.crm3843-col-title .photo-link{margin:1px auto 0!important;padding:1px 7px!important;min-height:24px!important}
+.crm3839-reordered-table .crm3843-col-title{width:138px!important;min-width:138px!important;max-width:138px!important}
+.crm3839-reordered-table .crm3843-col-trade{width:110px!important;min-width:110px!important;max-width:110px!important}
+
+/* ===== CRM v3.8.47 매물명 축소·주소 좌측끝·연락처 중앙정렬 ===== */
+/* 실제 매물명만 한 단계 작게 */
+.crm3839-reordered-table td.crm3843-col-title .crm3814-listing-title-link{
+  font-size:15px!important;
+  line-height:1.15!important;
+  font-weight:900!important;
+}
+/* 내부사진 버튼은 매물명 바로 아래 유지 */
+.crm3839-reordered-table td.crm3843-col-title .photo-link{
+  margin-top:1px!important;
+}
+/* 주소 행을 순번 열의 왼쪽 시작선부터 사용 */
+.crm3839-reordered-table .crm3813-address-row td{
+  padding-left:8px!important;
+  padding-right:8px!important;
+}
+.crm3839-reordered-table .crm3813-address-row .crm3825-address-spacer{
+  width:0!important;
+  min-width:0!important;
+  max-width:0!important;
+  padding:0!important;
+  border:0!important;
+}
+.crm3839-reordered-table .crm3829-address-line,
+.crm3839-reordered-table .crm3841-address-line{
+  justify-content:flex-start!important;
+  text-align:left!important;
+  margin-left:0!important;
+}
+/* 연락처 제목과 데이터 모두 정확히 중앙 정렬 */
+.crm3839-reordered-table th.crm3843-col-contact,
+.crm3839-reordered-table td.crm3843-col-contact,
+.crm3839-reordered-table .crm3842-contact-cell,
+.crm3839-reordered-table .crm3842-contact-cell .crm384-contact-list,
+.crm3839-reordered-table .crm3842-contact-cell .crm384-contact-item,
+.crm3839-reordered-table td.crm3843-col-contact .crm384-contact-list,
+.crm3839-reordered-table td.crm3843-col-contact .crm384-contact-item{
+  text-align:center!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+.crm3839-reordered-table td.crm3843-col-contact .crm384-contact-list,
+.crm3839-reordered-table .crm3842-contact-cell .crm384-contact-list{
+  width:100%!important;
+}
