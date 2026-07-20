@@ -3187,3 +3187,173 @@ renderListingTable=function(rows,target,mine,adminMode=false){
 
 Object.assign(window,{renderView,crm3848RenderCalendar,crm3848MoveMonth,crm3848GoToday,crm3848ToggleAll,crm3848ToggleFilter,crm3848OpenCalendarEvent,crm3848SaveCalendarEvent,crm3848DeleteCalendarEvent,renderListingTable});
 console.info('CRM v3.8.48 캘린더 및 매물명-내부사진 밀착 적용 완료');
+
+
+/* ===== CRM v3.8.50 관리자 메뉴 순서 · 캘린더 전체관리/드래그 이동 ===== */
+state.generalMenuOrder=[];
+state.calendarDraggingId=null;
+state.calendarEdgeTimer=null;
+state.calendarSuppressClick=false;
+
+const CRM3850_DEFAULT_MENU_ORDER=['dashboard','customers','myListings','network','calendar','smartMatch','globalSearch','documents'];
+
+function crm3850MenuButtons(){
+  return Array.from(document.querySelectorAll('#navMenu > button.nav:not(.admin-nav)'));
+}
+function crm3850ApplyMenuOrder(order){
+  const nav=document.getElementById('navMenu');
+  const adminSection=nav?.querySelector('.nav-section.admin-only');
+  if(!nav||!adminSection)return;
+  const buttons=crm3850MenuButtons();
+  const map=new Map(buttons.map(b=>[b.dataset.view,b]));
+  const normalized=[...(Array.isArray(order)?order:[]),...CRM3850_DEFAULT_MENU_ORDER].filter((v,i,a)=>a.indexOf(v)===i&&map.has(v));
+  normalized.forEach(v=>nav.insertBefore(map.get(v),adminSection));
+  state.generalMenuOrder=normalized;
+  crm3850EnsureMenuOrderButton();
+}
+function crm3850EnsureMenuOrderButton(){
+  const nav=document.getElementById('navMenu');
+  if(!nav||state.profile?.role!=='admin')return;
+  const label=nav.querySelector(':scope > .nav-section-label');
+  if(!label||document.getElementById('generalMenuOrderBtn'))return;
+  label.classList.add('crm3850-menu-label');
+  const btn=document.createElement('button');
+  btn.type='button';btn.id='generalMenuOrderBtn';btn.className='crm3850-menu-order-btn';btn.textContent='순서 변경';
+  btn.onclick=crm3850OpenMenuOrder;
+  label.appendChild(btn);
+}
+async function crm3850LoadMenuOrder(){
+  try{
+    const {data,error}=await state.client.from('app_settings').select('title').eq('setting_key','general_menu_order').maybeSingle();
+    if(error)throw error;
+    let order=[];
+    try{order=JSON.parse(data?.title||'[]')}catch(_){order=[]}
+    crm3850ApplyMenuOrder(order);
+  }catch(e){
+    console.warn('메뉴 순서 불러오기 실패',e);
+    crm3850ApplyMenuOrder(CRM3850_DEFAULT_MENU_ORDER);
+  }
+}
+function crm3850OpenMenuOrder(){
+  if(state.profile?.role!=='admin')return toast('관리자만 메뉴 순서를 변경할 수 있습니다.');
+  const buttons=crm3850MenuButtons();
+  const labels=new Map(buttons.map(b=>[b.dataset.view,b.textContent.trim()]));
+  const order=(state.generalMenuOrder.length?state.generalMenuOrder:CRM3850_DEFAULT_MENU_ORDER).filter(v=>labels.has(v));
+  $('#modalTitle').textContent='일반 업무 메뉴 순서';
+  $('#modalBody').innerHTML=`<div class="crm3850-menu-order-list">${order.map((v,i)=>`<div class="crm3850-menu-order-row" data-view="${v}"><span class="crm3850-order-number">${i+1}</span><strong>${escapeHtml(labels.get(v))}</strong><div class="crm3850-order-actions"><button type="button" class="ghost" onclick="crm3850MoveMenuRow(this,-1)" ${i===0?'disabled':''}>위</button><button type="button" class="ghost" onclick="crm3850MoveMenuRow(this,1)" ${i===order.length-1?'disabled':''}>아래</button></div></div>`).join('')}</div><p class="muted">저장하면 모든 중개사의 왼쪽 일반 업무 메뉴에 동일하게 적용됩니다.</p>`;
+  $('#modalSubmit').style.display='';
+  $('#modalSubmit').textContent='순서 저장';
+  $('#modalSubmit').onclick=async e=>{e.preventDefault();await crm3850SaveMenuOrder()};
+  $('#modal').showModal();
+}
+function crm3850RefreshMenuOrderRows(){
+  const rows=Array.from(document.querySelectorAll('.crm3850-menu-order-row'));
+  rows.forEach((row,i)=>{
+    row.querySelector('.crm3850-order-number').textContent=String(i+1);
+    const btns=row.querySelectorAll('button');
+    btns[0].disabled=i===0;btns[1].disabled=i===rows.length-1;
+  });
+}
+function crm3850MoveMenuRow(btn,delta){
+  const row=btn.closest('.crm3850-menu-order-row'),list=row?.parentElement;if(!row||!list)return;
+  if(delta<0&&row.previousElementSibling)list.insertBefore(row,row.previousElementSibling);
+  if(delta>0&&row.nextElementSibling)list.insertBefore(row.nextElementSibling,row);
+  crm3850RefreshMenuOrderRows();
+}
+async function crm3850SaveMenuOrder(){
+  const order=Array.from(document.querySelectorAll('.crm3850-menu-order-row')).map(r=>r.dataset.view);
+  const payload={setting_key:'general_menu_order',title:JSON.stringify(order),subtitle:'일반 업무 메뉴 순서',updated_by:state.profile.id,updated_at:new Date().toISOString()};
+  const {error}=await state.client.from('app_settings').upsert(payload,{onConflict:'setting_key'});
+  if(error)return toast(error.message);
+  crm3850ApplyMenuOrder(order);$('#modal').close();toast('일반 업무 메뉴 순서를 저장했습니다.');
+}
+
+const crm3850LoadProfileBase=loadProfile;
+loadProfile=async function(){
+  await crm3850LoadProfileBase();
+  if(state.profile?.status==='approved')await crm3850LoadMenuOrder();
+};
+
+function crm3850CanManageCalendarEvent(ev){return !!ev&&(ev.owner_id===state.profile.id||state.profile.role==='admin')}
+function crm3850CalendarEventHtml(ev){
+  const canMove=crm3850CanManageCalendarEvent(ev);
+  return `<button type="button" class="calendar-event ${crm3848CategoryClass(ev.category)} ${canMove?'calendar-draggable':''}" title="${escapeHtml(ev.title)}${canMove?' · 드래그하여 이동':''}" ${canMove?'draggable="true"':''} data-event-id="${ev.id}" onclick="event.stopPropagation();if(!state.calendarSuppressClick)crm3848OpenCalendarEvent('${ev.id}')" ondragstart="crm3850CalendarDragStart(event,'${ev.id}')" ondragend="crm3850CalendarDragEnd(event)">${crm3848EventTimeText(ev)}${escapeHtml(ev.title)}${state.calendarShowAll&&ev.owner?.full_name?` · ${escapeHtml(ev.owner.full_name)}`:''}</button>`;
+}
+
+crm3848RenderCalendar=async function(){
+  await crm3848LoadCalendar();
+  const current=crm3848ClampMonth(new Date(state.calendarMonth+'T00:00:00'));
+  state.calendarMonth=crm3848DateLocal(new Date(current.getFullYear(),current.getMonth(),1));
+  const year=current.getFullYear(),month=current.getMonth();
+  const first=new Date(year,month,1),start=new Date(year,month,1-first.getDay());
+  const filtered=state.calendarEvents.filter(e=>state.calendarFilters.has(e.category));
+  const cells=[];
+  for(let i=0;i<42;i++){
+    const date=new Date(start);date.setDate(start.getDate()+i);
+    const ds=crm3848DateLocal(date),outside=date.getMonth()!==month;
+    const events=filtered.filter(e=>e.start_date<=ds&&e.end_date>=ds);
+    const visible=events.slice(0,4);
+    cells.push(`<div class="calendar-day ${outside?'outside':''} ${ds===today()?'today':''}" data-date="${ds}" onclick="crm3848OpenCalendarEvent(null,'${ds}')" ondragover="crm3850CalendarDragOver(event)" ondragleave="crm3850CalendarDragLeave(event)" ondrop="crm3850CalendarDrop(event,'${ds}')">
+      <div class="calendar-day-head"><span class="calendar-day-number">${date.getDate()}</span><span class="calendar-day-add">＋</span></div>
+      <div class="calendar-events">${visible.map(crm3850CalendarEventHtml).join('')}${events.length>4?`<div class="calendar-more">+${events.length-4}개 더보기</div>`:''}</div>
+    </div>`);
+  }
+  const canPrev=year>2026||month>6,canNext=year<2030||month<11;
+  $('#content').innerHTML=`<div class="calendar-shell">
+    <div class="panel calendar-toolbar">
+      <div class="calendar-nav-group"><button class="ghost" onclick="crm3848MoveMonth(-1)" ${canPrev?'':'disabled'}>‹</button><button class="ghost" onclick="crm3848GoToday()">오늘</button><div class="calendar-month-title">${year}년 ${month+1}월</div><button class="ghost" onclick="crm3848MoveMonth(1)" ${canNext?'':'disabled'}>›</button></div>
+      <div class="calendar-action-group">${state.profile.role==='admin'?'<span class="crm3850-admin-calendar-badge">관리자: 전체 일정 수정·삭제·이동 가능</span>':''}<button class="ghost calendar-view-toggle ${state.calendarShowAll?'active':''}" onclick="crm3848ToggleAll()">${state.calendarShowAll?'내 일정만 보기':'전체 일정 보기'}</button><button class="primary" onclick="crm3848OpenCalendarEvent(null,'${crm3848DateLocal(current)}')">+ 일정 등록</button></div>
+    </div>
+    <div class="panel calendar-filter-panel"><span class="calendar-filter-label">표시할 일정</span>${['계약일정','잔금일정','휴무일정','기타일정'].map(c=>`<label class="calendar-filter-item"><input type="checkbox" ${state.calendarFilters.has(c)?'checked':''} onchange="crm3848ToggleFilter('${c}',this.checked)"><span class="calendar-filter-dot ${crm3848CategoryClass(c)}"></span>${c}</label>`).join('')}<span class="calendar-legend-note">일정을 원하는 날짜로 끌어 옮길 수 있습니다.</span></div>
+    <div class="calendar-grid-wrap crm3850-calendar-dnd-wrap">
+      <div class="crm3850-edge-zone prev ${canPrev?'':'disabled'}" ondragenter="crm3850CalendarEdgeEnter(event,-1)" ondragover="event.preventDefault()" ondragleave="crm3850CalendarEdgeLeave(event)">‹ 이전 달</div>
+      <div class="calendar-grid">${['일','월','화','수','목','금','토'].map((d,i)=>`<div class="calendar-weekday ${i===0?'sun':i===6?'sat':''}">${d}</div>`).join('')}${cells.join('')}</div>
+      <div class="crm3850-edge-zone next ${canNext?'':'disabled'}" ondragenter="crm3850CalendarEdgeEnter(event,1)" ondragover="event.preventDefault()" ondragleave="crm3850CalendarEdgeLeave(event)">다음 달 ›</div>
+    </div>
+  </div>`;
+};
+
+function crm3850CalendarDragStart(event,id){
+  const ev=state.calendarEvents.find(x=>x.id===id);
+  if(!crm3850CanManageCalendarEvent(ev)){event.preventDefault();return}
+  state.calendarDraggingId=id;state.calendarSuppressClick=true;
+  event.dataTransfer.effectAllowed='move';event.dataTransfer.setData('text/plain',id);
+  requestAnimationFrame(()=>document.body.classList.add('crm3850-calendar-dragging'));
+}
+function crm3850CalendarDragEnd(){
+  clearTimeout(state.calendarEdgeTimer);state.calendarEdgeTimer=null;state.calendarDraggingId=null;
+  document.body.classList.remove('crm3850-calendar-dragging');
+  document.querySelectorAll('.calendar-day.drag-target').forEach(el=>el.classList.remove('drag-target'));
+  setTimeout(()=>{state.calendarSuppressClick=false},120);
+}
+function crm3850CalendarDragOver(event){
+  if(!state.calendarDraggingId)return;event.preventDefault();event.dataTransfer.dropEffect='move';
+  event.currentTarget.classList.add('drag-target');
+}
+function crm3850CalendarDragLeave(event){event.currentTarget.classList.remove('drag-target')}
+function crm3850DateDiffDays(a,b){return Math.round((new Date(b+'T12:00:00')-new Date(a+'T12:00:00'))/86400000)}
+function crm3850AddDays(ds,days){const d=new Date(ds+'T12:00:00');d.setDate(d.getDate()+days);return crm3848DateLocal(d)}
+async function crm3850CalendarDrop(event,targetDate){
+  event.preventDefault();event.stopPropagation();event.currentTarget.classList.remove('drag-target');
+  const id=state.calendarDraggingId||event.dataTransfer.getData('text/plain');
+  const ev=state.calendarEvents.find(x=>x.id===id);if(!ev||!crm3850CanManageCalendarEvent(ev))return crm3850CalendarDragEnd();
+  const delta=crm3850DateDiffDays(ev.start_date,targetDate);
+  const newStart=crm3850AddDays(ev.start_date,delta),newEnd=crm3850AddDays(ev.end_date,delta);
+  if(newStart<'2026-07-01'||newEnd>'2030-12-31'){toast('일정은 2026년 7월부터 2030년 12월까지만 이동할 수 있습니다.');return crm3850CalendarDragEnd()}
+  const {error}=await state.client.from('calendar_events').update({start_date:newStart,end_date:newEnd,updated_at:new Date().toISOString()}).eq('id',id);
+  if(error){toast(error.message);return crm3850CalendarDragEnd()}
+  crm3850CalendarDragEnd();toast(`${fmtDate(newStart)}로 일정을 이동했습니다.`);await crm3848RenderCalendar();
+}
+function crm3850CalendarEdgeEnter(event,delta){
+  event.preventDefault();if(!state.calendarDraggingId||event.currentTarget.classList.contains('disabled'))return;
+  clearTimeout(state.calendarEdgeTimer);event.currentTarget.classList.add('edge-active');
+  state.calendarEdgeTimer=setTimeout(async()=>{
+    event.currentTarget?.classList.remove('edge-active');
+    const d=new Date(state.calendarMonth+'T00:00:00');d.setMonth(d.getMonth()+delta);
+    state.calendarMonth=crm3848DateLocal(crm3848ClampMonth(d));
+    await crm3848RenderCalendar();
+  },650);
+}
+function crm3850CalendarEdgeLeave(event){clearTimeout(state.calendarEdgeTimer);state.calendarEdgeTimer=null;event.currentTarget.classList.remove('edge-active')}
+
+console.info('CRM v3.8.50 관리자 메뉴 순서 및 캘린더 드래그 이동 적용 완료');

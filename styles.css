@@ -971,3 +971,24 @@ input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:
     min-height:96px;
   }
 }
+
+
+/* ===== CRM v3.8.50 메뉴 순서 · 캘린더 드래그 ===== */
+.crm3850-menu-label{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.crm3850-menu-order-btn{border:1px solid rgba(148,163,184,.35);background:rgba(255,255,255,.08);color:#cbd5e1;border-radius:7px;padding:4px 7px;font-size:11px;font-weight:800;cursor:pointer}
+.crm3850-menu-order-btn:hover{background:rgba(255,255,255,.15);color:#fff}
+.crm3850-menu-order-list{display:flex;flex-direction:column;gap:8px}
+.crm3850-menu-order-row{display:grid;grid-template-columns:34px 1fr auto;align-items:center;gap:10px;padding:10px 12px;border:1px solid #dbe2ea;border-radius:10px;background:#fff}
+.crm3850-order-number{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:#2563eb;color:#fff;font-weight:900}
+.crm3850-order-actions{display:flex;gap:6px}.crm3850-order-actions button{padding:6px 10px}
+.crm3850-admin-calendar-badge{display:inline-flex;align-items:center;border-radius:999px;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;padding:7px 10px;font-size:12px;font-weight:800;white-space:nowrap}
+.crm3850-calendar-dnd-wrap{position:relative}
+.calendar-event.calendar-draggable{cursor:grab}.calendar-event.calendar-draggable:active{cursor:grabbing}
+.calendar-day.drag-target{box-shadow:inset 0 0 0 3px #2563eb;background:#eff6ff!important}
+.crm3850-edge-zone{position:absolute;z-index:15;top:42px;bottom:0;width:62px;display:flex;align-items:center;justify-content:center;background:rgba(37,99,235,.9);color:#fff;font-size:12px;font-weight:900;writing-mode:vertical-rl;opacity:0;pointer-events:none;transition:opacity .15s,background .15s;border-radius:10px}
+.crm3850-edge-zone.prev{left:4px}.crm3850-edge-zone.next{right:4px}
+.crm3850-calendar-dragging .crm3850-edge-zone:not(.disabled){opacity:.9;pointer-events:auto}
+.crm3850-edge-zone.edge-active{background:#1d4ed8;opacity:1}
+.crm3850-edge-zone.disabled{display:none}
+body.crm3850-calendar-dragging .calendar-day{cursor:copy}
+@media(max-width:900px){.crm3850-admin-calendar-badge{width:100%;justify-content:center}.crm3850-edge-zone{position:fixed;top:35%;bottom:35%;width:48px}.crm3850-edge-zone.prev{left:4px}.crm3850-edge-zone.next{right:4px}}
