@@ -205,3 +205,27 @@ input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:
 .crm382-movein-grid{display:grid;grid-template-columns:minmax(220px,1fr) auto auto;gap:14px;align-items:end;margin-top:10px}
 .crm382-contact-gap{height:7px}
 @media(max-width:760px){.crm382-movein-grid{grid-template-columns:1fr}.crm382-movein-grid .check-label{min-height:44px}}
+
+/* ===== CRM v3.8.4 정렬 개선 ===== */
+.crm384-contact-list{display:flex;flex-direction:column;gap:10px;min-width:118px}
+.crm384-contact-item{display:flex;flex-direction:column;align-items:flex-start;line-height:1.35;white-space:nowrap}
+.crm384-contact-item strong{font-size:12px;color:#374151;margin-bottom:2px}
+.crm384-contact-item span{font-size:13px;color:#111827;font-variant-numeric:tabular-nums}
+
+/* 매물 등록/수정 폼의 좌우 칸과 안내문 정렬 */
+#modalBody .form-grid{align-items:start}
+#modalBody .form-grid>label{display:flex;flex-direction:column;align-self:start;min-width:0}
+#modalBody .form-grid>label>input,
+#modalBody .form-grid>label>select,
+#modalBody .form-grid>label>textarea{width:100%;box-sizing:border-box}
+#modalBody .form-grid .field-help{display:block;line-height:1.4;margin-top:7px;min-height:0}
+#modalBody .crm38-contact-row{display:grid;grid-template-columns:130px minmax(140px,1fr) minmax(180px,1.2fr) auto;gap:10px;align-items:center}
+#modalBody .crm38-contact-row>*{min-width:0;width:100%;box-sizing:border-box}
+#modalBody .crm38-contact-row button{width:auto;white-space:nowrap}
+
+@media(max-width:760px){
+  #modalBody .crm38-contact-row{grid-template-columns:1fr 1fr}
+  #modalBody .crm38-contact-row .crm38-contact-phone{grid-column:1/-1}
+  #modalBody .crm38-contact-row button{grid-column:1/-1;width:100%}
+  .crm384-contact-list{min-width:105px}
+}

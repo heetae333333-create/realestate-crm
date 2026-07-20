@@ -1387,3 +1387,115 @@ Object.assign(window,{crm382ContactDisplay});
 console.info('CRM v3.8.2 연락처·입주·전용면적·비밀메모 개선 로드 완료');
 
 console.info('CRM v3.8.3 입주 협의 날짜 표시 개선 로드 완료');
+
+/* ===== CRM v3.8.4 연락처 정렬·폼 정렬·카카오톡 직접복사 ===== */
+function crm384ContactDisplay(x){
+  const rows=[];
+  if(x.contact_phone){
+    rows.push(`<div class="crm384-contact-item"><strong>소유주</strong><span>${escapeHtml(crm381FormatPhone(x.contact_phone))}</span></div>`);
+  }
+  (x.additional_contacts||[]).forEach(c=>{
+    if(!c.phone)return;
+    rows.push(`<div class="crm384-contact-item"><strong>${escapeHtml(c.contact_role||'기타')}</strong><span>${escapeHtml(crm381FormatPhone(c.phone))}</span></div>`);
+  });
+  return rows.length?`<div class="crm384-contact-list">${rows.join('')}</div>`:'-';
+}
+
+// 표의 연락처 표현을 세로 정렬 형식으로 통일
+crm382ContactDisplay=crm384ContactDisplay;
+
+async function crm384CopyText(text){
+  // HTTPS 환경에서는 표준 Clipboard API를 우선 사용
+  try{
+    if(navigator.clipboard && window.isSecureContext){
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  }catch(_){ }
+
+  // 모바일/구형 브라우저용 폴백
+  const ta=document.createElement('textarea');
+  ta.value=text;
+  ta.setAttribute('readonly','');
+  ta.style.position='fixed';
+  ta.style.left='-9999px';
+  ta.style.top='0';
+  ta.style.opacity='0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  ta.setSelectionRange(0,ta.value.length);
+  let ok=false;
+  try{ok=document.execCommand('copy')}catch(_){ok=false}
+  ta.remove();
+  return ok;
+}
+
+function crm384KakaoText(customer,rows){
+  const lines=[
+    `안녕하세요, ${customer.name} 고객님.`,
+    `말씀해주신 조건을 기준으로 현재 확인 가능한 추천 매물을 정리해드렸습니다.`,
+    ``,
+    `[고객님 희망 조건]`,
+    `• 거래유형: ${customer.deal_type||customer.customer_type||'-'}`,
+    `• 희망금액: ${fmtMoney(customer.budget_max)}`,
+    `• 희망 방 개수: ${customerRoomText(customer)}`,
+    customer.desired_monthly_rent?`• 희망 월세: 월 ${fmtMoney(customer.desired_monthly_rent)}`:'',
+    customer.preferred_area?`• 선호지역: ${customer.preferred_area}`:'',
+    ``,
+    `[추천 매물 ${rows.length}건]`
+  ].filter(Boolean);
+
+  rows.forEach((x,i)=>{
+    const tags=crm36Array(x.feature_tags);
+    const priceText=String(listingPriceText(x)||'').replace(/<br\s*\/?\s*>/gi,' · ').replace(/<[^>]+>/g,'');
+    const item=[
+      ``,
+      `${i+1}. ${x.title}`,
+      `• 거래조건: ${crm38DealTypeText(x)} / ${priceText}`,
+      `• 위치: ${[x.district,x.address].filter(Boolean).join(' ')||'-'}`,
+      `• 구조: 방 ${listingRoomText(x)} / 욕실 ${x.bathroom_count??'-'}개`,
+      x.area_m2?`• 전용면적: ${x.area_m2}㎡ (약 ${(Number(x.area_m2)/3.3058).toFixed(2)}평)`: '',
+      x.management_fee?`• 관리비: ${fmtMoney(x.management_fee)}`:'',
+      x.move_in_immediate?'• 입주: 즉시입주 가능':x.move_in_date&&x.move_in_negotiable?`• 입주: ${fmtDate(x.move_in_date)}부터 협의 가능`:x.move_in_date?`• 입주 가능일: ${fmtDate(x.move_in_date)}`:'',
+      tags.length?`• 특징: ${tags.join(', ')}`:'',
+      x.options?`• 옵션: ${x.options}`:''
+    ].filter(Boolean);
+    lines.push(...item);
+  });
+
+  lines.push(
+    ``,
+    `※ 매물은 실시간으로 계약되거나 금액·입주 조건이 변경될 수 있어 방문 전 다시 확인해드리겠습니다.`,
+    `관심 가는 매물 번호를 말씀해주시면 공개 가능한 사진과 세부 조건을 안내드리고 방문 일정을 조율해드리겠습니다.`,
+    ``,
+    `담당 중개사: ${state.profile.full_name||''}`,
+    state.profile.office_name?`소속: ${state.profile.office_name}`:'',
+    state.profile.phone?`연락처: ${crm381FormatPhone(state.profile.phone)}`:''
+  );
+  return lines.filter(Boolean).join('\n');
+}
+
+// 버튼을 누르면 별도 팝업 없이 즉시 텍스트를 클립보드에 복사
+crm36KakaoMessage=async function(customerId){
+  const customer=state.customers.find(x=>x.id===customerId);
+  if(!customer)return toast('고객 정보를 찾지 못했습니다.');
+  const rows=state.listings.filter(x=>state.matchSelection.has(x.id));
+  if(!rows.length)return toast('카카오톡 문구에 넣을 매물을 먼저 체크하세요.');
+  const text=crm384KakaoText(customer,rows);
+  const copied=await crm384CopyText(text);
+  if(copied){
+    toast('카카오톡 추천문구를 클립보드에 복사했습니다.');
+  }else{
+    // 복사가 완전히 차단된 환경에서는 텍스트 창을 열어 수동 복사가 가능하도록 함
+    $('#modalTitle').textContent='카카오톡 추천 문구';
+    $('#modalBody').innerHTML=`<textarea id="crm384KakaoText" rows="24" style="width:100%">${escapeHtml(text)}</textarea><div class="notice" style="margin-top:12px">자동 복사가 차단되었습니다. 문구를 길게 누르거나 Ctrl+C로 복사하세요.</div>`;
+    $('#modalSubmit').textContent='전체 선택';
+    $('#modalSubmit').style.display='';
+    $('#modalSubmit').onclick=e=>{e.preventDefault();const ta=$('#crm384KakaoText');ta.focus();ta.select();ta.setSelectionRange(0,ta.value.length)};
+    $('#modal').showModal();
+  }
+};
+
+Object.assign(window,{crm384ContactDisplay,crm384CopyText,crm36KakaoMessage});
+console.info('CRM v3.8.4 연락처 정렬·폼 정렬·카카오톡 직접복사 로드 완료');
