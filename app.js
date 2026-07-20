@@ -2150,3 +2150,29 @@ filterAdminListings=function(){
 };
 Object.assign(window,{crm3818FormatDistrict,crm3818BindDistrictInput,crm3821RegionSearchKey,filterNetwork,filterAdminListings});
 console.info('CRM v3.8.21 지역 순수 텍스트 입력·공백 무관 검색 로드 완료');
+
+/* CRM v3.8.22 - 지역은 입력 그대로 두고 저장 순간에만 구/동 띄어쓰기 정리 */
+crm3818FormatDistrict=function(value){
+  let text=String(value||'').trim();
+  if(!text)return '';
+
+  // 지역 칸에서는 서울 표기를 생략합니다.
+  text=text.replace(/^(서울특별시|서울시|서울)\s*/,'');
+
+  // 입력 중에는 건드리지 않고, 저장 직전에만 공백을 제거한 뒤
+  // '○○구/군 + ○○동/읍/면/가' 형태로 한 칸 띄워 저장합니다.
+  const compact=text.replace(/\s+/g,'');
+  const match=compact.match(/^(.+?(?:구|군))(.+?(?:동|읍|면|가))$/);
+  if(match)return `${match[1]} ${match[2]}`;
+
+  // 인식되지 않는 자유입력은 내용은 보존하고 중복 공백만 정리합니다.
+  return text.replace(/\s+/g,' ').trim();
+};
+crm3818BindDistrictInput=function(){
+  const input=$('#modalBody input[name="district"]');
+  if(!input)return;
+  input.placeholder='예: 강서구 화곡동';
+  // 입력 중 자동변환 없음. modalForm submit 캡처 단계에서만 정리됩니다.
+};
+Object.assign(window,{crm3818FormatDistrict,crm3818BindDistrictInput});
+console.info('CRM v3.8.22 지역 저장 시 구·동 띄어쓰기 정리 로드 완료');
