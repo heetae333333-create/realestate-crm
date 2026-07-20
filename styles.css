@@ -246,3 +246,8 @@ input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:
 .crm386-fu-deal-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:10px}
 .crm386-fu-deal-fields[hidden]{display:none}
 @media(max-width:700px){.crm386-contact-toolbar{align-items:flex-start}.crm386-fu-deal-fields{grid-template-columns:1fr}}
+
+/* CRM v3.8.7 */
+.crm387-confirm-wrap{margin-top:18px;padding:16px;border:1px solid #dbe4ef;border-radius:14px;background:#f8fafc}
+.crm387-confirm-toggle{font-weight:800;gap:9px}
+#crm387ConfirmBlock{margin-top:14px}

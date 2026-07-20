@@ -1711,3 +1711,90 @@ filterNetwork=function(){
 
 Object.assign(window,{openListingModal,crm38AddContactRow,crm361OpenListingFu,openFollowUpModal,crm386SyncFuDeals,filterNetwork});
 console.info('CRM v3.8.6 FU 거래유형 전환·전체 거래필터·통합 연락처 로드 완료');
+
+/* =========================================================
+   CRM v3.8.7 - FU 기록 + 확인전화 통합
+   ========================================================= */
+function crm387ToggleConfirmBlock(){
+  const checked=$('#crm387UseConfirm')?.checked;
+  const block=$('#crm387ConfirmBlock');
+  if(block) block.hidden=!checked;
+  if(checked) crm386SyncFuDeals();
+}
+
+crm361OpenListingFu=async function(id){
+  const item=state.listings.find(x=>x.id===id);if(!item)return toast('매물을 찾지 못했습니다.');
+  const oldOpts=crm38DealOptions(item).map(o=>({...o}));
+  const map=Object.fromEntries(oldOpts.map(o=>[o.deal_type,{...o,checked:true}]));
+  $('#modalTitle').textContent=`${item.title} · FU 관리`;
+  $('#modalBody').innerHTML=`<input id="crm361ListingId" type="hidden" value="${id}">
+  <div class="crm361-fu-tabs">
+    <button type="button" class="crm361-fu-tab active" data-tab="record" onclick="crm361SetFuTab('record')">FU 기록</button>
+    <button type="button" class="crm361-fu-tab" data-tab="history" onclick="crm361SetFuTab('history')">가격 이력</button>
+  </div>
+  <section class="crm361-fu-panel" data-panel="record">
+    <div class="form-grid">
+      <label>기록 일자<input id="crm361FuDate" type="date" value="${today()}" required></label>
+      <label>상담 종류<select id="crm361FuMethod"><option>전화</option><option>대면투어</option><option>촬영</option><option>문자/톡 발송</option><option>문자/톡 수신</option><option>부재중</option><option>가계약</option><option>본계약</option><option>중도금</option><option>잔금</option><option>기타</option></select></label>
+      <label class="span-2">상담·진행 내용<textarea id="crm361FuContent" rows="6" placeholder="통화 내용, 조건 변경, 다음 조치 등을 구체적으로 기록하세요."></textarea></label>
+      <label>예정 FU<input id="crm361FuNext" type="date" value="${item.next_follow_up_at?item.next_follow_up_at.slice(0,10):''}"></label>
+      <div class="field-help span-2">이미 더 빠른 예정 FU가 있으면 기존의 빠른 일정이 유지됩니다.</div>
+    </div>
+    <div class="crm387-confirm-wrap">
+      <label class="inline-check crm387-confirm-toggle"><input id="crm387UseConfirm" type="checkbox" onchange="crm387ToggleConfirmBlock()"> 확인 전화·거래조건 변경도 함께 기록</label>
+      <div id="crm387ConfirmBlock" hidden>
+        <div class="notice">확인 결과와 현재 가능한 거래유형을 함께 저장합니다. 거래유형 추가·종료 또는 가격 변경 시 매물 정보, 가격 이력, FU 히스토리에 모두 반영됩니다.</div>
+        <div class="form-grid" style="margin-top:14px">
+          <label>확인 결과<select id="crm361ConfirmResult"><option>거래 가능</option><option>가격 변경</option><option>협의 중</option><option>거래 완료</option><option>연락 안 됨</option><option>재확인 필요</option></select></label>
+          <div></div>
+          <div class="span-2 crm386-fu-deals">${crm386FuDealCard('매매',map['매매']||{})}${crm386FuDealCard('전세',map['전세']||{})}${crm386FuDealCard('월세',map['월세']||{})}</div>
+          <label class="span-2">확인전화 메모<textarea id="crm361ConfirmNote" rows="5" placeholder="거래 가능 여부, 거래유형 추가·종료, 가격 협의, 입주 가능일 등을 기록하세요."></textarea></label>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="crm361-fu-panel hidden" data-panel="history"><div id="crm361PriceHistory"></div></section>`;
+  $('#modalSubmit').style.display='';
+  $('#modalSubmit').onclick=async e=>{
+    e.preventDefault();
+    const active=$('.crm361-fu-tab.active')?.dataset.tab||'record';
+    if(active==='history') return;
+    const content=$('#crm361FuContent').value.trim();
+    const useConfirm=!!$('#crm387UseConfirm')?.checked;
+    if(!content&&!useConfirm)return toast('FU 내용 또는 확인 전화 내용을 입력하세요.');
+    const fuDate=$('#crm361FuDate').value||today();
+    const next=$('#crm361FuNext').value||null;
+    let diffText='';
+    let result='';
+    let confirmNote='';
+    if(useConfirm){
+      const newOpts=crm386CollectFuDeals();if(!newOpts.length)return toast('거래유형을 하나 이상 체크하세요.');
+      const preferred=newOpts.find(o=>o.is_preferred)||newOpts[0];preferred.is_preferred=true;
+      result=$('#crm361ConfirmResult').value;
+      confirmNote=$('#crm361ConfirmNote').value.trim();
+      const {error:logErr}=await state.client.from('listing_confirmation_logs').insert({listing_id:id,confirmed_by:state.profile.id,result,note:confirmNote||null,confirmed_price:preferred.price??null,confirmed_monthly_rent:preferred.monthly_rent??null,next_confirm_at:next});if(logErr)return toast(logErr.message);
+      const {error:delErr}=await state.client.from('listing_deal_options').delete().eq('listing_id',id);if(delErr)return toast(delErr.message);
+      const {error:insErr}=await state.client.from('listing_deal_options').insert(newOpts.map(o=>({...o,listing_id:id})));if(insErr)return toast(insErr.message);
+      const update={last_confirmed_at:fuDate,next_confirm_at:null,transaction_type:preferred.deal_type,price:preferred.price,monthly_rent:preferred.monthly_rent,last_follow_up_at:fuDate};
+      if(result==='거래 완료')update.status='complete';else if(result==='협의 중')update.status='hold';else if(result==='거래 가능')update.status='available';
+      const {error:uErr}=await state.client.from('listings').update(update).eq('id',id);if(uErr)return toast(uErr.message);
+      const diff=crm385DiffDealOptions(oldOpts,newOpts);
+      diffText=diff.map(c=>c.kind==='add'?`${c.type} 조건 추가 · ${crm385DealValueText(c.newO)}`:c.kind==='remove'?`${c.type} 조건 종료 · ${crm385DealValueText(c.oldO)}`:`${c.type} 가격 변경 · ${crm385DealValueText(c.oldO)} → ${crm385DealValueText(c.newO)}`).join('\n');
+      const priceRows=diff.map(c=>({listing_id:id,changed_by:state.profile.id,transaction_type:c.type,old_price:c.oldO?.price??null,new_price:c.newO?.price??null,old_monthly_rent:c.oldO?.monthly_rent??null,new_monthly_rent:c.newO?.monthly_rent??null}));
+      if(priceRows.length){const {error:priceErr}=await state.client.from('listing_price_history').insert(priceRows);if(priceErr)toast(`가격 이력 저장 실패: ${priceErr.message}`)}
+    }
+    const parts=[];
+    if(content)parts.push(content);
+    if(useConfirm)parts.push(`확인 결과: ${result}${diffText?`\n${diffText}`:''}${confirmNote?`\n${confirmNote}`:''}`);
+    const history={created_by:state.profile.id,follow_up_date:fuDate,contact_method:useConfirm?'매물확인':$('#crm361FuMethod').value,content:parts.join('\n\n'),next_follow_up_at:next,listing_id:id};
+    const {error:hErr}=await state.client.from('interaction_history').insert(history);if(hErr)return toast(hErr.message);
+    if(!useConfirm)await state.client.from('listings').update({last_follow_up_at:fuDate}).eq('id',id);
+    await crm385RecalcNextFu(id);await loadListings();
+    $('#modal').close();toast(useConfirm?'FU·확인전화·가격변경을 히스토리에 함께 저장했습니다.':'FU 내용을 히스토리에 저장했습니다.');
+    return state.view==='adminListings'?renderAdminListings():renderMyListings();
+  };
+  $('#modal').showModal();
+};
+openFollowUpModal=function(entityType,id){return entityType==='listing'?crm361OpenListingFu(id):crm361BaseOpenFollowUpModal(entityType,id)};
+Object.assign(window,{crm361OpenListingFu,openFollowUpModal,crm387ToggleConfirmBlock});
+console.info('CRM v3.8.7 FU 기록·확인전화 통합 로드 완료');
