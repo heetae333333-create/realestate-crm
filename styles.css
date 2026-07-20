@@ -478,3 +478,44 @@ input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:
 .crm3839-reordered-table .crm3842-contact-cell{
   line-height:1.42;
 }
+
+/* ===== CRM v3.8.43 매물표 열 간격·폭 균형 정리 ===== */
+.crm3839-reordered-table{
+  width:max-content;
+  min-width:100%;
+  border-collapse:separate;
+  border-spacing:0;
+}
+.crm3839-reordered-table th,
+.crm3839-reordered-table td{
+  padding-left:8px!important;
+  padding-right:8px!important;
+}
+.crm3839-reordered-table thead th{
+  text-align:center!important;
+  letter-spacing:-.2px;
+}
+.crm3839-reordered-table .crm3843-col-select{width:44px;min-width:44px;max-width:44px}
+.crm3839-reordered-table .crm3843-col-no{width:42px;min-width:42px;max-width:42px}
+.crm3839-reordered-table .crm3843-col-status{width:84px;min-width:84px;max-width:84px}
+.crm3839-reordered-table .crm3843-col-title{width:122px;min-width:122px;max-width:122px}
+.crm3839-reordered-table .crm3843-col-trade{width:108px;min-width:108px;max-width:108px}
+.crm3839-reordered-table .crm3843-col-type{width:80px;min-width:80px;max-width:80px}
+.crm3839-reordered-table .crm3843-col-region{width:102px;min-width:102px;max-width:102px}
+.crm3839-reordered-table .crm3843-col-price{width:126px;min-width:126px;max-width:126px}
+.crm3839-reordered-table .crm3843-col-contact{width:138px;min-width:138px;max-width:138px}
+.crm3839-reordered-table .crm3843-col-loan{width:58px;min-width:58px;max-width:58px}
+.crm3839-reordered-table .crm3843-col-area{width:84px;min-width:84px;max-width:84px}
+.crm3839-reordered-table .crm3843-col-room{width:72px;min-width:72px;max-width:72px}
+.crm3839-reordered-table .crm3843-col-movein{width:100px;min-width:100px;max-width:100px}
+.crm3839-reordered-table .crm3843-col-owner{width:72px;min-width:72px;max-width:72px}
+.crm3839-reordered-table .crm3843-col-stage{width:82px;min-width:82px;max-width:82px}
+.crm3839-reordered-table .crm3843-col-lastfu{width:76px;min-width:76px;max-width:76px}
+.crm3839-reordered-table .crm3843-col-nextfu{width:76px;min-width:76px;max-width:76px}
+.crm3839-reordered-table .crm3843-col-manage{width:174px;min-width:174px;max-width:174px}
+.crm3839-reordered-table td.crm3843-col-title,
+.crm3839-reordered-table td.crm3843-col-price,
+.crm3839-reordered-table td.crm3843-col-contact{text-align:left!important}
+.crm3839-reordered-table td.crm3843-col-title .crm3814-listing-title-link{max-width:108px}
+.crm3839-reordered-table .crm3813-address-row td{padding-top:5px!important;padding-bottom:2px!important}
+.crm3839-reordered-table .crm3813-address-row+tr td{padding-top:5px!important;padding-bottom:7px!important}

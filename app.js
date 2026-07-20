@@ -3026,3 +3026,43 @@ renderListingTable=function(rows,target,mine,adminMode=false){
 };
 Object.assign(window,{renderListingTable});
 console.info('CRM v3.8.42 매물표 열 정렬 및 내부사진 간격 개선 완료');
+
+/* ===== CRM v3.8.43 매물표 열 간격·폭 균형 정리 ===== */
+const crm3843RenderListingTableBase=renderListingTable;
+renderListingTable=function(rows,target,mine,adminMode=false){
+  crm3843RenderListingTableBase(rows,target,mine,adminMode);
+  const root=document.getElementById(target);
+  const table=root?.querySelector('table.crm3839-reordered-table');
+  if(!table)return;
+
+  const widthClassByHeader={
+    '선택':'crm3843-col-select',
+    '순번':'crm3843-col-no',
+    '상태':'crm3843-col-status',
+    '매물명':'crm3843-col-title',
+    '거래':'crm3843-col-trade',
+    '유형':'crm3843-col-type',
+    '지역':'crm3843-col-region',
+    '금액':'crm3843-col-price',
+    '연락처':'crm3843-col-contact',
+    '대출':'crm3843-col-loan',
+    '전용면적':'crm3843-col-area',
+    '방/욕실':'crm3843-col-room',
+    '입주':'crm3843-col-movein',
+    '담당':'crm3843-col-owner',
+    '진행상황':'crm3843-col-stage',
+    '최종 FU':'crm3843-col-lastfu',
+    '예정 FU':'crm3843-col-nextfu',
+    '관리':'crm3843-col-manage'
+  };
+  const headers=[...table.querySelectorAll('thead th')];
+  const dataRows=[...table.querySelectorAll('tbody tr:not(.crm3813-address-row)')];
+  headers.forEach((th,index)=>{
+    const cls=widthClassByHeader[th.textContent.trim()];
+    if(!cls)return;
+    th.classList.add(cls);
+    dataRows.forEach(tr=>tr.children[index]?.classList.add(cls));
+  });
+};
+Object.assign(window,{renderListingTable});
+console.info('CRM v3.8.43 매물표 열 폭과 간격 균형 정리 완료');
