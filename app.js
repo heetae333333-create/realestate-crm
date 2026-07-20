@@ -2944,3 +2944,22 @@ console.info('CRM v3.8.31 리스트 FU 및 관리영역 압축 적용 완료');
 console.info('CRM v3.8.32 공지사항 압축 및 광고 변경이력 적용 완료');
 
 console.info('CRM v3.8.33 주소행 간격 축소 적용 완료');
+
+/* ===== CRM v3.8.34 주소·광고 행을 매물정보 아래로 이동 ===== */
+const crm3834RenderListingTableBase=renderListingTable;
+renderListingTable=function(rows,target,mine,adminMode=false){
+  crm3834RenderListingTableBase(rows,target,mine,adminMode);
+  const root=document.getElementById(target);
+  if(!root)return;
+  const tbody=root.querySelector('.crm3813-listing-table tbody');
+  if(!tbody)return;
+  [...tbody.querySelectorAll('tr.crm3813-address-row')].forEach(addressRow=>{
+    const dataRow=addressRow.nextElementSibling;
+    if(!dataRow||dataRow.classList.contains('crm3813-address-row'))return;
+    addressRow.classList.add('crm3834-address-below');
+    dataRow.classList.add('crm3834-listing-main-row');
+    tbody.insertBefore(addressRow,dataRow.nextSibling);
+  });
+};
+Object.assign(window,{renderListingTable});
+console.info('CRM v3.8.34 주소·광고 행 하단 배치 적용 완료');

@@ -387,3 +387,21 @@ input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:
 .crm3813-listing-table .crm3813-address-row + tr .crm3824-no-cell{
   padding-top:8px;
 }
+
+/* CRM v3.8.34 주소·광고 행을 매물정보 바로 아래에 밀착 배치 */
+.crm3813-listing-table .crm3834-listing-main-row td{
+  padding-bottom:2px!important;
+  border-bottom:0!important;
+}
+.crm3813-listing-table .crm3813-address-row.crm3834-address-below td{
+  padding-top:0!important;
+  padding-bottom:5px!important;
+  line-height:21px!important;
+  border-top:0!important;
+  border-bottom:1px solid var(--line,#e5e7eb)!important;
+  background:#fff!important;
+}
+.crm3813-listing-table .crm3813-address-row.crm3834-address-below .crm3829-address-line{
+  align-items:center;
+  min-height:22px;
+}
