@@ -343,3 +343,18 @@ input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:
 .crm3830-schedule-card{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,300px) auto;align-items:end;gap:16px;padding:20px;border:1px solid #dbe5f2;border-radius:14px;background:#f8fbff}
 .crm3830-schedule-card h4{margin:0 0 6px;font-size:17px}.crm3830-schedule-card p{margin:0;color:#64748b;font-size:13px;line-height:1.5}.crm3830-schedule-card label{margin:0}.crm3830-clear-schedule{height:46px;white-space:nowrap}
 @media(max-width:720px){.crm3813-listing-table .crm3813-address-row div,.crm3829-address-line,.crm3829-address-line>span{font-size:12px!important}.crm3830-schedule-card{grid-template-columns:1fr}.crm3830-clear-schedule{width:100%}}
+
+/* CRM v3.8.31 리스트 FU·관리영역 압축 */
+.crm3813-listing-table th.crm3831-fu-col,
+.crm3813-listing-table td.crm3831-fu-cell{min-width:78px;width:78px;padding-left:7px;padding-right:7px;text-align:center;font-variant-numeric:tabular-nums}
+.crm3831-date-badge{padding:4px 7px;white-space:nowrap;font-size:11px;letter-spacing:-.15px}
+.crm3813-listing-table th.crm3831-manage-col,
+.crm3813-listing-table td.crm3831-manage-cell{min-width:176px;width:176px;padding-left:7px;padding-right:7px}
+.crm3831-grid-actions{display:grid!important;grid-template-columns:repeat(3,max-content);gap:5px!important;align-items:center;justify-content:start}
+.crm3831-grid-actions button{margin:0!important;padding:5px 7px!important;font-size:11px!important;line-height:1.15;white-space:nowrap}
+.crm3831-grid-actions .danger:last-child{grid-column:auto}
+@media(max-width:760px){
+  .crm3813-listing-table th.crm3831-fu-col,.crm3813-listing-table td.crm3831-fu-cell{min-width:72px;width:72px}
+  .crm3813-listing-table th.crm3831-manage-col,.crm3813-listing-table td.crm3831-manage-cell{min-width:166px;width:166px}
+  .crm3831-grid-actions{grid-template-columns:repeat(3,max-content)}
+}

@@ -2873,3 +2873,56 @@ renderListingTable=function(rows,target,mine,adminMode=false){
 
 Object.assign(window,{openListingModal,renderAdminListings,crm361SetFuTab,crm361OpenListingFu,openFollowUpModal,renderListingTable});
 console.info('CRM v3.8.30 매물유형 원룸 제거·주소 확대·예정 FU 분리 적용 완료');
+
+/* ===== CRM v3.8.31 리스트 FU·관리영역 압축 ===== */
+function crm3831ShortDate(value){
+  if(!value)return '-';
+  const raw=String(value).slice(0,10);
+  const parts=raw.split('-');
+  if(parts.length!==3)return raw;
+  return `${parts[0].slice(2)}.${Number(parts[1])}.${Number(parts[2])}`;
+}
+function crm3831DueDate(value){
+  if(!value)return '-';
+  const d=new Date(String(value).slice(0,10)+'T00:00:00');
+  const now=new Date(today()+'T00:00:00');
+  const diff=Math.round((d-now)/86400000);
+  const cls=diff<0?'red':diff===0?'yellow':'blue';
+  return `<span class="badge ${cls} crm3831-date-badge">${crm3831ShortDate(value)}</span>`;
+}
+const crm3831RenderListingTableBase=renderListingTable;
+renderListingTable=function(rows,target,mine,adminMode=false){
+  crm3831RenderListingTableBase(rows,target,mine,adminMode);
+  const root=document.getElementById(target);
+  if(!root)return;
+  const table=root.querySelector('table');
+  if(!table)return;
+  const headers=[...table.querySelectorAll('thead th')];
+  const finalIndex=headers.findIndex(th=>th.textContent.trim()==='최종 FU');
+  const nextIndex=headers.findIndex(th=>th.textContent.trim()==='예정 FU');
+  const manageIndex=headers.findIndex(th=>th.textContent.trim()==='관리');
+  if(finalIndex>=0)headers[finalIndex].classList.add('crm3831-fu-col');
+  if(nextIndex>=0)headers[nextIndex].classList.add('crm3831-fu-col');
+  if(manageIndex>=0)headers[manageIndex].classList.add('crm3831-manage-col');
+  const dataRows=[...table.querySelectorAll('tbody tr:not(.crm3813-address-row)')];
+  dataRows.forEach((tr,index)=>{
+    const cells=[...tr.children];
+    const item=rows[index];
+    if(!item)return;
+    if(finalIndex>=0&&cells[finalIndex]){
+      cells[finalIndex].classList.add('crm3831-fu-cell');
+      cells[finalIndex].textContent=crm3831ShortDate(item.last_follow_up_at||item.last_confirmed_at);
+    }
+    if(nextIndex>=0&&cells[nextIndex]){
+      cells[nextIndex].classList.add('crm3831-fu-cell');
+      cells[nextIndex].innerHTML=crm3831DueDate(item.next_follow_up_at);
+    }
+    if(manageIndex>=0&&cells[manageIndex]){
+      cells[manageIndex].classList.add('crm3831-manage-cell');
+      const actions=cells[manageIndex].querySelector('.row-actions');
+      if(actions)actions.classList.add('crm3831-grid-actions');
+    }
+  });
+};
+Object.assign(window,{renderListingTable});
+console.info('CRM v3.8.31 리스트 FU 및 관리영역 압축 적용 완료');
