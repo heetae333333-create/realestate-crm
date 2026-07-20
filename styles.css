@@ -199,3 +199,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
 /* CRM v3.8.1 */
 input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:not-allowed}
 .crm381-next-help{display:block;margin-top:6px}
+
+/* CRM v3.8.2 */
+.crm382-movein-box{border:1px solid #dbe3ef;border-radius:14px;padding:16px;background:#f8fafc}
+.crm382-movein-grid{display:grid;grid-template-columns:minmax(220px,1fr) auto auto;gap:14px;align-items:end;margin-top:10px}
+.crm382-contact-gap{height:7px}
+@media(max-width:760px){.crm382-movein-grid{grid-template-columns:1fr}.crm382-movein-grid .check-label{min-height:44px}}
