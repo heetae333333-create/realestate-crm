@@ -264,3 +264,23 @@ input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:
 /* CRM v3.8.13 */
 .crm3813-listing-table .crm3813-address-row td{padding:5px 8px 2px;border-bottom:0;background:#fbfcfe}.crm3813-listing-table .crm3813-address-row+tr td{padding-top:4px}.crm3813-address-row div{font-size:11px;color:#667085;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:430px}.crm3813-contract-form{align-items:start}.crm3813-contract-table td{vertical-align:middle}.crm3813-contract-table td:first-child{min-width:250px;max-width:360px}.crm3813-contract-table td:nth-child(2){min-width:150px}
 @media(max-width:760px){.crm3813-address-row div{max-width:280px}.crm3813-contract-table td:first-child{min-width:200px}}
+
+
+/* CRM v3.8.14 매물명 클릭 */
+.crm3814-listing-title-link{
+  appearance:none;
+  border:0;
+  background:transparent;
+  padding:0;
+  margin:0;
+  color:#14213d;
+  font:inherit;
+  font-weight:800;
+  text-align:left;
+  cursor:pointer;
+  text-decoration:underline;
+  text-decoration-color:#a9b8d0;
+  text-underline-offset:3px;
+}
+.crm3814-listing-title-link:hover{color:#2563eb;text-decoration-color:#2563eb}
+.crm3814-listing-title-link:focus-visible{outline:2px solid #2563eb;outline-offset:3px;border-radius:3px}
