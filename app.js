@@ -1283,3 +1283,92 @@ function crm38TogglePhotoManage(btn){const on=$('#modalBody').classList.toggle('
 renderListingTable=function(rows,target,mine,adminMode=false){const el=$('#'+target);el.innerHTML=rows.length?`<div class="table-wrap listing-table-wrap"><table class="listing-table"><thead><tr>${adminMode?'<th class="select-col">선택</th>':''}<th>상태</th><th>거래</th><th>유형</th><th>매물명</th><th>지역</th><th>금액</th><th>연락처</th><th>대출</th><th>면적</th><th>방/욕실</th><th>입주</th><th>담당</th><th>계약</th><th>최종 FU</th><th>예정 FU</th>${mine?'<th>관리</th>':''}</tr></thead><tbody>${rows.map(x=>`<tr>${adminMode?`<td><input type="checkbox" class="admin-listing-check" value="${x.id}" onchange="toggleAdminListingSelection('${x.id}',this.checked)"></td>`:''}<td>${badge(x.status==='available'?'거래 가능':x.status==='complete'?'거래 완료':'협의 중',x.status==='available'?'green':x.status==='complete'?'gray':'yellow')}</td><td>${escapeHtml(crm38DealTypeText(x))}</td><td>${escapeHtml(x.property_type)}</td><td><strong>${escapeHtml(x.title)}</strong>${x.is_public?'':' '+badge('비공개','red')}<br><button class="photo-link" onclick="openListingPhotos('${x.id}')">📷 내부사진</button></td><td>${escapeHtml(listingAreaText(x))}</td><td>${listingPriceText(x)}</td><td>${escapeHtml(x.contact_phone||'-')}${x.additional_contacts?.length?`<br><span class="muted">추가 ${x.additional_contacts.length}명</span>`:''}</td><td>${x.loan_available===true?badge('O','green'):x.loan_available===false?badge('X','red'):badge('미확인','gray')}</td><td>${x.area_m2?x.area_m2+'㎡':'-'}</td><td>${listingRoomText(x)} / ${x.bathroom_count??'-'}</td><td>${moveInText(x)}</td><td>${escapeHtml(x.owner?.full_name||'-')}</td><td>${contractStage(x)}</td><td>${fmtDate(x.last_follow_up_at||x.last_confirmed_at)}</td><td>${dueBadge(x.next_follow_up_at)}</td>${mine?`<td><div class="row-actions"><button class="success" onclick="openFollowUpModal('listing','${x.id}')">FU</button><button class="ghost" onclick="openHistoryModal('listing','${x.id}')">히스토리</button><button class="ghost" onclick="openContractModal('listing','${x.id}')">계약일정</button><button class="ghost" onclick="openListingModal('${x.id}')">수정</button>${adminMode?`<button class="primary" onclick="openSingleListingTransfer('${x.id}')">개별 이관</button>`:''}<button class="danger" onclick="deleteListing('${x.id}')">삭제</button></div></td>`:''}</tr>`).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 매물이 없습니다.</div>';if(adminMode)updateBulkTransferControls()};
 Object.assign(window,{openListingModal,openListingPhotos,crm38AddContactRow,crm38SyncDealCards,crm38TogglePhotoManage,renderListingTable});
 console.info('CRM v3.8 매물 입력·사진·복수거래 개선 로드 완료');
+
+/* ===== CRM v3.8.1 연락처·확인일·카카오·소개서 개선 ===== */
+function crm381FormatPhone(value){
+  const raw=String(value??'').trim();
+  if(!raw)return '';
+  const d=raw.replace(/\D/g,'').slice(0,11);
+  if(!d)return raw;
+  if(d.startsWith('02')){
+    if(d.length<=2)return d;
+    if(d.length<=5)return `${d.slice(0,2)}-${d.slice(2)}`;
+    if(d.length<=9)return `${d.slice(0,2)}-${d.slice(2,d.length-4)}-${d.slice(-4)}`;
+    return `${d.slice(0,2)}-${d.slice(2,6)}-${d.slice(6,10)}`;
+  }
+  if(d.length<=3)return d;
+  if(d.length<=7)return `${d.slice(0,3)}-${d.slice(3)}`;
+  if(d.length===10)return `${d.slice(0,3)}-${d.slice(3,6)}-${d.slice(6)}`;
+  return `${d.slice(0,3)}-${d.slice(3,7)}-${d.slice(7,11)}`;
+}
+function crm381PhoneInput(el){
+  const pos=el.selectionStart, before=el.value;
+  el.value=crm381FormatPhone(before);
+  try{el.setSelectionRange(el.value.length,el.value.length)}catch(_){ }
+}
+function crm381IsPhoneInput(el){
+  if(!(el instanceof HTMLInputElement))return false;
+  const key=`${el.name||''} ${el.id||''} ${el.className||''} ${el.placeholder||''}`.toLowerCase();
+  return key.includes('phone')||key.includes('연락처')||key.includes('010-');
+}
+document.addEventListener('input',e=>{if(crm381IsPhoneInput(e.target))crm381PhoneInput(e.target)});
+document.addEventListener('focusin',e=>{if(crm381IsPhoneInput(e.target)&&e.target.value)e.target.value=crm381FormatPhone(e.target.value)});
+
+const crm381BaseLoadCustomers=loadCustomers;
+loadCustomers=async function(){
+  await crm381BaseLoadCustomers();
+  (state.customers||[]).forEach(x=>{x.phone=crm381FormatPhone(x.phone);if(x.counterparty_phone)x.counterparty_phone=crm381FormatPhone(x.counterparty_phone)});
+};
+const crm381BaseLoadListings=loadListings;
+loadListings=async function(){
+  await crm381BaseLoadListings();
+  (state.listings||[]).forEach(x=>{
+    x.contact_phone=crm381FormatPhone(x.contact_phone);
+    if(x.owner?.phone)x.owner.phone=crm381FormatPhone(x.owner.phone);
+    (x.additional_contacts||[]).forEach(c=>c.phone=crm381FormatPhone(c.phone));
+  });
+  (state.listingContacts||[]).forEach(c=>c.phone=crm381FormatPhone(c.phone));
+  state.myListings=(state.listings||[]).filter(x=>x.owner_id===state.profile?.id);
+};
+function crm381AddOneMonth(dateValue){
+  const base=dateValue?new Date(`${String(dateValue).slice(0,10)}T12:00:00`):new Date();
+  if(Number.isNaN(base.getTime()))return '';
+  const day=base.getDate();base.setDate(1);base.setMonth(base.getMonth()+1);const last=new Date(base.getFullYear(),base.getMonth()+1,0).getDate();base.setDate(Math.min(day,last));
+  return `${base.getFullYear()}-${String(base.getMonth()+1).padStart(2,'0')}-${String(base.getDate()).padStart(2,'0')}`;
+}
+const crm381BaseOpenListingModal=openListingModal;
+openListingModal=async function(id=null){
+  await crm381BaseOpenListingModal(id);
+  const x=id?state.listings.find(v=>v.id===id):{};
+  const base=[x?.last_confirmed_at,x?.last_follow_up_at].filter(Boolean).sort().at(-1)||today();
+  const lastInput=[...document.querySelectorAll('#modalBody input[type=date]')].find(el=>el.parentElement?.textContent?.includes('최종 확인일'));
+  const nextInput=document.querySelector('#modalBody [name=next_confirm_at]');
+  if(lastInput)lastInput.value=String(base).slice(0,10);
+  if(nextInput){nextInput.value=crm381AddOneMonth(base);nextInput.readOnly=true;nextInput.title='최종 확인일로부터 한 달 뒤 자동 설정';const help=document.createElement('span');help.className='field-help';help.textContent='최종 확인일로부터 한 달 뒤로 자동 설정됩니다.';if(!nextInput.parentElement.querySelector('.crm381-next-help')){help.classList.add('crm381-next-help');nextInput.parentElement.appendChild(help)}}
+  document.querySelectorAll('#modalBody input').forEach(el=>{if(crm381IsPhoneInput(el)&&el.value)el.value=crm381FormatPhone(el.value)});
+};
+
+crm36KakaoMessage=function(customerId){
+  const customer=state.customers.find(x=>x.id===customerId);const rows=state.listings.filter(x=>state.matchSelection.has(x.id));if(!rows.length)return toast('카카오톡 문구에 넣을 매물을 먼저 체크하세요.');
+  const lines=[`안녕하세요, ${customer.name} 고객님.`,`말씀해주신 조건을 기준으로 현재 확인 가능한 매물을 정리해드렸습니다.`,``,`[고객님 희망 조건]`,`• 거래유형: ${customer.deal_type||customer.customer_type||'-'}`,`• 희망금액: ${fmtMoney(customer.budget_max)}`,`• 희망 방 개수: ${customerRoomText(customer)}`,customer.desired_monthly_rent?`• 희망 월세: 월 ${fmtMoney(customer.desired_monthly_rent)}`:'',customer.preferred_area?`• 선호지역: ${customer.preferred_area}`:'',``,`[추천 매물 ${rows.length}건]`].filter(Boolean);
+  rows.forEach((x,i)=>{const tags=crm36Array(x.feature_tags);lines.push(``,`${i+1}. ${x.title}`,`• 거래조건: ${crm38DealTypeText(x)} / ${listingPriceText(x).replace(/<br>/g,' · ')}`,`• 위치: ${[x.district,x.address].filter(Boolean).join(' ')||'-'}`,`• 구조: 방 ${listingRoomText(x)} / 욕실 ${x.bathroom_count??'-'}개`,x.area_m2?`• 전용면적: ${x.area_m2}㎡`:'',x.management_fee?`• 관리비: ${fmtMoney(x.management_fee)}`:'',x.move_in_negotiable?'• 입주: 협의 가능':x.move_in_date?`• 입주 가능일: ${fmtDate(x.move_in_date)}`:'',tags.length?`• 특징: ${tags.join(', ')}`:'',x.options?`• 옵션: ${x.options}`:'',x.description?`• 상세: ${x.description}`:'').filter(Boolean)});
+  lines.push(``,`※ 매물은 실시간으로 계약되거나 금액·입주조건이 변경될 수 있어 방문 전 다시 확인해드리겠습니다.`,`관심 가는 매물 번호를 알려주시면 공개 가능한 내부사진과 세부 조건을 보내드리고 방문 일정을 조율해드리겠습니다.`,``,`담당 중개사: ${state.profile.full_name||''}`,state.profile.office_name?`소속: ${state.profile.office_name}`:'',state.profile.phone?`연락처: ${crm381FormatPhone(state.profile.phone)}`:'');
+  const text=lines.filter(Boolean).join('\n');$('#modalTitle').textContent='카카오톡 추천 문구';$('#modalBody').innerHTML=`<textarea id="crm36KakaoText" rows="24" style="width:100%">${escapeHtml(text)}</textarea><div class="notice" style="margin-top:12px">문구를 확인한 뒤 복사하세요. 브라우저 복사가 차단되면 자동으로 선택되므로 Ctrl+C 또는 길게 눌러 복사할 수 있습니다.</div>`;$('#modalSubmit').textContent='문구 복사';$('#modalSubmit').style.display='';$('#modalSubmit').onclick=async e=>{e.preventDefault();const ta=$('#crm36KakaoText');let copied=false;try{if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(ta.value);copied=true}}catch(_){ }if(!copied){ta.focus();ta.select();try{copied=document.execCommand('copy')}catch(_){copied=false}}toast(copied?'카카오톡 문구를 복사했습니다.':'문구가 선택되었습니다. Ctrl+C 또는 길게 눌러 복사하세요.');if(copied)$('#modal').close()};const reset=()=>{$('#modalSubmit').textContent='저장';$('#modal').removeEventListener('close',reset)};$('#modal').addEventListener('close',reset);$('#modal').showModal();
+};
+
+printSelectedListingBrochure=async function(customerId){
+  const customer=state.customers.find(x=>x.id===customerId),rows=state.listings.filter(x=>state.matchSelection.has(x.id));if(!rows.length)return toast('소개서에 넣을 매물을 선택하세요.');
+  const w=window.open('','_blank');if(!w)return toast('팝업이 차단되었습니다. 이 사이트의 팝업을 허용해주세요.');w.document.write('<p style="font-family:sans-serif;padding:30px">매물 사진과 소개서를 준비하고 있습니다...</p>');
+  const cards=[];
+  for(const x of rows){
+    const {data:photos}=await state.client.from('listing_photos').select('*').eq('listing_id',x.id).eq('is_customer_visible',true).order('sort_order').order('created_at');
+    const ordered=[...(photos||[])];const coverIndex=ordered.findIndex(p=>p.id===x.cover_photo_id);if(coverIndex>0)ordered.unshift(ordered.splice(coverIndex,1)[0]);
+    const urls=[];for(const p of ordered.slice(0,5)){const u=await signedPhotoUrl(p.storage_path);if(u)urls.push(u)}
+    const photoHtml=urls.length?`<div class="property-photos count-${urls.length}">${urls.map((u,i)=>`<img src="${u}" alt="${escapeHtml(x.title)} 사진 ${i+1}">`).join('')}</div>`:`<div class="no-photo">사진 없음</div>`;
+    cards.push(`<section class="property"><div class="property-info"><h2>${escapeHtml(x.title)}</h2><p class="price"><b>${escapeHtml(crm38DealTypeText(x))}</b> ${listingPriceText(x)}</p><p>${escapeHtml([x.district,x.address].filter(Boolean).join(' ')||'-')}</p><p>면적 ${x.area_m2||'-'}㎡ · 방 ${listingRoomText(x)} · 욕실 ${x.bathroom_count??'-'}</p>${x.management_fee?`<p>관리비 ${fmtMoney(x.management_fee)}</p>`:''}${x.description?`<p class="desc">${escapeHtml(x.description)}</p>`:''}</div>${photoHtml}</section>`)
+  }
+  w.document.open();w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(customer.name)} 매물소개서</title><style>body{font-family:Arial,'Noto Sans KR',sans-serif;max-width:980px;margin:auto;padding:30px;color:#111}header{border-bottom:3px solid #111;padding-bottom:18px;margin-bottom:16px}small{color:#666}.property{page-break-inside:avoid;border-bottom:2px solid #ddd;padding:24px 0}.property h2{margin:0 0 12px;font-size:25px}.property p{margin:8px 0;line-height:1.55}.price{font-size:17px}.desc{color:#444}.property-photos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:18px}.property-photos img{width:100%;height:155px;object-fit:cover;border-radius:9px;background:#eee}.property-photos img:first-child{grid-column:span 2;grid-row:span 2;height:318px}.property-photos.count-1{grid-template-columns:1fr}.property-photos.count-1 img:first-child{grid-column:auto;grid-row:auto;height:400px;object-fit:contain}.property-photos.count-2{grid-template-columns:repeat(2,1fr)}.property-photos.count-2 img:first-child{grid-column:auto;grid-row:auto;height:240px}.property-photos.count-2 img{height:240px}.no-photo{height:120px;display:grid;place-items:center;background:#f3f4f6;border:1px dashed #bbb;border-radius:10px;color:#777;font-weight:700;margin-top:18px}@media print{body{padding:0}.property-photos img{print-color-adjust:exact;-webkit-print-color-adjust:exact}}</style></head><body><header><h1>${escapeHtml(customer.name)} 고객님 추천 매물</h1><small>소유자 연락처와 내부 메모는 제외된 고객용 자료입니다.</small></header>${cards.join('')}<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),900))<\/script></body></html>`);w.document.close();
+};
+
+Object.assign(window,{crm381FormatPhone,crm36KakaoMessage,printSelectedListingBrochure,openListingModal});
+console.info('CRM v3.8.1 연락처·확인일·카카오·소개서 개선 로드 완료');

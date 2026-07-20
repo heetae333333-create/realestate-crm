@@ -195,3 +195,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 /* CRM v3.8 */
 .crm38-extra-contacts{display:grid;gap:8px}.crm38-contact-row{display:grid;grid-template-columns:130px 1fr 1.2fr auto;gap:8px;align-items:end;padding:10px;border:1px dashed #cbd5e1;border-radius:12px;background:#f8fafc}.crm38-deal-section{border:1px solid #dbe4ee;border-radius:14px;padding:14px;background:#f8fafc}.crm38-deal-section .section-title{font-weight:800;margin-bottom:4px}.crm38-deal-card{margin-top:10px;border:1px solid #dbe4ee;border-radius:12px;padding:12px;background:#fff}.crm38-deal-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.crm38-deal-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}.crm38-deal-fields[hidden]{display:none}.crm38-photo-grid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr));align-items:start}.crm38-photo-card{background:#f8fafc}.crm38-photo-card img{width:100%;height:210px;object-fit:contain;background:#eef2f7}.crm38-photo-meta{display:none}.photo-manage-on .crm38-photo-meta{display:grid}.photo-manage-on .crm38-photo-card img{height:180px}
 @media(max-width:700px){.crm38-contact-row{grid-template-columns:1fr}.crm38-deal-fields{grid-template-columns:1fr}.crm38-photo-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.crm38-photo-card img{height:150px}}
+
+/* CRM v3.8.1 */
+input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:not-allowed}
+.crm381-next-help{display:block;margin-top:6px}
