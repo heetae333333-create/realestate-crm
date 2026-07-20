@@ -2099,3 +2099,11 @@ if(!window.__crm3819DistrictSaveBound){
 }
 Object.assign(window,{crm3818FormatDistrict,crm3818BindDistrictInput});
 console.info('CRM v3.8.19 지역 저장 시 자동 정리 로드 완료');
+
+/* CRM v3.8.20 - 목록 지역 표시는 지역 입력값만 사용 */
+listingAreaText=function(x){
+  const district=String(x?.district||'').replace(/\s+/g,' ').trim();
+  return district||'-';
+};
+Object.assign(window,{listingAreaText});
+console.info('CRM v3.8.20 목록 지역은 지역 필드 기준으로 표시');
