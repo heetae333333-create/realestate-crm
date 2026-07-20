@@ -292,3 +292,14 @@ input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:
 .crm3824-no-col{width:48px;min-width:48px;text-align:center!important}.crm3824-no-cell,.crm3824-address-no{width:48px;min-width:48px;text-align:center!important;font-weight:800;color:#64748b;font-variant-numeric:tabular-nums}
 .crm3824-address-no{font-size:11px;vertical-align:middle}.crm3824-numbered-table th,.crm3824-numbered-table td{vertical-align:middle}
 @media(max-width:760px){.crm3824-listing-summary{grid-template-columns:repeat(2,1fr);max-width:none}.crm3824-no-col,.crm3824-no-cell,.crm3824-address-no{width:40px;min-width:40px}}
+
+/* CRM v3.8.25 매물 집계 분리·주소행 순번 제거 */
+.crm3825-summary-panel{display:flex;align-items:center;gap:18px;width:max-content;max-width:100%;margin:0 0 12px;padding:10px 14px;border:1px solid #dce3ee;border-radius:13px;background:#fff;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+.crm3825-summary-title{font-size:13px;font-weight:800;color:#334155;white-space:nowrap;padding-right:14px;border-right:1px solid #e5e7eb}
+.crm3825-summary-items{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.crm3825-summary-items>div{display:flex;align-items:center;gap:7px;min-width:72px;padding:6px 9px;border-radius:9px;background:#f8fafc}
+.crm3825-summary-items span{font-size:12px;font-weight:700;color:#64748b}
+.crm3825-summary-items strong{font-size:16px;color:#0f172a;font-variant-numeric:tabular-nums}
+.crm3825-my-listing-notice{padding:11px 14px}
+.crm3825-address-spacer{background:#fafcff!important;border-bottom:0!important}
+@media(max-width:760px){.crm3825-summary-panel{width:100%;align-items:flex-start;gap:10px;flex-direction:column}.crm3825-summary-title{border-right:0;padding-right:0}.crm3825-summary-items{width:100%;display:grid;grid-template-columns:repeat(4,1fr)}.crm3825-summary-items>div{min-width:0;justify-content:center;padding:6px 4px}}

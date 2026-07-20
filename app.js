@@ -2363,3 +2363,41 @@ filterCustomers=function(){
 };
 
 Object.assign(window,{renderMyListings,renderListingTable,filterCustomers});
+
+// ===== CRM v3.8.25 매물 집계 분리·주소행 순번 제거 =====
+function crm3825ListingSummary(rows){
+  const counts={전체:rows.length,매매:0,전세:0,월세:0};
+  rows.forEach(x=>{
+    const type=crm3824PreferredDealType(x);
+    if(Object.prototype.hasOwnProperty.call(counts,type)) counts[type]++;
+  });
+  return `<section class="crm3825-summary-panel" aria-label="내 매물 현황">
+    <div class="crm3825-summary-title">내 매물 현황</div>
+    <div class="crm3825-summary-items">
+      <div><span>전체</span><strong>${counts.전체}</strong></div>
+      <div><span>매매</span><strong>${counts.매매}</strong></div>
+      <div><span>전세</span><strong>${counts.전세}</strong></div>
+      <div><span>월세</span><strong>${counts.월세}</strong></div>
+    </div>
+  </section>`;
+}
+
+renderMyListings=async function(){
+  await loadListings();
+  state.myListings=state.listings.filter(x=>x.owner_id===state.profile.id);
+  $('#topActions').innerHTML='<button class="primary" onclick="openListingModal()">+ 매물 등록</button>';
+  $('#content').innerHTML=`${crm3825ListingSummary(state.myListings)}
+    <div class="notice crm3825-my-listing-notice" style="margin-bottom:14px">이 시트에서 등록한 매물은 공개 상태가 ‘공개’인 경우 공동매물망에 자동으로 올라갑니다.</div>
+    <div class="panel"><div id="myListingTable"></div></div>`;
+  renderListingTable(state.myListings,'myListingTable',true);
+  crm37AddQuickActions();
+};
+
+renderListingTable=function(rows,target,mine,adminMode=false){
+  const el=$('#'+target);
+  const totalCols=1+(adminMode?1:0)+16+(mine?1:0);
+  el.innerHTML=rows.length?`<div class="table-wrap listing-table-wrap"><table class="listing-table crm3813-listing-table crm3824-numbered-table"><thead><tr><th class="crm3824-no-col">순번</th>${adminMode?'<th class="select-col">선택</th>':''}<th>상태</th><th>거래</th><th>유형</th><th>매물명</th><th>지역</th><th>금액</th><th>연락처</th><th>대출</th><th>전용면적</th><th>방/욕실</th><th>입주</th><th>담당</th><th>진행상황</th><th>최종 FU</th><th>예정 FU</th>${mine?'<th>관리</th>':''}</tr></thead><tbody>${rows.map((x,index)=>`<tr class="crm3813-address-row"><td class="crm3825-address-spacer"></td>${adminMode?'<td></td>':''}<td colspan="3"><div title="${escapeHtml(x.address||x.district||'주소 미입력')}">${escapeHtml(x.address||x.district||'주소 미입력')}</div></td><td colspan="${totalCols-1-(adminMode?1:0)-3}"></td></tr><tr><td class="crm3824-no-cell">${index+1}</td>${adminMode?`<td><input type="checkbox" class="admin-listing-check" value="${x.id}" onchange="toggleAdminListingSelection('${x.id}',this.checked)"></td>`:''}<td>${badge(x.status==='available'?'거래 가능':x.status==='complete'?'거래 완료':'협의 중',x.status==='available'?'green':x.status==='complete'?'gray':'yellow')}</td><td>${escapeHtml(crm38DealTypeText(x))}</td><td>${escapeHtml(x.property_type)}</td><td><button type="button" class="crm3814-listing-title-link" onclick="openListingDetail('${x.id}')" title="매물 상세정보 보기">${escapeHtml(x.title)}</button>${x.is_public?'':' '+badge('비공개','red')}<br><button class="photo-link" onclick="openListingPhotos('${x.id}')">📷 내부사진</button></td><td>${escapeHtml(listingAreaText(x))}</td><td>${listingPriceText(x)}</td><td>${crm382ContactDisplay(x)}</td><td>${x.loan_available===true?badge('O','green'):x.loan_available===false?badge('X','red'):badge('미확인','gray')}</td><td>${x.area_m2?`${x.area_m2}㎡<br><span class="muted">약 ${(Number(x.area_m2)/3.3058).toFixed(2)}평</span>`:'-'}</td><td>${listingRoomText(x)} / ${x.bathroom_count??'-'}</td><td>${moveInText(x)}</td><td>${escapeHtml(x.owner?.full_name||'-')}</td><td>${contractStage(x)}</td><td>${fmtDate(x.last_follow_up_at||x.last_confirmed_at)}</td><td>${dueBadge(x.next_follow_up_at)}</td>${mine?`<td><div class="row-actions"><button class="success" onclick="openFollowUpModal('listing','${x.id}')">FU</button><button class="ghost" onclick="openHistoryModal('listing','${x.id}')">히스토리</button><button class="ghost" onclick="openContractModal('listing','${x.id}')">진행상황</button><button class="ghost" onclick="openListingModal('${x.id}')">수정</button>${adminMode?`<button class="primary" onclick="openSingleListingTransfer('${x.id}')">개별 이관</button>`:''}<button class="danger" onclick="deleteListing('${x.id}')">삭제</button></div></td>`:''}</tr>`).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 매물이 없습니다.</div>';
+  if(adminMode) updateBulkTransferControls();
+};
+
+Object.assign(window,{renderMyListings,renderListingTable});
