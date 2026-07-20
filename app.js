@@ -2297,6 +2297,17 @@ openContractModal=async function(entityType,id){
     payload.counterparty_name=fd.get('counterparty_name')||null;
     payload.counterparty_phone=fd.get('counterparty_phone')||null;
     payload.last_follow_up_at=today();
+    // 매물 진행상황이 하나라도 완료되면 상태를 거래 완료로 자동 전환한다.
+    // 모든 완료 체크가 해제되면 다시 거래 가능으로 전환한다.
+    if(entityType==='listing'){
+      const hasProgress=!!(
+        payload.provisional_contract_completed ||
+        payload.contract_completed ||
+        (!payload.interim_payment_not_applicable && payload.interim_payment_completed) ||
+        payload.final_payment_completed
+      );
+      payload.status=hasProgress?'complete':'available';
+    }
     const table=entityType==='customer'?'customers':'listings';
     const {error}=await state.client.from(table).update(payload).eq('id',id);
     if(error)return toast(error.message);
@@ -2403,8 +2414,17 @@ renderListingTable=function(rows,target,mine,adminMode=false){
 Object.assign(window,{renderMyListings,renderListingTable});
 
 // ===== CRM v3.8.26 필터 연동 매물 집계 · 상태 2단계 =====
+function crm3827HasContractProgress(listing){
+  return !!(
+    listing?.provisional_contract_completed ||
+    listing?.contract_completed ||
+    (!listing?.interim_payment_not_applicable && listing?.interim_payment_completed) ||
+    listing?.final_payment_completed
+  );
+}
 function crm3826StatusValue(listing){
-  return listing?.status==='complete'?'complete':'available';
+  // 가계약 이상 진행 완료가 체크된 매물은 더 이상 거래 가능으로 표시하지 않는다.
+  return (crm3827HasContractProgress(listing) || listing?.status==='complete') ? 'complete' : 'available';
 }
 function crm3826PreferredDealType(listing){
   return crm3824PreferredDealType(listing);
@@ -2504,9 +2524,9 @@ openListingModal=function(id){
   crm3826OpenListingModalBase(id);
   const select=document.querySelector('#modalBody select[name="status"]');
   if(select){
-    const current=state.listings.find(x=>x.id===id)?.status;
+    const listing=state.listings.find(x=>x.id===id);
     select.innerHTML='<option value="available">거래 가능</option><option value="complete">거래 완료</option>';
-    select.value=current==='complete'?'complete':'available';
+    select.value=crm3826StatusValue(listing);
   }
 };
 
@@ -2524,9 +2544,12 @@ openFollowUpModal=async function(entityType,id){
 // 목록에서도 기존 hold 데이터는 거래 가능으로 표현한다.
 const crm3826RenderListingTableBase=renderListingTable;
 renderListingTable=function(rows,target,mine,adminMode=false){
-  const normalized=rows.map(x=>x.status==='hold'?{...x,status:'available'}:x);
+  const normalized=rows.map(x=>({...x,status:crm3826StatusValue(x)}));
   crm3826RenderListingTableBase(normalized,target,mine,adminMode);
 };
 
 Object.assign(window,{renderMyListings,filterMyListings,renderNetwork,filterNetwork,openListingModal,openFollowUpModal,renderListingTable});
 console.info('CRM v3.8.26 필터 연동 집계 및 상태 2단계 적용 완료');
+
+// ===== CRM v3.8.27 진행상황-매물상태 자동연동 =====
+console.info('CRM v3.8.27 진행상황에 따른 매물 상태 자동연동 적용 완료');
