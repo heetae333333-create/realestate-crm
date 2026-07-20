@@ -303,3 +303,19 @@ input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:
 .crm3825-my-listing-notice{padding:11px 14px}
 .crm3825-address-spacer{background:#fafcff!important;border-bottom:0!important}
 @media(max-width:760px){.crm3825-summary-panel{width:100%;align-items:flex-start;gap:10px;flex-direction:column}.crm3825-summary-title{border-right:0;padding-right:0}.crm3825-summary-items{width:100%;display:grid;grid-template-columns:repeat(4,1fr)}.crm3825-summary-items>div{min-width:0;justify-content:center;padding:6px 4px}}
+
+/* CRM v3.8.26 필터 연동 집계 */
+.crm3825-summary-panel,.crm3824-listing-summary{display:none!important}
+.crm3826-my-listing-notice{margin-bottom:14px}
+.crm3826-filter-panel{display:flex;flex-direction:column;gap:14px}
+.crm3826-listing-filters{margin:0}
+.crm3826-filter-summary{display:flex;align-items:center;gap:18px;padding:12px 16px;border:1px solid #dbe3ee;border-radius:14px;background:#fff}
+.crm3826-filter-summary-title{font-size:14px;font-weight:800;white-space:nowrap;color:#26364a}
+.crm3826-filter-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(72px,1fr));gap:8px;flex:1}
+.crm3826-filter-summary-grid>div{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;border-radius:10px;background:#f5f7fb;font-size:13px}
+.crm3826-filter-summary-grid span{color:#667085;font-weight:700}
+.crm3826-filter-summary-grid strong{font-size:17px;color:#152238}
+@media(max-width:720px){
+  .crm3826-filter-summary{align-items:stretch;flex-direction:column;gap:9px}
+  .crm3826-filter-summary-grid{grid-template-columns:repeat(2,1fr)}
+}

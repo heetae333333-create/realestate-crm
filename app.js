@@ -2401,3 +2401,132 @@ renderListingTable=function(rows,target,mine,adminMode=false){
 };
 
 Object.assign(window,{renderMyListings,renderListingTable});
+
+// ===== CRM v3.8.26 필터 연동 매물 집계 · 상태 2단계 =====
+function crm3826StatusValue(listing){
+  return listing?.status==='complete'?'complete':'available';
+}
+function crm3826PreferredDealType(listing){
+  return crm3824PreferredDealType(listing);
+}
+function crm3826SummaryMarkup(rows,title='필터 결과'){
+  const counts={전체:rows.length,매매:0,전세:0,월세:0};
+  rows.forEach(x=>{
+    const type=crm3826PreferredDealType(x);
+    if(type in counts) counts[type]++;
+  });
+  return `<section class="crm3826-filter-summary" aria-live="polite">
+    <div class="crm3826-filter-summary-title">${escapeHtml(title)}</div>
+    <div class="crm3826-filter-summary-grid">
+      <div><span>전체</span><strong>${counts.전체}</strong></div>
+      <div><span>매매</span><strong>${counts.매매}</strong></div>
+      <div><span>전세</span><strong>${counts.전세}</strong></div>
+      <div><span>월세</span><strong>${counts.월세}</strong></div>
+    </div>
+  </section>`;
+}
+function crm3826RenderSummary(targetId,rows,title){
+  const el=document.getElementById(targetId);
+  if(el) el.innerHTML=crm3826SummaryMarkup(rows,title);
+}
+function crm3826FilterRows(source,prefix){
+  const q=crm3821RegionSearchKey(document.getElementById(`${prefix}Search`)?.value||'');
+  const tx=document.getElementById(`${prefix}Tx`)?.value||'';
+  const ty=document.getElementById(`${prefix}Type`)?.value||'';
+  const st=document.getElementById(`${prefix}Status`)?.value||'';
+  const mx=Number(document.getElementById(`${prefix}Max`)?.value||0);
+  return source.filter(x=>{
+    const hay=crm3821RegionSearchKey(`${x.title||''} ${x.address||''} ${x.district||''} ${x.owner?.full_name||''} ${x.owner?.office_name||''}`);
+    if(q&&!hay.includes(q))return false;
+    if(ty&&x.property_type!==ty)return false;
+    if(st&&crm3826StatusValue(x)!==st)return false;
+    const opts=crm38DealOptions(x)||[];
+    const matching=tx?opts.filter(o=>o.deal_type===tx):opts;
+    if(tx&&!matching.length)return false;
+    if(mx&&!matching.some(o=>Number(o.price||0)<=mx))return false;
+    return true;
+  });
+}
+function crm3826FilterBar(prefix){
+  return `<div class="filters crm3826-listing-filters">
+    <input id="${prefix}Search" placeholder="매물명·주소·지역 검색" oninput="${prefix==='myListing'?'filterMyListings()':'filterNetwork()'}">
+    <select id="${prefix}Tx" onchange="${prefix==='myListing'?'filterMyListings()':'filterNetwork()'}"><option value="">전체 거래</option><option>매매</option><option>전세</option><option>월세</option></select>
+    <select id="${prefix}Type" onchange="${prefix==='myListing'?'filterMyListings()':'filterNetwork()'}"><option value="">전체 유형</option><option>아파트</option><option>오피스텔</option><option>빌라</option><option>상가</option><option>사무실</option><option>토지</option></select>
+    <select id="${prefix}Status" onchange="${prefix==='myListing'?'filterMyListings()':'filterNetwork()'}"><option value="">전체 상태</option><option value="available">거래 가능</option><option value="complete">거래 완료</option></select>
+    <input id="${prefix}Max" type="number" min="0" placeholder="최대금액(만원)" oninput="${prefix==='myListing'?'filterMyListings()':'filterNetwork()'}">
+  </div>`;
+}
+
+renderMyListings=async function(){
+  await loadListings();
+  state.myListings=state.listings.filter(x=>x.owner_id===state.profile.id);
+  $('#topActions').innerHTML='<button class="primary" onclick="openListingModal()">+ 매물 등록</button>';
+  $('#content').innerHTML=`
+    <div class="notice crm3826-my-listing-notice">이 시트에서 등록한 매물은 공개 상태가 ‘공개’인 경우 공동매물망에 자동으로 올라갑니다.</div>
+    <div class="panel crm3826-filter-panel">
+      ${crm3826FilterBar('myListing')}
+      <div id="myListingSummary"></div>
+      <div id="myListingTable"></div>
+    </div>`;
+  filterMyListings();
+  crm37AddQuickActions();
+};
+
+filterMyListings=function(){
+  const rows=crm3826FilterRows(state.myListings||[],'myListing');
+  state.filteredMyListings=rows;
+  crm3826RenderSummary('myListingSummary',rows,'내 매물 필터 결과');
+  renderListingTable(rows,'myListingTable',true);
+};
+
+renderNetwork=async function(){
+  await loadListings();
+  $('#topActions').innerHTML='';
+  $('#content').innerHTML=`<div class="panel crm3826-filter-panel">
+    ${crm3826FilterBar('listing')}
+    <div id="networkSummary"></div>
+    <div id="networkTable"></div>
+  </div>`;
+  filterNetwork();
+};
+
+filterNetwork=function(){
+  const publicRows=state.listings.filter(x=>x.is_public);
+  const rows=crm3826FilterRows(publicRows,'listing');
+  state.filteredNetworkListings=rows;
+  crm3826RenderSummary('networkSummary',rows,'공동매물망 필터 결과');
+  renderListingTable(rows,'networkTable',false);
+};
+
+// 매물 등록/수정의 상태는 거래 가능·거래 완료만 사용한다.
+const crm3826OpenListingModalBase=openListingModal;
+openListingModal=function(id){
+  crm3826OpenListingModalBase(id);
+  const select=document.querySelector('#modalBody select[name="status"]');
+  if(select){
+    const current=state.listings.find(x=>x.id===id)?.status;
+    select.innerHTML='<option value="available">거래 가능</option><option value="complete">거래 완료</option>';
+    select.value=current==='complete'?'complete':'available';
+  }
+};
+
+// FU 안에서도 협의 중 상태를 다시 만들지 못하도록 제거한다.
+const crm3826OpenFollowUpModalBase=openFollowUpModal;
+openFollowUpModal=async function(entityType,id){
+  await crm3826OpenFollowUpModalBase(entityType,id);
+  if(entityType!=='listing')return;
+  const result=document.getElementById('crm361ConfirmResult');
+  if(result){
+    [...result.options].filter(o=>o.value==='협의 중'||o.textContent.trim()==='협의 중').forEach(o=>o.remove());
+  }
+};
+
+// 목록에서도 기존 hold 데이터는 거래 가능으로 표현한다.
+const crm3826RenderListingTableBase=renderListingTable;
+renderListingTable=function(rows,target,mine,adminMode=false){
+  const normalized=rows.map(x=>x.status==='hold'?{...x,status:'available'}:x);
+  crm3826RenderListingTableBase(normalized,target,mine,adminMode);
+};
+
+Object.assign(window,{renderMyListings,filterMyListings,renderNetwork,filterNetwork,openListingModal,openFollowUpModal,renderListingTable});
+console.info('CRM v3.8.26 필터 연동 집계 및 상태 2단계 적용 완료');
