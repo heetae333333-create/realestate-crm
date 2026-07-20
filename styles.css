@@ -992,3 +992,17 @@ input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:
 .crm3850-edge-zone.disabled{display:none}
 body.crm3850-calendar-dragging .calendar-day{cursor:copy}
 @media(max-width:900px){.crm3850-admin-calendar-badge{width:100%;justify-content:center}.crm3850-edge-zone{position:fixed;top:35%;bottom:35%;width:48px}.crm3850-edge-zone.prev{left:4px}.crm3850-edge-zone.next{right:4px}}
+
+/* ===== CRM v3.8.51 계약 일정 가져오기 ===== */
+.crm3851-contract-import-btn{border-color:#bfdbfe!important;background:#eff6ff!important;color:#1d4ed8!important;font-weight:900!important}
+.crm3851-import-help{padding:12px 14px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:12px;color:#1e40af;line-height:1.55;margin-bottom:12px}
+.crm3851-import-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:10px;font-size:13px;font-weight:800;color:#475569}
+.crm3851-import-list{display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow:auto;padding-right:3px}
+.crm3851-import-row{display:grid;grid-template-columns:24px 68px minmax(0,1fr) auto;align-items:center;gap:10px;padding:11px 12px;border:1px solid #dbe2ea;border-radius:11px;background:#fff;cursor:pointer}
+.crm3851-import-row:hover{border-color:#93c5fd;background:#f8fbff}
+.crm3851-import-row input{width:17px;height:17px}
+.crm3851-import-stage{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:5px 8px;font-size:12px;font-weight:900;white-space:nowrap}
+.crm3851-import-stage.contract{background:#dbeafe;color:#1d4ed8}.crm3851-import-stage.balance{background:#dcfce7;color:#15803d}
+.crm3851-import-main{min-width:0;display:flex;flex-direction:column;gap:4px}.crm3851-import-main strong{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.crm3851-import-main small{color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crm3851-import-state{font-size:12px;font-weight:800;color:#64748b;white-space:nowrap}
+@media(max-width:760px){.crm3851-import-row{grid-template-columns:22px 62px minmax(0,1fr)}.crm3851-import-state{grid-column:3}.crm3851-contract-import-btn{width:100%}}

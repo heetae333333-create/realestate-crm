@@ -3357,3 +3357,118 @@ function crm3850CalendarEdgeEnter(event,delta){
 function crm3850CalendarEdgeLeave(event){clearTimeout(state.calendarEdgeTimer);state.calendarEdgeTimer=null;event.currentTarget.classList.remove('edge-active')}
 
 console.info('CRM v3.8.50 관리자 메뉴 순서 및 캘린더 드래그 이동 적용 완료');
+
+/* ===== CRM v3.8.51 계약진행 일정 캘린더 가져오기 ===== */
+function crm3851StripHtml(value){
+  const div=document.createElement('div');div.innerHTML=String(value||'').replace(/<br\s*\/?>/gi,' · ');return (div.textContent||'').trim();
+}
+function crm3851StageDefinitions(listing){
+  return [
+    {key:'provisional',label:'가계약',date:listing.provisional_contract_date,amountLabel:'가계약금',amount:listing.provisional_contract_amount,category:'계약일정',completed:!!listing.provisional_contract_completed},
+    {key:'contract',label:'본계약',date:listing.contract_date,amountLabel:'계약금',amount:listing.contract_amount,category:'계약일정',completed:!!listing.contract_completed},
+    {key:'interim',label:'중도금',date:listing.interim_payment_date,amountLabel:'중도금',amount:listing.interim_payment_amount,category:'계약일정',completed:!!listing.interim_payment_completed,skip:!!listing.interim_payment_not_applicable},
+    {key:'final',label:'잔금',date:listing.final_payment_date,amountLabel:'잔금',amount:listing.final_payment_amount,category:'잔금일정',completed:!!listing.final_payment_completed}
+  ].filter(x=>x.date&&!x.skip&&x.date>='2026-07-01'&&x.date<='2030-12-31');
+}
+function crm3851ContractMarker(listingId,key){return `#CRM-CONTRACT:${listingId}:${key}`}
+function crm3851StageStatus(stage){return stage.completed?'완료':'예정'}
+function crm3851AllStageSummary(listing){
+  return crm3851StageDefinitions(listing).map(s=>`• ${s.label}: ${fmtDate(s.date)}${s.amount!==null&&s.amount!==undefined&&s.amount!==''?` / ${s.amountLabel} ${fmtMoney(s.amount)}`:''} / ${crm3851StageStatus(s)}`).join('\n')||'• 등록된 계약 일정 없음';
+}
+function crm3851EventDescription(listing,stage){
+  const broker=listing.owner?.full_name||state.profile.full_name||'-';
+  const deal=crm38DealTypeText(listing)||listing.transaction_type||'-';
+  const price=crm3851StripHtml(listingPriceText(listing))||'-';
+  const customer=listing.counterparty_name||'-';
+  const customerPhone=listing.counterparty_phone||'-';
+  return [
+    '[계약 일정 정보]',
+    `단계: ${stage.label} (${crm3851StageStatus(stage)})`,
+    `일정일: ${fmtDate(stage.date)}`,
+    stage.amount!==null&&stage.amount!==undefined&&stage.amount!==''?`${stage.amountLabel}: ${fmtMoney(stage.amount)}`:'',
+    `매물명: ${listing.title||'-'}`,
+    `주소: ${listing.address||listing.district||'-'}`,
+    `거래유형: ${deal}`,
+    `거래조건: ${price}`,
+    `거래 고객명: ${customer}`,
+    `거래 고객 연락처: ${customerPhone}`,
+    `담당 중개사: ${broker}`,
+    '',
+    '[전체 계약 진행 일정]',
+    crm3851AllStageSummary(listing),
+    '',
+    crm3851ContractMarker(listing.id,stage.key)
+  ].filter(v=>v!==''||v=== '').join('\n');
+}
+function crm3851EventPayload(listing,stage){
+  const broker=listing.owner?.full_name||state.profile.full_name||'중개사';
+  return {
+    owner_id:state.profile.id,
+    category:stage.category,
+    title:`[${stage.label}] ${listing.title} ${broker}`,
+    description:crm3851EventDescription(listing,stage),
+    start_date:stage.date,
+    end_date:stage.date,
+    start_time:null,
+    end_time:null,
+    updated_at:new Date().toISOString()
+  };
+}
+async function crm3851OpenContractImport(){
+  await loadListings();
+  const ownListings=state.listings.filter(x=>x.owner_id===state.profile.id);
+  const candidates=[];
+  ownListings.forEach(listing=>crm3851StageDefinitions(listing).forEach(stage=>candidates.push({listing,stage,marker:crm3851ContractMarker(listing.id,stage.key)})));
+  const {data:existing,error}=await state.client.from('calendar_events').select('id,description,start_date,title').eq('owner_id',state.profile.id);
+  if(error)return toast(error.message);
+  const existingRows=existing||[];
+  candidates.forEach(c=>{c.existing=existingRows.find(e=>String(e.description||'').includes(c.marker))||null});
+  $('#modalTitle').textContent='계약 진행 일정 가져오기';
+  $('#modalBody').innerHTML=candidates.length?`<div class="crm3851-import-help">내 매물의 가계약·본계약·중도금·잔금 날짜를 캘린더 일정으로 가져옵니다. 이미 가져온 일정은 현재 계약정보로 갱신됩니다.</div>
+    <div class="crm3851-import-toolbar"><label class="inline-check"><input id="crm3851SelectAll" type="checkbox" onchange="crm3851ToggleAll(this.checked)"> 전체 선택</label><span>가져올 일정 ${candidates.length}건</span></div>
+    <div class="crm3851-import-list">${candidates.map((c,i)=>`<label class="crm3851-import-row">
+      <input type="checkbox" class="crm3851-import-check" data-index="${i}">
+      <span class="crm3851-import-stage ${c.stage.category==='잔금일정'?'balance':'contract'}">${escapeHtml(c.stage.label)}</span>
+      <span class="crm3851-import-main"><strong>${escapeHtml(c.listing.title)}</strong><small>${escapeHtml(c.listing.address||c.listing.district||'주소 미입력')} · ${fmtDate(c.stage.date)}${c.stage.amount!==null&&c.stage.amount!==undefined&&c.stage.amount!==''?` · ${escapeHtml(c.stage.amountLabel)} ${fmtMoney(c.stage.amount)}`:''}</small></span>
+      <span class="crm3851-import-state">${c.existing?'기존 일정 갱신':'새 일정'}</span>
+    </label>`).join('')}</div>`:'<div class="empty">내 매물에 등록된 계약 일정이 없습니다.<br><span class="muted">진행상황에서 가계약·본계약·중도금·잔금 날짜를 먼저 입력하세요.</span></div>';
+  state.crm3851ImportCandidates=candidates;
+  $('#modalSubmit').style.display=candidates.length?'':'none';
+  $('#modalSubmit').textContent='선택 일정 가져오기';
+  $('#modalSubmit').onclick=candidates.length?async e=>{e.preventDefault();await crm3851ImportSelected()}:null;
+  const reset=()=>{$('#modalSubmit').style.display='';state.crm3851ImportCandidates=[];$('#modal').removeEventListener('close',reset)};
+  $('#modal').addEventListener('close',reset);
+  $('#modal').showModal();
+}
+function crm3851ToggleAll(checked){document.querySelectorAll('.crm3851-import-check').forEach(x=>x.checked=checked)}
+async function crm3851ImportSelected(){
+  const indexes=Array.from(document.querySelectorAll('.crm3851-import-check:checked')).map(x=>Number(x.dataset.index));
+  if(!indexes.length)return toast('가져올 일정을 선택하세요.');
+  const candidates=state.crm3851ImportCandidates||[];
+  let created=0,updated=0;
+  for(const idx of indexes){
+    const c=candidates[idx];if(!c)continue;
+    const payload=crm3851EventPayload(c.listing,c.stage);
+    let error;
+    if(c.existing){delete payload.owner_id;({error}=await state.client.from('calendar_events').update(payload).eq('id',c.existing.id));updated++}
+    else {({error}=await state.client.from('calendar_events').insert(payload));created++}
+    if(error)return toast(error.message);
+  }
+  $('#modal').close();
+  toast(`계약 일정을 가져왔습니다. 신규 ${created}건 · 갱신 ${updated}건`);
+  const first=(candidates[indexes[0]]?.stage.date)||state.calendarMonth;
+  state.calendarMonth=first.slice(0,7)+'-01';
+  await crm3848RenderCalendar();
+}
+
+const crm3851RenderCalendarBase=crm3848RenderCalendar;
+crm3848RenderCalendar=async function(){
+  await crm3851RenderCalendarBase();
+  const actions=document.querySelector('.calendar-action-group');
+  if(actions&&!actions.querySelector('.crm3851-contract-import-btn')){
+    const btn=document.createElement('button');
+    btn.type='button';btn.className='ghost crm3851-contract-import-btn';btn.textContent='계약일정 가져오기';btn.onclick=crm3851OpenContractImport;
+    const register=actions.querySelector('.primary');actions.insertBefore(btn,register||null);
+  }
+};
+console.info('CRM v3.8.51 계약진행 일정 캘린더 가져오기 적용 완료');
