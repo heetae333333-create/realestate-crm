@@ -419,3 +419,24 @@ input[readonly][name="next_confirm_at"]{background:#f1f5f9;color:#334155;cursor:
 .crm3839-reordered-table .crm3839-title-cell .photo-link{
   margin-top:4px;
 }
+
+/* ===== CRM v3.8.41 내 매물·공동매물망 동일 열간격 ===== */
+.crm3839-reordered-table th.crm3841-col-no,
+.crm3839-reordered-table td.crm3841-col-no{width:46px;min-width:46px;max-width:46px;text-align:center}
+.crm3839-reordered-table th.crm3841-col-status,
+.crm3839-reordered-table td.crm3841-col-status{width:92px;min-width:92px;max-width:92px;text-align:center}
+.crm3839-reordered-table th.crm3841-col-title,
+.crm3839-reordered-table td.crm3841-col-title{width:124px;min-width:124px;max-width:124px;text-align:left}
+.crm3839-reordered-table th.crm3841-col-trade,
+.crm3839-reordered-table td.crm3841-col-trade{width:112px;min-width:112px;max-width:112px;text-align:center}
+.crm3839-reordered-table th.crm3841-col-type,
+.crm3839-reordered-table td.crm3841-col-type{width:88px;min-width:88px;max-width:88px;text-align:center}
+.crm3839-reordered-table th.crm3841-col-region,
+.crm3839-reordered-table td.crm3841-col-region{width:110px;min-width:110px;max-width:110px;text-align:center}
+.crm3839-reordered-table th.crm3841-col-price,
+.crm3839-reordered-table td.crm3841-col-price{width:128px;min-width:128px;max-width:128px}
+.crm3839-reordered-table th.crm3841-col-contact,
+.crm3839-reordered-table td.crm3841-col-contact{width:146px;min-width:146px;max-width:146px}
+.crm3839-reordered-table .crm3841-address-line{justify-content:flex-start!important;gap:7px!important;width:max-content;max-width:560px}
+.crm3839-reordered-table .crm3841-address-line>span{flex:0 1 auto;max-width:390px}
+.crm3839-reordered-table .crm3841-address-badges{margin-left:0!important;justify-content:flex-start!important;gap:5px!important}

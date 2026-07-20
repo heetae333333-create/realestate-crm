@@ -2946,3 +2946,40 @@ console.info('CRM v3.8.32 공지사항 압축 및 광고 변경이력 적용 완
 console.info('CRM v3.8.33 주소행 간격 축소 적용 완료');
 
 console.info('CRM v3.8.38 주소·광고 상단 배치 복원 완료');
+
+/* ===== CRM v3.8.41 내 매물·공동매물망 열간격 통일 / 광고 아이콘 주소 옆 배치 ===== */
+const crm3841RenderListingTableBase=renderListingTable;
+renderListingTable=function(rows,target,mine,adminMode=false){
+  crm3841RenderListingTableBase(rows,target,mine,adminMode);
+  const root=document.getElementById(target);
+  const table=root?.querySelector('table.crm3839-reordered-table');
+  if(!table)return;
+
+  const headers=[...table.querySelectorAll('thead th')];
+  const classByName={
+    '순번':'crm3841-col-no',
+    '상태':'crm3841-col-status',
+    '매물명':'crm3841-col-title',
+    '거래':'crm3841-col-trade',
+    '유형':'crm3841-col-type',
+    '지역':'crm3841-col-region',
+    '금액':'crm3841-col-price',
+    '연락처':'crm3841-col-contact'
+  };
+  headers.forEach((th,index)=>{
+    const cls=classByName[th.textContent.trim()];
+    if(!cls)return;
+    th.classList.add(cls);
+    table.querySelectorAll('tbody tr:not(.crm3813-address-row)').forEach(tr=>{
+      tr.children[index]?.classList.add(cls);
+    });
+  });
+
+  table.querySelectorAll('.crm3829-address-line').forEach(line=>{
+    line.classList.add('crm3841-address-line');
+    const badges=line.querySelector('.crm3829-ad-badges');
+    if(badges)badges.classList.add('crm3841-address-badges');
+  });
+};
+Object.assign(window,{renderListingTable});
+console.info('CRM v3.8.41 공동매물망 열간격 통일 및 광고 아이콘 주소 옆 배치 완료');
