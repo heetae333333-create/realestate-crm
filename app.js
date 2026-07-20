@@ -1835,3 +1835,41 @@ crm382ContactDisplay=crm389ContactDisplay;
 crm384ContactDisplay=crm389ContactDisplay;
 Object.assign(window,{crm382ContactDisplay,crm384ContactDisplay,crm389ContactDisplay});
 console.info('CRM v3.8.9 연락처 이름 표시 개선 로드 완료');
+
+/* ===== CRM v3.8.10 통합검색 타인 매물 읽기 전용 ===== */
+function crm3810ApplyReadOnlyListing(listing){
+  const modal=$('#modal');
+  const body=$('#modalBody');
+  if(!modal||!body)return;
+  $('#modalTitle').textContent=`${listing.title} · 매물 보기 (읽기 전용)`;
+  body.querySelectorAll('input, select, textarea, button').forEach(el=>{
+    el.disabled=true;
+    if(el.tagName==='INPUT'&&['file','checkbox','radio'].includes(el.type)) el.style.pointerEvents='none';
+  });
+  body.querySelectorAll('[contenteditable="true"]').forEach(el=>el.setAttribute('contenteditable','false'));
+  const submit=$('#modalSubmit');
+  if(submit){submit.style.display='none';submit.onclick=null;}
+  let notice=body.querySelector('.crm3810-readonly-notice');
+  if(!notice){
+    notice=document.createElement('div');
+    notice.className='notice crm3810-readonly-notice';
+    notice.textContent='다른 중개사가 등록한 매물입니다. 통합검색에서는 내용을 확인만 할 수 있으며 수정할 수 없습니다.';
+    body.prepend(notice);
+  }
+}
+function openGlobalSearchListing(id){
+  const listing=state.listings.find(x=>x.id===id);
+  if(!listing)return toast('매물을 찾지 못했습니다.');
+  if(listing.owner_id===state.profile.id)return openListingModal(id);
+  openListingModal(id);
+  [60,180,400].forEach(ms=>setTimeout(()=>crm3810ApplyReadOnlyListing(listing),ms));
+}
+runGlobalSearch=function(){
+  const q=normalizeText($('#globalSearchInput').value);
+  if(!q){$('#globalSearchResults').innerHTML='<div class="empty">검색어를 입력하세요.</div>';return}
+  const customers=state.customers.filter(x=>normalizeText(`${x.name} ${x.phone} ${x.preferred_area} ${x.notes}`).includes(q));
+  const listings=state.listings.filter(x=>normalizeText(`${x.title} ${x.address} ${x.district} ${x.contact_phone} ${x.description} ${x.owner?.full_name}`).includes(q));
+  $('#globalSearchResults').innerHTML=`<div class="split"><div><h3>고객 ${customers.length}명</h3>${customers.map(x=>`<div class="search-result"><strong>${escapeHtml(x.name)}</strong><span>${escapeHtml(x.phone||'')} · ${escapeHtml(x.preferred_area||'')}</span><button onclick="openCustomerModal('${x.id}')">열기</button></div>`).join('')||'<div class="empty">결과 없음</div>'}</div><div><h3>매물 ${listings.length}개</h3>${listings.map(x=>{const mine=x.owner_id===state.profile.id;return `<div class="search-result"><strong>${escapeHtml(x.title)}</strong><span>${escapeHtml(x.address||'')} · ${listingPriceText(x)}${mine?' · 내 매물':' · 읽기 전용'}</span><button onclick="openGlobalSearchListing('${x.id}')">${mine?'수정':'보기'}</button></div>`}).join('')||'<div class="empty">결과 없음</div>'}</div></div>`;
+};
+Object.assign(window,{runGlobalSearch,openGlobalSearchListing});
+console.info('CRM v3.8.10 통합검색 타인 매물 읽기 전용 로드 완료');
