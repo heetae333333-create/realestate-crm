@@ -4269,3 +4269,99 @@ crm3855CanonicalListing=function(listing){
 crm3855BuildingLooksSimilar=function(a,b){return crm3863BuildingKey(a)===crm3863BuildingKey(b)};
 Object.assign(window,{crm3863BuildingKey,crm3863UnitKey});
 console.info('CRM v3.8.63 1동·101동 표기 통합 중복판정 적용 완료');
+
+/* ===== CRM v3.8.64 고객 희망 매물특징 · 매물 필터 연동 ===== */
+const CRM3864_FEATURES=['반지하','옥탑','1층','엘리베이터','주차','반려동물 가능'];
+function crm3864CustomerFeatures(customer){
+  return Array.isArray(customer?.desired_feature_tags)?customer.desired_feature_tags:[];
+}
+function crm3864FeatureText(customer){
+  const tags=crm3864CustomerFeatures(customer);
+  return tags.length?`<div class="crm3864-feature-tags">${tags.map(t=>`<span>${escapeHtml(t)}</span>`).join('')}</div>`:'-';
+}
+function crm3864ReadCustomerFeatures(){
+  return [...document.querySelectorAll('.crm3864-customer-feature:checked')].map(x=>x.value);
+}
+
+openCustomerModal=function(id=null){
+  const x=id?(state.customers.find(v=>v.id===id)||{}):{};
+  const opts=crm3857DealOptions(x),contacts=crm3857Contacts(x),selectedFeatures=new Set(crm3864CustomerFeatures(x));
+  $('#modalTitle').textContent=id?`${x.name||'고객'} · 고객 상세정보`:'고객 등록';
+  $('#modalBody').innerHTML=`
+  <div class="crm3857-customer-detail">
+    <section class="crm3857-form-card crm3859-contact-first"><div class="crm3857-card-title"><div><h3>연락처</h3><p>구분·이름·전화번호를 여러 개 등록할 수 있습니다.</p></div><button type="button" class="primary" onclick="crm3857AddContactRow()">+ 번호 추가</button></div><div id="crm3857CustomerContacts" class="crm3857-customer-contacts"></div></section>
+    <section class="crm3857-form-card"><h3>기본 정보</h3><div class="form-grid">
+      <label>고객명<input name="name" value="${escapeHtml(x.name||'')}" required></label>
+      <label>고객 구분<select name="customer_type"><option>매수</option><option>임차</option></select></label>
+      <label>상태<select name="status">${CRM3857_CUSTOMER_STATUSES.map(s=>`<option>${s}</option>`).join('')}</select></label>
+      <label>고객등급<select name="customer_grade"><option>A</option><option>B</option><option>C</option><option>D</option></select></label>
+      <label>희망 지역<input name="preferred_area" value="${escapeHtml(x.preferred_area||'')}"></label>
+      <label>희망 방개수<div class="inline-field"><input id="desiredRoomsInput" name="desired_rooms" type="number" min="0" step="1" value="${x.desired_rooms??''}" placeholder="예: 3"><label class="inline-check"><input id="desiredOnePointFiveCheck" type="checkbox" ${x.desired_one_point_five_room?'checked':''}> 1.5룸</label></div></label>
+      <label>대출 여부<select name="loan_available"><option value="true">O</option><option value="false">X</option></select></label>
+      <label>자기자본금(만원)<div class="inline-field"><input id="equityCapitalInput" name="equity_capital" type="number" min="0" value="${x.equity_capital??''}"><label class="inline-check"><input id="equityUnknownCheck" type="checkbox" ${x.equity_unknown?'checked':''}> 모름</label></div></label>
+      <label>예정 FU<input name="next_follow_up_at" type="date" value="${x.next_follow_up_at?String(x.next_follow_up_at).slice(0,10):''}"></label>
+    </div></section>
+    <section class="crm3857-form-card crm3859-deal-card"><h3>희망 거래유형 및 금액</h3><p class="muted">여러 거래유형을 선택하면 유형별 희망금액을 각각 입력할 수 있습니다.</p><div class="crm3857-deal-checks">${CRM3857_DEAL_TYPES.map(type=>`<label class="crm3857-deal-check-card"><input type="checkbox" class="crm3857-customer-deal-check" value="${type}" ${opts.some(o=>o.deal_type===type)?'checked':''} onchange="crm3857ToggleDeal('${type}',this.checked)"> ${type}</label>`).join('')}</div><div class="crm3857-deal-panels">${CRM3857_DEAL_TYPES.map(type=>{const o=opts.find(v=>v.deal_type===type)||{};return `<div class="crm3857-customer-deal-panel" data-type="${type}" ${opts.some(v=>v.deal_type===type)?'':'hidden'}><strong>${type}</strong><label>${type==='월세'?'희망 보증금':'희망금액'}(만원)<input class="crm3857-budget" type="number" min="0" value="${o.budget_max??''}"></label>${type==='월세'?`<label>희망 월세(만원)<input class="crm3857-rent" type="number" min="0" value="${o.desired_monthly_rent??''}"></label>`:''}</div>`}).join('')}</div></section>
+    <section class="crm3857-form-card crm3864-feature-card"><h3>희망 매물 특징</h3><p class="muted">고객이 반드시 원하는 특징을 체크하세요. 자동추천과 매물 필터에 반영됩니다.</p><div class="crm3864-feature-grid">${CRM3864_FEATURES.map(tag=>`<label><input type="checkbox" class="crm3864-customer-feature" value="${tag}" ${selectedFeatures.has(tag)?'checked':''}> <span>${tag}</span></label>`).join('')}</div></section>
+    <section class="crm3857-form-card"><label>상담 메모<textarea name="notes" rows="5">${escapeHtml(x.notes||'')}</textarea></label></section>
+  </div>`;
+  const form=$('#modalForm');
+  form.querySelector('[name=customer_type]').value=['매수','임차'].includes(x.customer_type)?x.customer_type:'매수';
+  form.querySelector('[name=status]').value=CRM3857_CUSTOMER_STATUSES.includes(x.status)?x.status:'신규인입';
+  form.querySelector('[name=customer_grade]').value=x.customer_grade||'C';
+  form.querySelector('[name=loan_available]').value=x.loan_available===false?'false':'true';
+  (contacts.length?contacts:[{contact_label:'본인',contact_name:x.name||'',phone:x.phone||''}]).forEach(crm3857AddContactRow);
+  const room=$('#desiredRoomsInput'),room15=$('#desiredOnePointFiveCheck');const syncRoom=()=>{room.disabled=room15.checked;if(room15.checked)room.value='1'};room15.onchange=syncRoom;syncRoom();
+  const equity=$('#equityCapitalInput'),unknown=$('#equityUnknownCheck');const syncEq=()=>{equity.disabled=unknown.checked;if(unknown.checked)equity.value=''};unknown.onchange=syncEq;syncEq();
+  $('#modalSubmit').style.display='';
+  $('#modalSubmit').onclick=async e=>{
+    e.preventDefault();
+    const fd=new FormData(form),deals=crm3857ReadDealOptions(),contactList=crm3857ReadContacts(),desiredFeatures=crm3864ReadCustomerFeatures();
+    if(!fd.get('name')?.trim())return toast('고객명을 입력하세요.');
+    if(!contactList.length)return toast('연락처를 한 개 이상 입력하세요.');
+    if(!deals.length)return toast('거래유형을 한 개 이상 선택하세요.');
+    const joined=deals.map(o=>o.deal_type).join('+'),primary=deals[0];
+    const payload={owner_id:id?(x.owner_id||state.profile.id):state.profile.id,name:fd.get('name').trim(),phone:contactList[0].phone,customer_type:fd.get('customer_type'),status:fd.get('status'),customer_grade:fd.get('customer_grade')||'C',deal_type:joined,preferred_area:fd.get('preferred_area')||null,desired_rooms:room15.checked?1:(fd.get('desired_rooms')?Number(fd.get('desired_rooms')):null),desired_one_point_five_room:room15.checked,budget_max:primary?.budget_max??null,desired_monthly_rent:deals.find(o=>o.deal_type==='월세')?.desired_monthly_rent??null,loan_available:fd.get('loan_available')==='true',equity_unknown:unknown.checked,equity_capital:unknown.checked?null:(fd.get('equity_capital')?Number(fd.get('equity_capital')):null),next_follow_up_at:fd.get('next_follow_up_at')||null,notes:fd.get('notes')||null,desired_feature_tags:desiredFeatures};
+    let customerId=id;
+    if(id){const {error}=await state.client.from('customers').update(payload).eq('id',id);if(error)return toast(error.message)}else{const {data,error}=await state.client.from('customers').insert(payload).select('id').single();if(error)return toast(error.message);customerId=data.id}
+    const [{error:dDel},{error:cDel}]=await Promise.all([state.client.from('customer_deal_options').delete().eq('customer_id',customerId),state.client.from('customer_contacts').delete().eq('customer_id',customerId)]);
+    if(dDel||cDel)return toast((dDel||cDel).message);
+    const [{error:dErr},{error:cErr}]=await Promise.all([state.client.from('customer_deal_options').insert(deals.map(o=>({...o,customer_id:customerId}))),state.client.from('customer_contacts').insert(contactList.map(o=>({...o,customer_id:customerId})))]);
+    if(dErr||cErr)return toast((dErr||cErr).message);
+    $('#modal').close();toast('고객정보를 저장했습니다.');await loadCustomers();renderCustomers();
+  };
+  $('#modal').showModal();
+  setTimeout(()=>document.getElementById('contractCancelBtn')?.remove(),0);
+};
+
+filterCustomers=function(){
+  const q=($('#customerSearch')?.value||'').toLowerCase().replace(/\s/g,''),t=$('#customerType')?.value||'',s=$('#customerStatus')?.value||'',d=$('#customerDealType')?.value||'',g=$('#customerGrade')?.value||'';
+  const rows=state.customers.filter(x=>{const search=`${x.name||''} ${x.phone||''} ${crm3857Contacts(x).map(c=>`${c.contact_label||''} ${c.contact_name||''} ${c.phone||''}`).join(' ')}`.toLowerCase().replace(/\s/g,'');return (!q||search.includes(q))&&(!t||x.customer_type===t)&&(!s||x.status===s)&&(!d||crm3857DealOptions(x).some(o=>o.deal_type===d))&&(!g||x.customer_grade===g)});
+  $('#customerTable').innerHTML=rows.length?`<div class="table-wrap"><table class="customer-table crm3857-customer-table crm3861-customer-table"><thead><tr><th>순번</th><th>상태</th><th>고객명</th><th>연락처</th><th>구분</th><th>거래유형</th><th>등급</th><th>희망지역</th><th>방</th><th>희망금액</th><th>희망특징</th><th>진행상황</th><th>최종 FU</th><th>예정 FU</th><th>관리</th></tr></thead><tbody>${rows.map((x,i)=>`<tr><td>${i+1}</td><td>${badge(x.status||'신규인입','blue')}</td><td><button class="crm3857-customer-name" onclick="openCustomerModal('${x.id}')">${escapeHtml(x.name)}</button></td><td>${crm3857ContactHtml(x)}</td><td>${escapeHtml(x.customer_type||'-')}</td><td>${escapeHtml(crm3857DealText(x))}</td><td>${gradeBadge(x.customer_grade)}</td><td>${escapeHtml(x.preferred_area||'-')}</td><td>${customerRoomText(x)}</td><td>${crm3857BudgetText(x)}</td><td>${crm3864FeatureText(x)}</td><td>${contractStage(x)}</td><td>${fmtDate(x.last_follow_up_at)}</td><td>${dueBadge(x.next_follow_up_at)}</td><td><div class="row-actions"><button class="success" onclick="openFollowUpModal('customer','${x.id}')">FU</button><button class="ghost" onclick="openHistoryModal('customer','${x.id}')">히스토리</button><button class="ghost" onclick="openContractModal('customer','${x.id}')">진행상황</button><button class="ghost" onclick="openCustomerModal('${x.id}')">수정</button><button class="danger" onclick="deleteCustomer('${x.id}')">삭제</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 고객이 없습니다.</div>';
+};
+
+const crm3864FilterBarBase=crm3826FilterBar;
+crm3826FilterBar=function(prefix){
+  const handler=prefix==='myListing'?'filterMyListings()':'filterNetwork()';
+  return `${crm3864FilterBarBase(prefix)}<div class="crm3864-listing-feature-filter"><strong>매물 특징</strong>${CRM3864_FEATURES.map(tag=>`<label><input type="checkbox" class="crm3864-listing-feature-check" data-prefix="${prefix}" value="${tag}" onchange="${handler}"> ${tag}</label>`).join('')}<button type="button" class="ghost" onclick="crm3864ClearListingFeatures('${prefix}')">초기화</button></div>`;
+};
+function crm3864SelectedListingFeatures(prefix){return [...document.querySelectorAll(`.crm3864-listing-feature-check[data-prefix="${prefix}"]:checked`)].map(x=>x.value)}
+function crm3864ClearListingFeatures(prefix){document.querySelectorAll(`.crm3864-listing-feature-check[data-prefix="${prefix}"]`).forEach(x=>x.checked=false);prefix==='myListing'?filterMyListings():filterNetwork()}
+const crm3864FilterRowsBase=crm3826FilterRows;
+crm3826FilterRows=function(source,prefix){
+  const rows=crm3864FilterRowsBase(source,prefix),features=crm3864SelectedListingFeatures(prefix);
+  if(!features.length)return rows;
+  return rows.filter(x=>{const tags=new Set(crm36Array(x.feature_tags));return features.every(tag=>tags.has(tag))});
+};
+
+const crm3864EvaluateBase=evaluateListingMatch;
+evaluateListingMatch=function(customer,listing){
+  const base=crm3864EvaluateBase(customer,listing),wanted=crm3864CustomerFeatures(customer);
+  if(!wanted.length)return base;
+  const tags=new Set(crm36Array(listing.feature_tags)),missing=wanted.filter(tag=>!tags.has(tag));
+  if(missing.length)return {...base,matched:false,reasons:[...(base.reasons||[]),`희망 특징 미충족: ${missing.join(', ')}`]};
+  return {...base,reasons:[...(base.reasons||[]),`희망 특징 충족: ${wanted.join(', ')}`]};
+};
+
+Object.assign(window,{openCustomerModal,filterCustomers,crm3864ClearListingFeatures});
+console.info('CRM v3.8.64 고객 희망 매물특징 및 매물필터 연동 적용 완료');

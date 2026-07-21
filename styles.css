@@ -1126,3 +1126,18 @@ body.crm3850-calendar-dragging .calendar-day{cursor:copy}
   }
   .crm3862-address-row .crm3861-address-search-line{grid-template-columns:minmax(0,1fr) auto!important}
 }
+
+/* ===== CRM v3.8.64 고객 희망 매물특징 · 매물 필터 ===== */
+.crm3864-feature-card{padding:18px 20px!important}
+.crm3864-feature-card h3{margin:0 0 4px}
+.crm3864-feature-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:12px}
+.crm3864-feature-grid label{display:flex;align-items:center;gap:8px;min-height:42px;padding:9px 12px;border:1px solid #dbe3ef;border-radius:10px;background:#fff;font-weight:700;cursor:pointer}
+.crm3864-feature-grid input{width:17px;height:17px;margin:0}
+.crm3864-feature-tags{display:flex;flex-wrap:wrap;justify-content:center;gap:4px;min-width:110px}
+.crm3864-feature-tags span{display:inline-flex;padding:3px 7px;border-radius:999px;background:#eef4ff;color:#244d9c;font-size:11px;font-weight:800;white-space:nowrap}
+.crm3864-listing-feature-filter{display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;margin:10px 0 0;padding:10px 13px;border:1px solid #dbe3ef;border-radius:12px;background:#f8fafc}
+.crm3864-listing-feature-filter strong{margin-right:2px;white-space:nowrap}
+.crm3864-listing-feature-filter label{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:700;white-space:nowrap}
+.crm3864-listing-feature-filter input{width:16px;height:16px;margin:0}
+.crm3864-listing-feature-filter .ghost{padding:6px 10px;margin-left:auto}
+@media(max-width:760px){.crm3864-feature-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.crm3864-listing-feature-filter .ghost{margin-left:0}}
