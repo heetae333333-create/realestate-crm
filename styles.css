@@ -1049,3 +1049,18 @@ body.crm3850-calendar-dragging .calendar-day{cursor:copy}
 .crm3857-budget-list>div{white-space:nowrap}
 .crm3857-customer-table th,.crm3857-customer-table td{text-align:center;vertical-align:middle}
 @media(max-width:760px){.crm3857-customer-contact-row{grid-template-columns:1fr}.crm3857-deal-checks{grid-template-columns:1fr 1fr}.crm3857-customer-deal-panel{grid-template-columns:1fr}.crm3857-card-title{align-items:flex-start;flex-direction:column}}
+
+
+/* CRM v3.8.59 고객 상세 UI 압축 */
+.crm3859-contact-first{order:-1}
+.crm3859-deal-card{padding:14px 16px}
+.crm3859-deal-card>h3{font-size:16px;margin-bottom:4px}
+.crm3859-deal-card>.muted{font-size:12px;margin:0 0 8px}
+.crm3859-deal-card .crm3857-deal-checks{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:8px 0}
+.crm3859-deal-card .crm3857-deal-check-card{justify-content:center;min-height:42px;padding:8px 10px;border-radius:10px;font-size:14px}
+.crm3859-deal-card .crm3857-deal-panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.crm3859-deal-card .crm3857-customer-deal-panel{grid-template-columns:70px minmax(130px,1fr) minmax(130px,1fr);gap:8px;padding:10px;border-radius:10px}
+.crm3859-deal-card .crm3857-customer-deal-panel strong{align-self:center;text-align:center}
+.crm3859-deal-card .crm3857-customer-deal-panel label{font-size:12px}
+.crm3859-deal-card .crm3857-customer-deal-panel input{min-height:40px;padding:8px 10px}
+@media(max-width:760px){.crm3859-deal-card .crm3857-deal-panels{grid-template-columns:1fr}.crm3859-deal-card .crm3857-customer-deal-panel{grid-template-columns:1fr}}

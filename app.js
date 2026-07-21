@@ -2230,6 +2230,21 @@ function crm3823ContractSnapshot(x, entityType){
   return lines.join('\n');
 }
 
+
+function crm3859ContractHistory(before, after, entityType){
+  const changes=[];
+  [['가계약','provisional_contract_completed'],['본계약','contract_completed'],['중도금','interim_payment_completed'],['잔금','final_payment_completed']].forEach(([label,key])=>{
+    const was=!!before?.[key], now=!!after?.[key];
+    if(was&&!now) changes.push(`${label} 완료 취소됨`);
+    else if(!was&&now) changes.push(`${label} 완료`);
+  });
+  if(!!before?.interim_payment_not_applicable!==!!after?.interim_payment_not_applicable){
+    changes.push(after?.interim_payment_not_applicable?'중도금 해당없음으로 변경':'중도금 일정 사용으로 변경');
+  }
+  const snapshot=crm3823ContractSnapshot(after,entityType);
+  return changes.length?`${changes.join('\n')}\n\n${snapshot}`:snapshot;
+}
+
 openContractModal=async function(entityType,id){
   const item=entityType==='customer'?state.customers.find(x=>x.id===id):state.listings.find(x=>x.id===id);
   if(!item)return toast('대상을 찾지 못했습니다.');
@@ -2317,14 +2332,17 @@ openContractModal=async function(entityType,id){
     payload.last_follow_up_at=today();
     // 매물 진행상황이 하나라도 완료되면 상태를 거래 완료로 자동 전환한다.
     // 모든 완료 체크가 해제되면 다시 거래 가능으로 전환한다.
+    const hasProgress=!!(
+      payload.provisional_contract_completed ||
+      payload.contract_completed ||
+      (!payload.interim_payment_not_applicable && payload.interim_payment_completed) ||
+      payload.final_payment_completed
+    );
     if(entityType==='listing'){
-      const hasProgress=!!(
-        payload.provisional_contract_completed ||
-        payload.contract_completed ||
-        (!payload.interim_payment_not_applicable && payload.interim_payment_completed) ||
-        payload.final_payment_completed
-      );
       payload.status=hasProgress?'complete':'available';
+    }else if(entityType==='customer'){
+      if(hasProgress) payload.status='계약';
+      else if(item.status==='계약') payload.status='매물추천';
     }
     const table=entityType==='customer'?'customers':'listings';
     const {error}=await state.client.from(table).update(payload).eq('id',id);
@@ -2336,7 +2354,7 @@ openContractModal=async function(entityType,id){
       const target={customer_id:entityType==='customer'?id:null,listing_id:entityType==='listing'?id:null};
       const {error:hErr}=await state.client.from('interaction_history').insert({
         ...target,created_by:state.profile.id,follow_up_date:today(),contact_method:'진행상황',
-        content:crm3823ContractSnapshot(updated,entityType),next_follow_up_at:null
+        content:crm3859ContractHistory(item,updated,entityType),next_follow_up_at:null
       });
       if(hErr)return toast(`진행상황은 저장됐지만 히스토리 기록에 실패했습니다: ${hErr.message}`);
     }
@@ -3954,6 +3972,7 @@ openCustomerModal=function(id=null){
   $('#modalTitle').textContent=id?`${x.name||'고객'} · 고객 상세정보`:'고객 등록';
   $('#modalBody').innerHTML=`
   <div class="crm3857-customer-detail">
+    <section class="crm3857-form-card crm3859-contact-first"><div class="crm3857-card-title"><div><h3>연락처</h3><p>구분·이름·전화번호를 여러 개 등록할 수 있습니다.</p></div><button type="button" class="primary" onclick="crm3857AddContactRow()">+ 번호 추가</button></div><div id="crm3857CustomerContacts" class="crm3857-customer-contacts"></div></section>
     <section class="crm3857-form-card"><h3>기본 정보</h3><div class="form-grid">
       <label>고객명<input name="name" value="${escapeHtml(x.name||'')}" required></label>
       <label>고객 구분<select name="customer_type"><option>매수</option><option>임차</option></select></label>
@@ -3965,8 +3984,7 @@ openCustomerModal=function(id=null){
       <label>자기자본금(만원)<div class="inline-field"><input id="equityCapitalInput" name="equity_capital" type="number" min="0" value="${x.equity_capital??''}"><label class="inline-check"><input id="equityUnknownCheck" type="checkbox" ${x.equity_unknown?'checked':''}> 모름</label></div></label>
       <label>예정 FU<input name="next_follow_up_at" type="date" value="${x.next_follow_up_at?String(x.next_follow_up_at).slice(0,10):''}"></label>
     </div></section>
-    <section class="crm3857-form-card"><div class="crm3857-card-title"><div><h3>연락처</h3><p>구분·이름·전화번호를 여러 개 등록할 수 있습니다.</p></div><button type="button" class="primary" onclick="crm3857AddContactRow()">+ 번호 추가</button></div><div id="crm3857CustomerContacts" class="crm3857-customer-contacts"></div></section>
-    <section class="crm3857-form-card"><h3>희망 거래유형 및 금액</h3><p class="muted">여러 거래유형을 선택하면 유형별 희망금액을 각각 입력할 수 있습니다.</p><div class="crm3857-deal-checks">${CRM3857_DEAL_TYPES.map(type=>`<label class="crm3857-deal-check-card"><input type="checkbox" class="crm3857-customer-deal-check" value="${type}" ${opts.some(o=>o.deal_type===type)?'checked':''} onchange="crm3857ToggleDeal('${type}',this.checked)"> ${type}</label>`).join('')}</div><div class="crm3857-deal-panels">${CRM3857_DEAL_TYPES.map(type=>{const o=opts.find(v=>v.deal_type===type)||{};return `<div class="crm3857-customer-deal-panel" data-type="${type}" ${opts.some(v=>v.deal_type===type)?'':'hidden'}><strong>${type}</strong><label>${type==='월세'?'희망 보증금':'희망금액'}(만원)<input class="crm3857-budget" type="number" min="0" value="${o.budget_max??''}"></label>${type==='월세'?`<label>희망 월세(만원)<input class="crm3857-rent" type="number" min="0" value="${o.desired_monthly_rent??''}"></label>`:''}</div>`}).join('')}</div></section>
+    <section class="crm3857-form-card crm3859-deal-card"><h3>희망 거래유형 및 금액</h3><p class="muted">여러 거래유형을 선택하면 유형별 희망금액을 각각 입력할 수 있습니다.</p><div class="crm3857-deal-checks">${CRM3857_DEAL_TYPES.map(type=>`<label class="crm3857-deal-check-card"><input type="checkbox" class="crm3857-customer-deal-check" value="${type}" ${opts.some(o=>o.deal_type===type)?'checked':''} onchange="crm3857ToggleDeal('${type}',this.checked)"> ${type}</label>`).join('')}</div><div class="crm3857-deal-panels">${CRM3857_DEAL_TYPES.map(type=>{const o=opts.find(v=>v.deal_type===type)||{};return `<div class="crm3857-customer-deal-panel" data-type="${type}" ${opts.some(v=>v.deal_type===type)?'':'hidden'}><strong>${type}</strong><label>${type==='월세'?'희망 보증금':'희망금액'}(만원)<input class="crm3857-budget" type="number" min="0" value="${o.budget_max??''}"></label>${type==='월세'?`<label>희망 월세(만원)<input class="crm3857-rent" type="number" min="0" value="${o.desired_monthly_rent??''}"></label>`:''}</div>`}).join('')}</div></section>
     <section class="crm3857-form-card"><label>상담 메모<textarea name="notes" rows="5">${escapeHtml(x.notes||'')}</textarea></label></section>
   </div>`;
   const form=$('#modalForm');
@@ -4012,7 +4030,7 @@ filterCustomers=function(){
     const search=`${x.name||''} ${x.phone||''} ${crm3857Contacts(x).map(c=>`${c.contact_label||''} ${c.contact_name||''} ${c.phone||''}`).join(' ')}`.toLowerCase().replace(/\s/g,'');
     return (!q||search.includes(q))&&(!t||x.customer_type===t)&&(!s||x.status===s)&&(!d||crm3857DealOptions(x).some(o=>o.deal_type===d))&&(!g||x.customer_grade===g);
   });
-  $('#customerTable').innerHTML=rows.length?`<div class="table-wrap"><table class="customer-table crm3857-customer-table"><thead><tr><th>순번</th><th>고객명</th><th>연락처</th><th>구분</th><th>상태</th><th>거래유형</th><th>등급</th><th>희망지역</th><th>방</th><th>희망금액</th><th>진행상황</th><th>최종 FU</th><th>예정 FU</th><th>관리</th></tr></thead><tbody>${rows.map((x,i)=>`<tr><td>${i+1}</td><td><button class="crm3857-customer-name" onclick="openCustomerModal('${x.id}')">${escapeHtml(x.name)}</button></td><td>${crm3857ContactHtml(x)}</td><td>${escapeHtml(x.customer_type||'-')}</td><td>${badge(x.status||'신규인입','blue')}</td><td>${escapeHtml(crm3857DealText(x))}</td><td>${gradeBadge(x.customer_grade)}</td><td>${escapeHtml(x.preferred_area||'-')}</td><td>${customerRoomText(x)}</td><td>${crm3857BudgetText(x)}</td><td>${contractStage(x)}</td><td>${fmtDate(x.last_follow_up_at)}</td><td>${dueBadge(x.next_follow_up_at)}</td><td><div class="row-actions"><button class="success" onclick="openFollowUpModal('customer','${x.id}')">FU</button><button class="ghost" onclick="openHistoryModal('customer','${x.id}')">히스토리</button><button class="ghost" onclick="openContractModal('customer','${x.id}')">진행상황</button><button class="ghost" onclick="openCustomerModal('${x.id}')">수정</button><button class="danger" onclick="deleteCustomer('${x.id}')">삭제</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 고객이 없습니다.</div>';
+  $('#customerTable').innerHTML=rows.length?`<div class="table-wrap"><table class="customer-table crm3857-customer-table"><thead><tr><th>순번</th><th>고객명</th><th>연락처</th><th>상태</th><th>구분</th><th>거래유형</th><th>등급</th><th>희망지역</th><th>방</th><th>희망금액</th><th>진행상황</th><th>최종 FU</th><th>예정 FU</th><th>관리</th></tr></thead><tbody>${rows.map((x,i)=>`<tr><td>${i+1}</td><td><button class="crm3857-customer-name" onclick="openCustomerModal('${x.id}')">${escapeHtml(x.name)}</button></td><td>${crm3857ContactHtml(x)}</td><td>${badge(x.status||'신규인입','blue')}</td><td>${escapeHtml(x.customer_type||'-')}</td><td>${escapeHtml(crm3857DealText(x))}</td><td>${gradeBadge(x.customer_grade)}</td><td>${escapeHtml(x.preferred_area||'-')}</td><td>${customerRoomText(x)}</td><td>${crm3857BudgetText(x)}</td><td>${contractStage(x)}</td><td>${fmtDate(x.last_follow_up_at)}</td><td>${dueBadge(x.next_follow_up_at)}</td><td><div class="row-actions"><button class="success" onclick="openFollowUpModal('customer','${x.id}')">FU</button><button class="ghost" onclick="openHistoryModal('customer','${x.id}')">히스토리</button><button class="ghost" onclick="openContractModal('customer','${x.id}')">진행상황</button><button class="ghost" onclick="openCustomerModal('${x.id}')">수정</button><button class="danger" onclick="deleteCustomer('${x.id}')">삭제</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 고객이 없습니다.</div>';
 };
 
 const crm3857FollowBase=openFollowUpModal;
@@ -4021,4 +4039,4 @@ const crm3857HistoryBase=openHistoryModal;
 openHistoryModal=async function(...args){const result=await crm3857HistoryBase(...args);setTimeout(()=>document.getElementById('contractCancelBtn')?.remove(),0);return result};
 
 Object.assign(window,{openCustomerModal,renderCustomers,filterCustomers,loadCustomers,crm3857AddContactRow,crm3857ToggleDeal,openFollowUpModal,openHistoryModal});
-console.info('CRM v3.8.58 고객시트 6개 요청 재적용·캐시강제 완료');
+console.info('CRM v3.8.59 고객시트 정렬·UI·진행취소 이력 완료');
