@@ -4325,9 +4325,17 @@ openCustomerModal=function(id=null){
     let customerId=id;
     if(id){const {error}=await state.client.from('customers').update(payload).eq('id',id);if(error)return toast(error.message)}else{const {data,error}=await state.client.from('customers').insert(payload).select('id').single();if(error)return toast(error.message);customerId=data.id}
     const [{error:dDel},{error:cDel}]=await Promise.all([state.client.from('customer_deal_options').delete().eq('customer_id',customerId),state.client.from('customer_contacts').delete().eq('customer_id',customerId)]);
-    if(dDel||cDel)return toast((dDel||cDel).message);
+    if(dDel||cDel){
+      const err=dDel||cDel;
+      if(/customer_deal_options|customer_contacts|schema cache/i.test(err.message||'')) return toast('고객 거래유형·연락처 테이블이 아직 설치되지 않았습니다. v3.8.65 SQL을 Supabase에서 먼저 실행해 주세요.');
+      return toast(err.message);
+    }
     const [{error:dErr},{error:cErr}]=await Promise.all([state.client.from('customer_deal_options').insert(deals.map(o=>({...o,customer_id:customerId}))),state.client.from('customer_contacts').insert(contactList.map(o=>({...o,customer_id:customerId})))]);
-    if(dErr||cErr)return toast((dErr||cErr).message);
+    if(dErr||cErr){
+      const err=dErr||cErr;
+      if(/customer_deal_options|customer_contacts|schema cache/i.test(err.message||'')) return toast('고객 거래유형·연락처 테이블이 아직 설치되지 않았습니다. v3.8.65 SQL을 Supabase에서 먼저 실행해 주세요.');
+      return toast(err.message);
+    }
     $('#modal').close();toast('고객정보를 저장했습니다.');await loadCustomers();renderCustomers();
   };
   $('#modal').showModal();
@@ -4365,3 +4373,5 @@ evaluateListingMatch=function(customer,listing){
 
 Object.assign(window,{openCustomerModal,filterCustomers,crm3864ClearListingFeatures});
 console.info('CRM v3.8.64 고객 희망 매물특징 및 매물필터 연동 적용 완료');
+
+console.info('CRM v3.8.65 고객 테이블 설치 오류 안내 및 스키마 보완 적용 완료');
