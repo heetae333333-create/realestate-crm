@@ -3864,3 +3864,161 @@ window.addEventListener('unhandledrejection',function(event){
   }
 });
 console.info('CRM v3.8.56 중복매물 데이터베이스 오류 안내 적용 완료');
+
+/* ===== CRM v3.8.57 고객 상세·복수 거래유형·다중 연락처 개선 ===== */
+const CRM3857_CUSTOMER_STATUSES=['신규인입','매물추천','방문','계약','보류','영업종료'];
+const CRM3857_DEAL_TYPES=['매매','전세','월세'];
+state.customerDealOptions=[];
+state.customerContacts=[];
+
+function crm3857DealOptions(customer){
+  const rows=Array.isArray(customer?.deal_options)?customer.deal_options:[];
+  if(rows.length)return CRM3857_DEAL_TYPES.map(t=>rows.find(r=>r.deal_type===t)).filter(Boolean);
+  const types=String(customer?.deal_type||'').split('+').filter(t=>CRM3857_DEAL_TYPES.includes(t));
+  return types.map((deal_type,i)=>({deal_type,budget_max:customer?.budget_max??null,desired_monthly_rent:deal_type==='월세'?customer?.desired_monthly_rent??null:null,is_preferred:i===0,sort_order:i}));
+}
+function crm3857Contacts(customer){
+  const rows=Array.isArray(customer?.additional_contacts)?customer.additional_contacts:[];
+  if(rows.length)return rows;
+  return customer?.phone?[{contact_label:'본인',contact_name:customer.name||'',phone:customer.phone,sort_order:0}]:[];
+}
+function crm3857ContactHtml(customer){
+  const rows=crm3857Contacts(customer);
+  if(!rows.length)return '-';
+  return `<div class="crm3857-contact-list">${rows.map(r=>`<div class="crm3857-contact-item"><strong>${escapeHtml(r.contact_label||'연락처')}${r.contact_name?` ${escapeHtml(r.contact_name)}`:''}</strong><span>${escapeHtml(crm381FormatPhone(r.phone||''))}</span></div>`).join('')}</div>`;
+}
+function crm3857DealText(customer){
+  const opts=crm3857DealOptions(customer);
+  return opts.length?opts.map(o=>o.deal_type).join(' · '):(customer?.deal_type||'-');
+}
+function crm3857BudgetText(customer){
+  const opts=crm3857DealOptions(customer);
+  if(!opts.length)return customerBudgetText(customer);
+  return `<div class="crm3857-budget-list">${opts.map(o=>{
+    if(o.deal_type==='월세')return `<div><strong>월세</strong> ${fmtMoney(o.budget_max)} / 월 ${fmtMoney(o.desired_monthly_rent)}</div>`;
+    return `<div><strong>${escapeHtml(o.deal_type)}</strong> ${fmtMoney(o.budget_max)}</div>`;
+  }).join('')}</div>`;
+}
+
+const crm3857LoadCustomersBase=loadCustomers;
+loadCustomers=async function(){
+  await crm3857LoadCustomersBase();
+  const ids=(state.customers||[]).map(x=>x.id);
+  if(!ids.length){state.customerDealOptions=[];state.customerContacts=[];return;}
+  const [{data:dealRows,error:dealErr},{data:contactRows,error:contactErr}]=await Promise.all([
+    state.client.from('customer_deal_options').select('*').in('customer_id',ids).order('sort_order'),
+    state.client.from('customer_contacts').select('*').in('customer_id',ids).order('sort_order')
+  ]);
+  if(dealErr&&!String(dealErr.message||'').includes('does not exist'))console.warn(dealErr);
+  if(contactErr&&!String(contactErr.message||'').includes('does not exist'))console.warn(contactErr);
+  state.customerDealOptions=dealRows||[];
+  state.customerContacts=contactRows||[];
+  (state.customers||[]).forEach(c=>{
+    c.deal_options=state.customerDealOptions.filter(x=>x.customer_id===c.id);
+    c.additional_contacts=state.customerContacts.filter(x=>x.customer_id===c.id).map(x=>({...x,phone:crm381FormatPhone(x.phone)}));
+    c.phone=crm381FormatPhone(c.phone||c.additional_contacts?.[0]?.phone||'');
+  });
+};
+
+function crm3857AddContactRow(data={}){
+  const wrap=document.getElementById('crm3857CustomerContacts');if(!wrap)return;
+  const row=document.createElement('div');row.className='crm3857-customer-contact-row';
+  row.innerHTML=`<input class="crm3857-contact-label" placeholder="구분 예: 본인, 배우자, 가족" value="${escapeHtml(data.contact_label||'')}"><input class="crm3857-contact-name" placeholder="이름" value="${escapeHtml(data.contact_name||'')}"><input class="crm3857-contact-phone" placeholder="010-0000-0000" value="${escapeHtml(crm381FormatPhone(data.phone||''))}"><button type="button" class="danger" onclick="this.closest('.crm3857-customer-contact-row').remove()">삭제</button>`;
+  wrap.appendChild(row);
+}
+function crm3857ToggleDeal(type,checked){
+  const panel=document.querySelector(`.crm3857-customer-deal-panel[data-type="${type}"]`);
+  if(panel)panel.hidden=!checked;
+}
+function crm3857ReadDealOptions(){
+  return CRM3857_DEAL_TYPES.flatMap((type,index)=>{
+    const checked=document.querySelector(`.crm3857-customer-deal-check[value="${type}"]`)?.checked;
+    if(!checked)return [];
+    const panel=document.querySelector(`.crm3857-customer-deal-panel[data-type="${type}"]`);
+    const budget=Number(panel?.querySelector('.crm3857-budget')?.value||0)||null;
+    const rent=type==='월세'?(Number(panel?.querySelector('.crm3857-rent')?.value||0)||null):null;
+    return [{deal_type:type,budget_max:budget,desired_monthly_rent:rent,is_preferred:index===CRM3857_DEAL_TYPES.findIndex(t=>document.querySelector(`.crm3857-customer-deal-check[value="${t}"]`)?.checked),sort_order:index}];
+  });
+}
+function crm3857ReadContacts(){
+  return [...document.querySelectorAll('.crm3857-customer-contact-row')].map((row,index)=>({
+    contact_label:row.querySelector('.crm3857-contact-label')?.value.trim()||'연락처',
+    contact_name:row.querySelector('.crm3857-contact-name')?.value.trim()||null,
+    phone:crm381FormatPhone(row.querySelector('.crm3857-contact-phone')?.value||''),sort_order:index
+  })).filter(x=>x.phone);
+}
+
+openCustomerModal=function(id=null){
+  const x=id?(state.customers.find(v=>v.id===id)||{}):{};
+  const opts=crm3857DealOptions(x),contacts=crm3857Contacts(x);
+  $('#modalTitle').textContent=id?`${x.name||'고객'} · 고객 상세정보`:'고객 등록';
+  $('#modalBody').innerHTML=`
+  <div class="crm3857-customer-detail">
+    <section class="crm3857-form-card"><h3>기본 정보</h3><div class="form-grid">
+      <label>고객명<input name="name" value="${escapeHtml(x.name||'')}" required></label>
+      <label>고객 구분<select name="customer_type"><option>매수</option><option>임차</option></select></label>
+      <label>상태<select name="status">${CRM3857_CUSTOMER_STATUSES.map(s=>`<option>${s}</option>`).join('')}</select></label>
+      <label>고객등급<select name="customer_grade"><option>A</option><option>B</option><option>C</option><option>D</option></select></label>
+      <label>희망 지역<input name="preferred_area" value="${escapeHtml(x.preferred_area||'')}"></label>
+      <label>희망 방개수<div class="inline-field"><input id="desiredRoomsInput" name="desired_rooms" type="number" min="0" step="1" value="${x.desired_rooms??''}" placeholder="예: 3"><label class="inline-check"><input id="desiredOnePointFiveCheck" type="checkbox" ${x.desired_one_point_five_room?'checked':''}> 1.5룸</label></div></label>
+      <label>대출 여부<select name="loan_available"><option value="true">O</option><option value="false">X</option></select></label>
+      <label>자기자본금(만원)<div class="inline-field"><input id="equityCapitalInput" name="equity_capital" type="number" min="0" value="${x.equity_capital??''}"><label class="inline-check"><input id="equityUnknownCheck" type="checkbox" ${x.equity_unknown?'checked':''}> 모름</label></div></label>
+      <label>예정 FU<input name="next_follow_up_at" type="date" value="${x.next_follow_up_at?String(x.next_follow_up_at).slice(0,10):''}"></label>
+    </div></section>
+    <section class="crm3857-form-card"><div class="crm3857-card-title"><div><h3>연락처</h3><p>구분·이름·전화번호를 여러 개 등록할 수 있습니다.</p></div><button type="button" class="primary" onclick="crm3857AddContactRow()">+ 번호 추가</button></div><div id="crm3857CustomerContacts" class="crm3857-customer-contacts"></div></section>
+    <section class="crm3857-form-card"><h3>희망 거래유형 및 금액</h3><p class="muted">여러 거래유형을 선택하면 유형별 희망금액을 각각 입력할 수 있습니다.</p><div class="crm3857-deal-checks">${CRM3857_DEAL_TYPES.map(type=>`<label class="crm3857-deal-check-card"><input type="checkbox" class="crm3857-customer-deal-check" value="${type}" ${opts.some(o=>o.deal_type===type)?'checked':''} onchange="crm3857ToggleDeal('${type}',this.checked)"> ${type}</label>`).join('')}</div><div class="crm3857-deal-panels">${CRM3857_DEAL_TYPES.map(type=>{const o=opts.find(v=>v.deal_type===type)||{};return `<div class="crm3857-customer-deal-panel" data-type="${type}" ${opts.some(v=>v.deal_type===type)?'':'hidden'}><strong>${type}</strong><label>${type==='월세'?'희망 보증금':'희망금액'}(만원)<input class="crm3857-budget" type="number" min="0" value="${o.budget_max??''}"></label>${type==='월세'?`<label>희망 월세(만원)<input class="crm3857-rent" type="number" min="0" value="${o.desired_monthly_rent??''}"></label>`:''}</div>`}).join('')}</div></section>
+    <section class="crm3857-form-card"><label>상담 메모<textarea name="notes" rows="5">${escapeHtml(x.notes||'')}</textarea></label></section>
+  </div>`;
+  const form=$('#modalForm');
+  form.querySelector('[name=customer_type]').value=['매수','임차'].includes(x.customer_type)?x.customer_type:'매수';
+  form.querySelector('[name=status]').value=CRM3857_CUSTOMER_STATUSES.includes(x.status)?x.status:'신규인입';
+  form.querySelector('[name=customer_grade]').value=x.customer_grade||'C';
+  form.querySelector('[name=loan_available]').value=x.loan_available===false?'false':'true';
+  (contacts.length?contacts:[{contact_label:'본인',contact_name:x.name||'',phone:x.phone||''}]).forEach(crm3857AddContactRow);
+  const room=$('#desiredRoomsInput'),room15=$('#desiredOnePointFiveCheck');const syncRoom=()=>{room.disabled=room15.checked;if(room15.checked)room.value='1'};room15.onchange=syncRoom;syncRoom();
+  const equity=$('#equityCapitalInput'),unknown=$('#equityUnknownCheck');const syncEq=()=>{equity.disabled=unknown.checked;if(unknown.checked)equity.value=''};unknown.onchange=syncEq;syncEq();
+  $('#modalSubmit').style.display='';
+  $('#modalSubmit').onclick=async e=>{
+    e.preventDefault();
+    const fd=new FormData(form),deals=crm3857ReadDealOptions(),contactList=crm3857ReadContacts();
+    if(!fd.get('name')?.trim())return toast('고객명을 입력하세요.');
+    if(!contactList.length)return toast('연락처를 한 개 이상 입력하세요.');
+    if(!deals.length)return toast('거래유형을 한 개 이상 선택하세요.');
+    const joined=deals.map(o=>o.deal_type).join('+'),primary=deals[0];
+    const payload={owner_id:id?(x.owner_id||state.profile.id):state.profile.id,name:fd.get('name').trim(),phone:contactList[0].phone,customer_type:fd.get('customer_type'),status:fd.get('status'),customer_grade:fd.get('customer_grade')||'C',deal_type:joined,preferred_area:fd.get('preferred_area')||null,desired_rooms:room15.checked?1:(fd.get('desired_rooms')?Number(fd.get('desired_rooms')):null),desired_one_point_five_room:room15.checked,budget_max:primary?.budget_max??null,desired_monthly_rent:deals.find(o=>o.deal_type==='월세')?.desired_monthly_rent??null,loan_available:fd.get('loan_available')==='true',equity_unknown:unknown.checked,equity_capital:unknown.checked?null:(fd.get('equity_capital')?Number(fd.get('equity_capital')):null),next_follow_up_at:fd.get('next_follow_up_at')||null,notes:fd.get('notes')||null};
+    let customerId=id;
+    if(id){const {error}=await state.client.from('customers').update(payload).eq('id',id);if(error)return toast(error.message)}else{const {data,error}=await state.client.from('customers').insert(payload).select('id').single();if(error)return toast(error.message);customerId=data.id}
+    const [{error:dDel},{error:cDel}]=await Promise.all([state.client.from('customer_deal_options').delete().eq('customer_id',customerId),state.client.from('customer_contacts').delete().eq('customer_id',customerId)]);
+    if(dDel||cDel)return toast((dDel||cDel).message);
+    const dealInsert=deals.map(o=>({...o,customer_id:customerId}));
+    const contactInsert=contactList.map(o=>({...o,customer_id:customerId}));
+    const [{error:dErr},{error:cErr}]=await Promise.all([state.client.from('customer_deal_options').insert(dealInsert),state.client.from('customer_contacts').insert(contactInsert)]);
+    if(dErr||cErr)return toast((dErr||cErr).message);
+    $('#modal').close();toast('고객정보를 저장했습니다.');await loadCustomers();renderCustomers();
+  };
+  $('#modal').showModal();
+  setTimeout(()=>document.getElementById('contractCancelBtn')?.remove(),0);
+};
+
+renderCustomers=async function(){
+  await loadCustomers();
+  $('#topActions').innerHTML='<button class="primary" onclick="openCustomerModal()">+ 고객 등록</button>';
+  $('#content').innerHTML=`<div class="panel"><div class="filters customer-filters"><input id="customerSearch" placeholder="이름·연락처 검색" oninput="filterCustomers()"><select id="customerType" onchange="filterCustomers()"><option value="">전체 구분</option><option>매수</option><option>임차</option></select><select id="customerStatus" onchange="filterCustomers()"><option value="">전체 상태</option>${CRM3857_CUSTOMER_STATUSES.map(s=>`<option>${s}</option>`).join('')}</select><select id="customerDealType" onchange="filterCustomers()"><option value="">전체 거래유형</option>${CRM3857_DEAL_TYPES.map(t=>`<option>${t}</option>`).join('')}</select><select id="customerGrade" onchange="filterCustomers()"><option value="">전체 등급</option><option>A</option><option>B</option><option>C</option><option>D</option></select></div><div id="customerTable"></div></div>`;
+  filterCustomers();crm37AddQuickActions?.();
+};
+filterCustomers=function(){
+  const q=($('#customerSearch')?.value||'').toLowerCase().replace(/\s/g,''),t=$('#customerType')?.value||'',s=$('#customerStatus')?.value||'',d=$('#customerDealType')?.value||'',g=$('#customerGrade')?.value||'';
+  const rows=state.customers.filter(x=>{
+    const search=`${x.name||''} ${x.phone||''} ${crm3857Contacts(x).map(c=>`${c.contact_label||''} ${c.contact_name||''} ${c.phone||''}`).join(' ')}`.toLowerCase().replace(/\s/g,'');
+    return (!q||search.includes(q))&&(!t||x.customer_type===t)&&(!s||x.status===s)&&(!d||crm3857DealOptions(x).some(o=>o.deal_type===d))&&(!g||x.customer_grade===g);
+  });
+  $('#customerTable').innerHTML=rows.length?`<div class="table-wrap"><table class="customer-table crm3857-customer-table"><thead><tr><th>순번</th><th>고객명</th><th>연락처</th><th>구분</th><th>상태</th><th>거래유형</th><th>등급</th><th>희망지역</th><th>방</th><th>희망금액</th><th>진행상황</th><th>최종 FU</th><th>예정 FU</th><th>관리</th></tr></thead><tbody>${rows.map((x,i)=>`<tr><td>${i+1}</td><td><button class="crm3857-customer-name" onclick="openCustomerModal('${x.id}')">${escapeHtml(x.name)}</button></td><td>${crm3857ContactHtml(x)}</td><td>${escapeHtml(x.customer_type||'-')}</td><td>${badge(x.status||'신규인입','blue')}</td><td>${escapeHtml(crm3857DealText(x))}</td><td>${gradeBadge(x.customer_grade)}</td><td>${escapeHtml(x.preferred_area||'-')}</td><td>${customerRoomText(x)}</td><td>${crm3857BudgetText(x)}</td><td>${contractStage(x)}</td><td>${fmtDate(x.last_follow_up_at)}</td><td>${dueBadge(x.next_follow_up_at)}</td><td><div class="row-actions"><button class="success" onclick="openFollowUpModal('customer','${x.id}')">FU</button><button class="ghost" onclick="openHistoryModal('customer','${x.id}')">히스토리</button><button class="ghost" onclick="openContractModal('customer','${x.id}')">진행상황</button><button class="ghost" onclick="openCustomerModal('${x.id}')">수정</button><button class="danger" onclick="deleteCustomer('${x.id}')">삭제</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 고객이 없습니다.</div>';
+};
+
+const crm3857FollowBase=openFollowUpModal;
+openFollowUpModal=async function(...args){const result=await crm3857FollowBase(...args);setTimeout(()=>document.getElementById('contractCancelBtn')?.remove(),0);return result};
+const crm3857HistoryBase=openHistoryModal;
+openHistoryModal=async function(...args){const result=await crm3857HistoryBase(...args);setTimeout(()=>document.getElementById('contractCancelBtn')?.remove(),0);return result};
+
+Object.assign(window,{openCustomerModal,renderCustomers,filterCustomers,loadCustomers,crm3857AddContactRow,crm3857ToggleDeal,openFollowUpModal,openHistoryModal});
+console.info('CRM v3.8.58 고객시트 6개 요청 재적용·캐시강제 완료');
