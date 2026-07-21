@@ -4462,8 +4462,36 @@ async function crm3866RenderMap(rows){
   const token=++state.networkMapRenderToken;
   const mapEl=document.getElementById('networkMap');if(!mapEl||!window.L)return;
   if(state.networkMap){state.networkMap.remove();state.networkMap=null}
-  state.networkMap=L.map(mapEl,{zoomControl:true,minZoom:6,maxZoom:19}).setView([37.5665,126.9780],11);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(state.networkMap);
+  state.networkMap=L.map(mapEl,{zoomControl:true,minZoom:6,maxZoom:19,preferCanvas:true}).setView([37.5665,126.9780],11);
+
+  // 일부 브라우저/보안 확장 프로그램에서 특정 지도 타일 서버가 차단될 수 있어
+  // 순서대로 다른 지도 서버로 자동 전환한다.
+  const tileProviders=[
+    {name:'OpenStreetMap',url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',opts:{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}},
+    {name:'Carto',url:'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',opts:{maxZoom:20,subdomains:'abcd',attribution:'&copy; OpenStreetMap contributors &copy; CARTO'}},
+    {name:'Esri',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,attribution:'Tiles &copy; Esri'}}
+  ];
+  let providerIndex=0,tileErrors=0,tileLoaded=false,activeTileLayer=null;
+  const loadTileProvider=()=>{
+    if(activeTileLayer){try{state.networkMap.removeLayer(activeTileLayer)}catch{}}
+    const provider=tileProviders[providerIndex];
+    tileErrors=0; tileLoaded=false;
+    activeTileLayer=L.tileLayer(provider.url,{...provider.opts,keepBuffer:4,updateWhenIdle:false});
+    activeTileLayer.on('tileload',()=>{tileLoaded=true});
+    activeTileLayer.on('tileerror',()=>{
+      tileErrors++;
+      if(!tileLoaded&&tileErrors>=4&&providerIndex<tileProviders.length-1){
+        providerIndex++;
+        loadTileProvider();
+      }
+    });
+    activeTileLayer.addTo(state.networkMap);
+  };
+  loadTileProvider();
+  setTimeout(()=>{
+    if(!tileLoaded&&providerIndex<tileProviders.length-1){providerIndex++;loadTileProvider()}
+  },2500);
+
   state.networkMapCluster=L.markerClusterGroup({
     showCoverageOnHover:false,spiderfyOnMaxZoom:true,removeOutsideVisibleBounds:true,maxClusterRadius:58,
     iconCreateFunction:crm3866ClusterIcon
@@ -4512,4 +4540,4 @@ filterNetwork=function(){
   if(state.networkMapMode)crm3866RenderMap(rows);else renderListingTable(rows,'networkTable',false);
 };
 Object.assign(window,{renderNetwork,filterNetwork,openNetworkMap,closeNetworkMap});
-console.info('CRM v3.8.66 공동매물망 지도 보기 적용 완료');
+console.info('CRM v3.8.67 지도 타일 자동 복구 적용 완료');

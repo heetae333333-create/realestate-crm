@@ -1163,3 +1163,14 @@ body.crm3850-calendar-dragging .calendar-day{cursor:copy}
 .crm3866-map-popup-price{margin:7px 0;font-weight:800;color:#0f6d3f}
 .crm3866-map-popup button{width:100%;margin-top:9px;padding:8px;border:0;border-radius:8px;background:#1769e0;color:#fff;font-weight:800;cursor:pointer}
 @media(max-width:760px){.crm3866-map{height:68vh;min-height:470px;border-radius:10px}.crm3866-map-head{align-items:flex-start;flex-direction:column;gap:5px}.crm3866-map-head>div:first-child{align-items:flex-start;flex-direction:column;gap:3px}}
+
+
+/* ===== CRM v3.8.67 지도 타일 표시 안정화 ===== */
+.crm3866-map{background:#e5e7eb!important}
+.crm3866-map .leaflet-tile-pane{opacity:1!important;visibility:visible!important}
+.crm3866-map .leaflet-tile{max-width:none!important;max-height:none!important;object-fit:initial!important}
+.crm3866-map .leaflet-pane,.crm3866-map .leaflet-map-pane{z-index:auto}
+.crm3866-map .leaflet-tile-pane{z-index:200}
+.crm3866-map .leaflet-overlay-pane{z-index:400}
+.crm3866-map .leaflet-marker-pane{z-index:600}
+.crm3866-map .leaflet-popup-pane{z-index:700}
