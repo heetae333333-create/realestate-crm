@@ -5,7 +5,15 @@ const SUPA_URL_KEY='crm_supabase_url', SUPA_ANON_KEY='crm_supabase_anon';
 const DEFAULT_SUPABASE_URL='https://zcxxxqyntzlvyaakbnlq.supabase.co';
 const DEFAULT_SUPABASE_PUBLISHABLE_KEY='sb_publishable_k1lbkjVDKgYgxq_kp9lzsw_iNGSVbnJ';
 
-function toast(msg){const el=$('#toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2600)}
+function toast(msg){
+  let text=String(msg||'');
+  if(text.includes('duplicate_listing_same_trade')){
+    text='동일한 주소·동·호수에 같은 거래유형 매물이 이미 등록되어 있습니다. 기존 매물의 담당 중개사와 거래유형을 확인해 주세요.';
+  }else if(text.includes('duplicate_listing_address')){
+    text='동일한 주소·동·호수의 매물이 이미 등록되어 있어 저장할 수 없습니다.';
+  }
+  const el=$('#toast');el.textContent=text;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),4200)
+}
 function showOnly(id){['setupScreen','authScreen','pendingScreen','appScreen'].forEach(x=>$('#'+x).classList.toggle('hidden',x!==id))}
 function fmtMoney(v){if(v===null||v===undefined||v==='')return '-';return Number(v).toLocaleString('ko-KR')+'만원'}
 function fmtDate(v){return v?new Date(v).toLocaleDateString('ko-KR'):'-'}
@@ -3845,3 +3853,14 @@ openListingModal=function(id){
 };
 Object.assign(window,{openListingModal,crm3855ParseLotAddress});
 console.info('CRM v3.8.55 구조화 주소키 및 확정/의심 중복매물 판정 적용 완료');
+
+
+/* ===== CRM v3.8.56 데이터베이스 중복 오류 사용자 안내 ===== */
+window.addEventListener('unhandledrejection',function(event){
+  const msg=String(event?.reason?.message||event?.reason||'');
+  if(msg.includes('duplicate_listing_same_trade')){
+    event.preventDefault();
+    alert('동일한 주소·동·호수에 같은 거래유형 매물이 이미 등록되어 있습니다.\n\n기존 매물의 담당 중개사와 거래유형을 확인한 뒤 다른 거래유형으로 등록하거나 기존 매물을 이용해 주세요.');
+  }
+});
+console.info('CRM v3.8.56 중복매물 데이터베이스 오류 안내 적용 완료');
