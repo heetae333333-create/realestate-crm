@@ -1187,3 +1187,9 @@ body.crm3850-calendar-dragging .calendar-day{cursor:copy}
 .crm3868-kakao-map .wrap_controllers{display:none!important}
 .crm3868-kakao-map img{max-width:none!important}
 @media(max-width:720px){.crm3868-map-error{min-height:430px}.crm3868-kakao-map{height:62vh!important}}
+
+/* ===== CRM v3.8.70 지도 마커·관리자 전용 표기 ===== */
+.crm3870-admin-tag{display:inline-flex;align-items:center;margin-left:5px;padding:1px 4px;border-radius:4px;background:#fef3c7;color:#b45309;font-size:8px;font-weight:900;line-height:1.25;letter-spacing:.25px;vertical-align:middle;white-space:nowrap}
+button .crm3870-admin-tag{pointer-events:none}
+.crm3868-kakao-map img[src^="data:image/svg+xml"]{image-rendering:auto}
+@media(max-width:720px){.crm3870-admin-tag{font-size:7px;padding:1px 3px;margin-left:3px}}

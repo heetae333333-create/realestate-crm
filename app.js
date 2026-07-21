@@ -4819,3 +4819,120 @@ crm3868SaveMapSetting = async function(key){
 };
 Object.assign(window,{crm3868OpenMapSettings,crm3868SaveMapSetting});
 console.info('CRM v3.8.69 카카오맵 설정 버튼 수정 완료');
+
+/* ===== CRM v3.8.70 카카오맵 마커 압축·관리자 표시·좌표 자동보정 ===== */
+function crm3870Money(value){
+  const n=Number(value||0);
+  if(!n)return '-';
+  if(n>=10000)return `${(n/10000).toFixed(2)}억`;
+  return `${Math.round(n).toLocaleString()}만`;
+}
+function crm3870MarkerPrice(listing){
+  const o=crm3866PreferredDeal(listing);
+  if(o.deal_type==='월세')return `${crm3870Money(o.price)}/${crm3870Money(o.monthly_rent)}`;
+  return crm3870Money(o.price);
+}
+crm3868MarkerSvg=function(listing){
+  const deal=crm3866PreferredDeal(listing),type=deal.deal_type||'매물';
+  const typeShort=type==='매매'?'매':type==='전세'?'전':type==='월세'?'월':'매';
+  const price=crm3870MarkerPrice(listing);
+  const palette=type==='매매'?['#ef4444','#b91c1c']:type==='전세'?['#2563eb','#1d4ed8']:['#7c3aed','#6d28d9'];
+  const priceSize=price.length>=10?9:price.length>=8?10:11;
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="88" height="40" viewBox="0 0 88 40"><defs><filter id="s" x="-20%" y="-25%" width="140%" height="155%"><feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-opacity=".23"/></filter></defs><g filter="url(#s)"><rect x="1.5" y="1.5" width="85" height="31" rx="8" fill="white" stroke="${palette[0]}" stroke-width="1.8"/><path d="M39 32h10l-5 6z" fill="${palette[0]}"/><rect x="1.5" y="1.5" width="24" height="31" rx="7" fill="${palette[0]}"/><text x="13.5" y="21.5" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" font-weight="800" fill="white">${typeShort}</text><text x="56" y="21.5" text-anchor="middle" font-family="Arial,sans-serif" font-size="${priceSize}" font-weight="800" fill="#111827">${String(price).replace(/&/g,'&amp;').replace(/</g,'&lt;')}</text></g></svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+};
+crm3868CreateMarker=function(listing){
+  const position=new kakao.maps.LatLng(Number(listing.latitude),Number(listing.longitude));
+  const image=new kakao.maps.MarkerImage(crm3868MarkerSvg(listing),new kakao.maps.Size(88,40),{offset:new kakao.maps.Point(44,40)});
+  const marker=new kakao.maps.Marker({position,image,title:listing.title||'매물'});
+  marker.__listing=listing;
+  kakao.maps.event.addListener(marker,'click',()=>{
+    const html=`<div class="crm3868-kakao-popup">${crm3866MapPopup(listing)}</div>`;
+    if(state.kakaoMapInfoWindow)state.kakaoMapInfoWindow.close();
+    state.kakaoMapInfoWindow=new kakao.maps.InfoWindow({content:html,removable:true});
+    state.kakaoMapInfoWindow.open(state.networkMap,marker);
+  });
+  return marker;
+};
+
+// 지도 전환 시 현재 필터 결과의 좌표를 카카오 주소 기준으로 자동 재확인한다.
+openNetworkMap=function(){
+  state.networkMapForceCoordinateRefresh=true;
+  state.networkMapMode=true;
+  renderNetwork();
+};
+crm3868RenderKakaoMap=async function(rows){
+  const token=++state.networkMapRenderToken;
+  const mapEl=document.getElementById('networkMap');
+  const status=document.getElementById('networkMapStatus');
+  if(!mapEl)return;
+  try{await crm3868EnsureKakaoSdk()}catch(e){
+    const missing=e.message==='KAKAO_KEY_MISSING';
+    mapEl.innerHTML=`<div class="crm3868-map-error"><strong>${missing?'카카오맵 설정이 필요합니다.':'카카오맵을 불러오지 못했습니다.'}</strong><p>${escapeHtml(missing?'관리자가 카카오 JavaScript 키를 등록해 주세요.':e.message)}</p>${state.profile?.role==='admin'?'<button class="primary" data-admin-only="true" onclick="crm3868OpenMapSettings()">카카오맵 설정 <span class="crm3870-admin-tag">ADMIN</span></button>':''}</div>`;
+    if(status)status.textContent='지도 설정 필요';return;
+  }
+  if(token!==state.networkMapRenderToken)return;
+  mapEl.innerHTML='';
+  state.networkMap=new kakao.maps.Map(mapEl,{center:new kakao.maps.LatLng(37.5665,126.9780),level:7});
+  state.kakaoMapClusterer=new kakao.maps.MarkerClusterer({map:state.networkMap,averageCenter:true,minLevel:6,disableClickZoom:false,gridSize:70,styles:crm3868ClusterStyles()});
+  const bounds=new kakao.maps.LatLngBounds();
+  const shown=[];
+  const force=!!state.networkMapForceCoordinateRefresh;
+  state.networkMapForceCoordinateRefresh=false;
+  const addListing=x=>{
+    const marker=crm3868CreateMarker(x);
+    state.kakaoMapClusterer.addMarker(marker);
+    bounds.extend(marker.getPosition());
+    shown.push(x);
+  };
+  const cached=force?[]:rows.filter(x=>Number.isFinite(Number(x.latitude))&&Number.isFinite(Number(x.longitude))&&x.coordinate_provider==='kakao');
+  cached.forEach(addListing);
+  const pending=force?rows:rows.filter(x=>!cached.includes(x));
+  if(cached.length)state.networkMap.setBounds(bounds,80,80,80,80);
+  if(status)status.textContent=force?`카카오 좌표 자동 보정 0/${pending.length}`:`카카오 좌표 ${cached.length}건 표시 · ${pending.length}건 확인 중`;
+  for(let i=0;i<pending.length;i++){
+    if(token!==state.networkMapRenderToken||!state.networkMapMode)return;
+    const x=pending[i];
+    if(status)status.textContent=force?`카카오 좌표 자동 보정 ${i+1}/${pending.length}`:`카카오 주소 좌표 확인 ${i+1}/${pending.length}`;
+    const coord=await crm3868GeocodeKakao(crm3868NormalizeGeocodeAddress(x));
+    if(coord){await crm3868PersistKakaoCoordinates(x,coord);addListing(x)}
+    await new Promise(r=>setTimeout(r,110));
+  }
+  if(shown.length)state.networkMap.setBounds(bounds,80,80,80,80);
+  if(status)status.textContent=`필터 결과 ${rows.length}건 중 지도에 ${shown.length}건 표시${shown.length<rows.length?` · 주소 확인 필요 ${rows.length-shown.length}건`:''}`;
+  setTimeout(()=>state.networkMap?.relayout?.(),50);
+};
+crm3866RenderMap=crm3868RenderKakaoMap;
+
+function crm3870AdminTag(){return '<span class="crm3870-admin-tag">ADMIN</span>'}
+renderNetwork=async function(){
+  await loadListings();
+  const mapSetting=state.profile?.role==='admin'?`<button class="ghost" data-admin-only="true" onclick="crm3868OpenMapSettings()">지도 설정 ${crm3870AdminTag()}</button>`:'';
+  $('#topActions').innerHTML=state.networkMapMode
+    ?`${mapSetting}<button class="ghost" onclick="closeNetworkMap()">목록으로 보기</button>`
+    :`${mapSetting}<button class="primary crm3866-map-view-btn" onclick="openNetworkMap()">🗺 지도로 보기</button>`;
+  $('#content').innerHTML=`<div class="panel crm3826-filter-panel crm3866-network-panel">
+    ${crm3826FilterBar('listing')}
+    <div id="networkSummary"></div>
+    ${state.networkMapMode?`<div class="crm3866-map-head"><div><strong>공동매물 카카오맵</strong><span id="networkMapStatus">카카오 주소 좌표를 자동으로 확인하고 있습니다.</span></div><div class="muted">현재 필터 결과만 지도에 표시됩니다.</div></div><div id="networkMap" class="crm3866-map crm3868-kakao-map"></div>`:'<div id="networkTable"></div>'}
+  </div>`;
+  filterNetwork();
+  setTimeout(crm3870DecorateAdminButtons,0);
+};
+
+function crm3870DecorateAdminButtons(){
+  if(state.profile?.role!=='admin')return;
+  document.querySelectorAll('button').forEach(btn=>{
+    if(btn.querySelector('.crm3870-admin-tag'))return;
+    const oc=btn.getAttribute('onclick')||'';
+    const adminOnly=btn.dataset.adminOnly==='true'||!!btn.closest('.admin-only')||/Admin|admin|MapSettings|MenuOrder|AnnouncementManager|Transfer/.test(oc);
+    if(adminOnly)btn.insertAdjacentHTML('beforeend',crm3870AdminTag());
+  });
+}
+if(!window.__crm3870AdminObserver){
+  window.__crm3870AdminObserver=new MutationObserver(()=>crm3870DecorateAdminButtons());
+  window.__crm3870AdminObserver.observe(document.body,{childList:true,subtree:true});
+}
+Object.assign(window,{openNetworkMap,renderNetwork,crm3868RenderKakaoMap,crm3870DecorateAdminButtons});
+setTimeout(crm3870DecorateAdminButtons,100);
+console.info('CRM v3.8.70 카카오맵 마커 압축·관리자 표시·좌표 자동보정 적용 완료');
