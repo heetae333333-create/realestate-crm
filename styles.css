@@ -1196,3 +1196,12 @@ button .crm3870-admin-tag{pointer-events:none}
 
 /* CRM v3.8.73 프로필 설정 버튼 ADMIN 글자 숨김 */
 #editSidebarProfileBtn .crm3870-admin-tag{display:none!important;}
+
+/* ===== CRM v3.8.74 매물 복사 ===== */
+.crm3874-copy-btn{white-space:nowrap;border-color:#8b5cf6!important;color:#6d28d9!important;background:#f5f3ff!important}
+.crm3874-copy-btn:hover{background:#ede9fe!important}
+.crm3874-copy-notice{grid-column:1/-1;display:flex;flex-direction:column;gap:4px;padding:12px 14px;margin-bottom:4px;border:1px solid #c4b5fd;border-radius:12px;background:#f5f3ff;color:#4c1d95;font-size:13px;line-height:1.45}
+.crm3874-copy-notice strong{font-size:15px;color:#5b21b6}
+.crm3874-copy-submit{min-width:132px}
+.row-actions .crm3874-copy-btn{order:5}
+.row-actions .danger{order:6}

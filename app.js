@@ -5022,3 +5022,200 @@ crm3868CreateMarker=function(listing){
 console.info('CRM v3.8.71 카카오맵 매물 아이콘 개선 완료');
 
 console.info('CRM v3.8.73 긴급 복구·지도 목록복귀 안정화 적용 완료');
+
+/* ===== CRM v3.8.74 매물 복사(상세정보·사진 포함 신규등록) ===== */
+function crm3874CopyNotice(source){
+  return `<div class="crm3874-copy-notice"><strong>매물 복사 · 신규 등록</strong><span>${escapeHtml(source.title||'매물')}의 내용을 복사했습니다. 동·호수 등 필요한 부분을 수정한 뒤 신규 매물로 등록하세요.</span><span>계약 진행상황·FU·광고 이력은 복사되지 않고, 내부사진은 저장 시 새 매물로 복사됩니다.</span></div>`;
+}
+
+async function crm3874CopyListingPhotos(sourceId,newListingId,sourceCoverId){
+  const {data:photos,error}=await state.client.from('listing_photos').select('*').eq('listing_id',sourceId).order('sort_order').order('created_at');
+  if(error)throw error;
+  let copied=0,failed=0,newCoverId=null;
+  for(const photo of (photos||[])){
+    try{
+      const {data:blob,error:downloadError}=await state.client.storage.from('listing-photos').download(photo.storage_path);
+      if(downloadError||!blob)throw downloadError||new Error('사진 다운로드 실패');
+      const originalName=photo.file_name||photo.storage_path.split('/').pop()||'image.jpg';
+      const path=`${newListingId}/${safeFileName(originalName)}`;
+      const {error:uploadError}=await state.client.storage.from('listing-photos').upload(path,blob,{cacheControl:'3600',upsert:false,contentType:blob.type||'image/jpeg'});
+      if(uploadError)throw uploadError;
+      const payload={
+        listing_id:newListingId,
+        storage_path:path,
+        file_name:originalName,
+        uploaded_by:state.profile.id,
+        caption:photo.caption||null,
+        photo_category:photo.photo_category||'기타',
+        is_customer_visible:photo.is_customer_visible!==false,
+        sort_order:Number(photo.sort_order||0)
+      };
+      const {data:newPhoto,error:dbError}=await state.client.from('listing_photos').insert(payload).select('id').single();
+      if(dbError){await state.client.storage.from('listing-photos').remove([path]);throw dbError}
+      if(photo.id===sourceCoverId)newCoverId=newPhoto?.id||null;
+      copied++;
+    }catch(err){console.warn('복사 사진 처리 실패',err);failed++}
+  }
+  if(newCoverId)await state.client.from('listings').update({cover_photo_id:newCoverId}).eq('id',newListingId);
+  return {copied,failed};
+}
+
+function crm3874SelectedDeals(){
+  return [...document.querySelectorAll('#modalBody .crm38-deal-card')]
+    .filter(c=>c.querySelector('.crm38-deal-check')?.checked)
+    .map((c,i)=>({
+      deal_type:c.dataset.type,
+      price:Number(c.querySelector('.crm38-deal-price')?.value||0)||null,
+      monthly_rent:c.dataset.type==='월세'?(Number(c.querySelector('.crm38-deal-rent')?.value||0)||null):null,
+      is_preferred:!!c.querySelector('input[type=radio]')?.checked,
+      sort_order:i
+    }));
+}
+
+async function crm3874ValidateCopyDuplicate(address,building,unit,newTypes){
+  if(!address||!unit||!newTypes.length)return true;
+  if(typeof crm3855FindCandidates!=='function')return true;
+  const {key,rows}=await crm3855FindCandidates(address,building,unit,null);
+  const exact=rows.filter(x=>crm3855CanonicalListing(x).building_key===key.building_key);
+  const blocked=exact.filter(x=>crm3854ListingDealTypes(x).some(t=>newTypes.includes(t)));
+  if(blocked.length){
+    alert(`동일한 지번·동·호수에 같은 거래유형이 이미 등록되어 있습니다.\n\n${blocked.map(crm3855CandidateLine).join('\n\n')}\n\n동·호수나 거래유형을 수정한 뒤 등록하세요.`);
+    return false;
+  }
+  const other=exact.filter(x=>!crm3854ListingDealTypes(x).some(t=>newTypes.includes(t)));
+  if(other.length&&!confirm(`동일한 호수에 다른 거래유형 매물이 있습니다.\n\n${other.map(crm3855CandidateLine).join('\n\n')}\n\n새 거래유형(${newTypes.join('·')})은 겹치지 않습니다. 계속 등록하시겠습니까?`))return false;
+  const suspicious=rows.filter(x=>crm3855CanonicalListing(x).building_key!==key.building_key);
+  if(suspicious.length&&!confirm(`같은 지번·호수에 동 표기만 다른 매물이 있습니다.\n\n${suspicious.map(crm3855CandidateLine).join('\n\n')}\n\n실제로 다른 동인지 확인한 뒤 계속 등록하시겠습니까?`))return false;
+  return true;
+}
+
+async function openListingCopyModal(sourceId){
+  const source=state.listings.find(x=>x.id===sourceId);
+  if(!source)return toast('복사할 매물을 찾지 못했습니다.');
+  if(!canManageListing(source))return toast('본인 매물만 복사할 수 있습니다.');
+
+  await Promise.resolve(openListingModal(sourceId));
+  await new Promise(r=>setTimeout(r,40));
+  $('#modalTitle').textContent='매물 복사 · 신규 등록';
+  const body=$('#modalBody');
+  body?.insertAdjacentHTML('afterbegin',crm3874CopyNotice(source));
+  const submit=$('#modalSubmit');
+  if(!submit)return;
+  submit.textContent='신규 매물 등록';
+  submit.classList.add('crm3874-copy-submit');
+
+  submit.onclick=async e=>{
+    e.preventDefault();
+    const fd=new FormData($('#modalForm'));
+    const deals=crm3874SelectedDeals();
+    if(!deals.length)return toast('거래유형을 하나 이상 체크하세요.');
+    const preferred=deals.find(x=>x.is_preferred)||deals[0];
+    const address=String(fd.get('address')||'').trim().replace(/\s+/g,' ');
+    const building=typeof crm3852NormalizeBuilding==='function'?crm3852NormalizeBuilding(fd.get('building_no')):(fd.get('building_no')||'1동');
+    const unit=typeof crm3852NormalizeUnit==='function'?crm3852NormalizeUnit(fd.get('unit_no')):(fd.get('unit_no')||'');
+    if(!address)return toast('주소를 선택하거나 입력하세요.');
+    if(!unit)return toast('호수를 입력하세요.');
+    if(!await crm3874ValidateCopyDuplicate(address,building,unit,deals.map(x=>x.deal_type)))return;
+
+    const p={
+      owner_id:state.profile.id,
+      title:String(fd.get('title')||'').trim(),
+      contact_phone:fd.get('contact_phone')||null,
+      transaction_type:preferred.deal_type,
+      price:preferred.price,
+      monthly_rent:preferred.monthly_rent,
+      property_type:fd.get('property_type'),
+      status:fd.get('status')||'available',
+      district:fd.get('district')||null,
+      address,
+      building_no:building,
+      unit_no:unit,
+      management_fee:Number(fd.get('management_fee')||0)||null,
+      area_m2:Number(fd.get('area_m2')||0)||null,
+      room_count:Number(fd.get('room_count')||0)||null,
+      bathroom_count:Number(fd.get('bathroom_count')||0)||null,
+      options:fd.get('options')||null,
+      loan_available:fd.get('loan_available')===''?null:fd.get('loan_available')==='true',
+      official_price:Number(fd.get('official_price')||0)||null,
+      move_in_immediate:fd.get('move_in_immediate')==='on',
+      move_in_negotiable:fd.get('move_in_negotiable')==='on',
+      move_in_date:fd.get('move_in_immediate')==='on'?null:(fd.get('move_in_date')||null),
+      is_public:fd.get('is_public')==='true',
+      next_confirm_at:fd.get('next_confirm_at')||null,
+      description:fd.get('description')||null,
+      feature_tags:[...document.querySelectorAll('#modalBody .crm361-feature-check:checked')].map(el=>el.value),
+      is_one_point_five_room:fd.get('is_one_point_five_room')==='on',
+      last_confirmed_at:null,
+      last_follow_up_at:null,
+      next_follow_up_at:null,
+      latitude:null,
+      longitude:null,
+      coordinate_provider:null
+    };
+    if(!p.title)return toast('매물명을 입력하세요.');
+    if(p.is_one_point_five_room)p.room_count=1;
+    if(!p.loan_available)p.official_price=null;
+    if(typeof crm3852AddressKey==='function')p.address_normalized=crm3852AddressKey(address);
+    if(typeof crm3855CanonicalInput==='function'){
+      const key=crm3855CanonicalInput(address,building,unit);
+      p.district_key=key.district_key||null;
+      p.legal_dong_key=key.legal_dong_key||null;
+      p.lot_main_key=key.lot_main_key||null;
+      p.lot_sub_key=key.lot_sub_key||'0';
+      p.building_key=key.building_key||null;
+      p.unit_key=key.unit_key||null;
+    }
+
+    submit.disabled=true;submit.textContent='복사 등록 중...';
+    try{
+      const {data:newListing,error}=await state.client.from('listings').insert(p).select('id').single();
+      if(error)throw error;
+      const newId=newListing.id;
+      const {error:dealError}=await state.client.from('listing_deal_options').insert(deals.map(o=>({...o,listing_id:newId})));
+      if(dealError)throw dealError;
+      const contacts=[...document.querySelectorAll('#modalBody .crm38-contact-row')].map((row,i)=>({
+        listing_id:newId,
+        contact_role:row.querySelector('.crm38-contact-role')?.value||'기타',
+        contact_name:row.querySelector('.crm38-contact-name')?.value||null,
+        phone:row.querySelector('.crm38-contact-phone')?.value||'',
+        sort_order:i
+      })).filter(x=>x.phone);
+      if(contacts.length){const {error}=await state.client.from('listing_contacts').insert(contacts);if(error)throw error}
+      const copiedPhotos=await crm3874CopyListingPhotos(sourceId,newId,source.cover_photo_id);
+      const files=$('#listingPhotoFiles')?.files;
+      const uploaded=files?.length?await uploadListingPhotos(newId,files):{uploaded:0,failed:0};
+      $('#modal').close();
+      toast(`매물을 신규 등록했습니다. 기존 사진 ${copiedPhotos.copied}장 복사${uploaded.uploaded?`, 새 사진 ${uploaded.uploaded}장 추가`:''}.${copiedPhotos.failed||uploaded.failed?' 일부 사진은 복사하지 못했습니다.':''}`);
+      await loadListings();
+      state.view==='adminListings'?renderAdminListings():renderMyListings();
+    }catch(error){
+      console.error('매물 복사 등록 실패',error);
+      toast(error?.message||'매물 복사 등록에 실패했습니다.');
+    }finally{
+      submit.disabled=false;submit.textContent='신규 매물 등록';
+    }
+  };
+}
+
+const crm3874RenderListingTableBase=renderListingTable;
+renderListingTable=function(rows,target,mine,adminMode=false){
+  crm3874RenderListingTableBase(rows,target,mine,adminMode);
+  if(!mine)return;
+  const table=document.querySelector(`#${target} table`);if(!table)return;
+  const headers=[...table.querySelectorAll('thead th')];
+  const manageIndex=headers.findIndex(th=>th.textContent.trim()==='관리');
+  if(manageIndex<0)return;
+  const dataRows=[...table.querySelectorAll('tbody tr:not(.crm3813-address-row)')];
+  dataRows.forEach((tr,index)=>{
+    const listing=rows[index],cell=tr.children[manageIndex];
+    const actions=cell?.querySelector('.row-actions');
+    if(!listing||!actions||actions.querySelector('.crm3874-copy-btn'))return;
+    const deleteBtn=[...actions.querySelectorAll('button')].find(b=>b.textContent.trim()==='삭제');
+    const btn=document.createElement('button');
+    btn.type='button';btn.className='ghost crm3874-copy-btn';btn.textContent='매물복사';
+    btn.onclick=()=>openListingCopyModal(listing.id);
+    if(deleteBtn)actions.insertBefore(btn,deleteBtn);else actions.appendChild(btn);
+  });
+};
+Object.assign(window,{openListingCopyModal,renderListingTable});
+console.info('CRM v3.8.74 매물 복사 신규등록 적용 완료');
