@@ -4748,3 +4748,74 @@ renderNetwork=async function(){
 };
 Object.assign(window,{renderNetwork,crm3861OpenPostcode,crm3868OpenMapSettings,crm3868SaveMapSetting,crm3868RefreshVisibleCoordinates});
 console.info('CRM v3.8.68 카카오맵 전환 적용 완료');
+
+/* ===== CRM v3.8.69 카카오맵 설정 버튼 수정 ===== */
+crm3868OpenMapSettings = function(){
+  if(state.profile?.role!=='admin'){
+    toast('관리자만 지도 설정을 변경할 수 있습니다.');
+    return;
+  }
+  const modalEl=$('#modal');
+  const submitBtn=$('#modalSubmit');
+  $('#modalTitle').textContent='카카오맵 설정';
+  $('#modalBody').innerHTML=`<div class="stack crm3868-map-setting">
+    <p class="muted">카카오 Developers에서 발급한 <strong>JavaScript 키</strong>를 입력하세요.</p>
+    <label>카카오 JavaScript 키
+      <input id="crm3868KakaoKey" value="${escapeHtml(state.kakaoMapKey||'')}" placeholder="JavaScript 키" autocomplete="off" spellcheck="false">
+    </label>
+    <div class="notice">JavaScript SDK 도메인에는 <strong>https://heetae333333-create.github.io</strong> 를 등록하세요.</div>
+  </div>`;
+  submitBtn.style.display='';
+  submitBtn.classList.remove('hidden');
+  submitBtn.textContent='저장';
+  submitBtn.onclick=async(e)=>{
+    e.preventDefault();
+    const key=$('#crm3868KakaoKey')?.value||'';
+    await crm3868SaveMapSetting(key);
+  };
+  const cleanup=()=>{
+    submitBtn.textContent='저장';
+    submitBtn.style.display='';
+    submitBtn.classList.remove('hidden');
+    modalEl.removeEventListener('close',cleanup);
+  };
+  modalEl.addEventListener('close',cleanup);
+  modalEl.showModal();
+};
+
+crm3868SaveMapSetting = async function(key){
+  if(state.profile?.role!=='admin'){
+    toast('관리자만 지도 설정을 변경할 수 있습니다.');
+    return;
+  }
+  const clean=String(key||'').trim();
+  if(!clean){
+    toast('카카오 JavaScript 키를 입력하세요.');
+    return;
+  }
+  const submitBtn=$('#modalSubmit');
+  if(submitBtn){submitBtn.disabled=true;submitBtn.textContent='저장 중...';}
+  try{
+    const payload={
+      setting_key:'kakao_map_javascript_key',
+      title:clean,
+      updated_by:state.profile.id,
+      updated_at:new Date().toISOString()
+    };
+    const {error}=await state.client.from('app_settings').upsert(payload,{onConflict:'setting_key'});
+    if(error)throw error;
+    state.kakaoMapKey=clean;
+    state.kakaoMapSdkPromise=null;
+    document.getElementById('kakaoMapsSdk')?.remove();
+    $('#modal').close();
+    toast('카카오맵 설정을 저장했습니다.');
+    if(state.currentView==='network'&&state.networkMapMode)renderNetwork();
+  }catch(error){
+    console.error('카카오맵 설정 저장 실패',error);
+    toast(`카카오맵 설정 저장 실패: ${error?.message||'알 수 없는 오류'}`);
+  }finally{
+    if(submitBtn){submitBtn.disabled=false;submitBtn.textContent='저장';}
+  }
+};
+Object.assign(window,{crm3868OpenMapSettings,crm3868SaveMapSetting});
+console.info('CRM v3.8.69 카카오맵 설정 버튼 수정 완료');
