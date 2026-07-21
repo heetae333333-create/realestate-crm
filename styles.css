@@ -1093,3 +1093,36 @@ body.crm3850-calendar-dragging .calendar-day{cursor:copy}
  .crm3861-building-unit-wrap{grid-template-columns:1fr 1fr}
  .crm3861-address-search-line{grid-template-columns:1fr}
 }
+
+/* ===== CRM v3.8.62 주소·동·호수 직접입력 UI ===== */
+.crm3852-address-row.crm3862-address-row{
+  display:grid!important;
+  grid-template-columns:minmax(300px,2.8fr) minmax(105px,.55fr) minmax(105px,.55fr)!important;
+  gap:10px!important;
+  align-items:end!important;
+}
+.crm3862-address-row .crm3862-address-label{grid-column:auto!important;min-width:0!important}
+.crm3862-address-row .crm3861-address-search-line{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto!important;
+  gap:7px!important;
+  align-items:end!important;
+}
+.crm3862-address-row .crm3861-address-search-btn{height:42px!important;padding:0 14px!important}
+.crm3862-address-row .crm3862-unit-label{grid-template-columns:1fr!important;gap:4px!important;min-width:0!important}
+.crm3862-address-row .crm3862-unit-label input{
+  display:block!important;
+  width:100%!important;
+  min-width:0!important;
+  height:42px!important;
+  min-height:42px!important;
+  padding:8px 10px!important;
+  text-transform:uppercase;
+}
+.crm3862-address-row .crm3852-address-help{grid-column:1/-1!important;margin-top:-2px!important;font-size:11px!important;line-height:1.45!important}
+@media(max-width:760px){
+  .crm3852-address-row.crm3862-address-row{
+    grid-template-columns:minmax(0,1fr) minmax(90px,.45fr) minmax(90px,.45fr)!important;
+  }
+  .crm3862-address-row .crm3861-address-search-line{grid-template-columns:minmax(0,1fr) auto!important}
+}

@@ -4156,3 +4156,78 @@ openListingModal=function(id){
 };
 Object.assign(window,{filterCustomers,openListingModal,crm3861OpenPostcode});
 console.info('CRM v3.8.61 고객시트 순서·간편 거래UI·주소검색/동호 선택 적용 완료');
+
+/* ===== CRM v3.8.62 동·호수 단순 직접입력 ===== */
+function crm3862AlphaNumericOnly(value){
+  return String(value||'').replace(/[^0-9A-Za-z]/g,'').slice(0,12);
+}
+function crm3862EnhanceListingAddress(){
+  const row=document.querySelector('#modalBody .crm3852-address-row');
+  const addressInput=row?.querySelector('[name="address"]');
+  const buildingInput=row?.querySelector('[name="building_no"]');
+  const unitInput=row?.querySelector('[name="unit_no"]');
+  if(!row||!addressInput||!buildingInput||!unitInput||row.dataset.crm3862==='1')return;
+  row.dataset.crm3862='1';
+  row.classList.add('crm3862-address-row');
+
+  // v3.8.61에서 만든 동·호수 선택 UI 제거
+  row.querySelector('.crm3861-building-unit-wrap')?.remove();
+
+  const addressLabel=addressInput.closest('label');
+  const buildingLabel=buildingInput.closest('label');
+  const unitLabel=unitInput.closest('label');
+  if(addressLabel){
+    addressLabel.classList.remove('crm3861-address-search-label');
+    addressLabel.classList.add('crm3862-address-label');
+  }
+
+  [buildingLabel,unitLabel].forEach(label=>{
+    if(label){
+      label.style.display='grid';
+      label.classList.add('crm3862-unit-label');
+    }
+  });
+
+  buildingInput.type='text';
+  unitInput.type='text';
+  buildingInput.inputMode='text';
+  unitInput.inputMode='text';
+  buildingInput.autocomplete='off';
+  unitInput.autocomplete='off';
+  buildingInput.placeholder='예: 101 또는 A';
+  unitInput.placeholder='예: 603 또는 B1';
+  buildingInput.value=crm3862AlphaNumericOnly(String(buildingInput.value||'').replace(/동$/,''));
+  unitInput.value=crm3862AlphaNumericOnly(String(unitInput.value||'').replace(/호$/,''));
+
+  const sanitize=e=>{
+    const next=crm3862AlphaNumericOnly(e.target.value);
+    if(e.target.value!==next)e.target.value=next;
+  };
+  buildingInput.addEventListener('input',sanitize);
+  unitInput.addEventListener('input',sanitize);
+
+  // 기존 주소검색 버튼의 동·호수 선택 연동 제거 후 단순 주소검색으로 교체
+  const oldBtn=row.querySelector('.crm3861-address-search-btn');
+  if(oldBtn){
+    const newBtn=oldBtn.cloneNode(true);
+    oldBtn.replaceWith(newBtn);
+    newBtn.onclick=()=>crm3861OpenPostcode(addressInput,(selected,data)=>{
+      const region=document.querySelector('#modalBody [name="district"]');
+      if(region&&data?.sigungu&&data?.bname)region.value=`${data.sigungu} ${data.bname}`;
+      buildingInput.value='';
+      unitInput.value='';
+      buildingInput.focus();
+    });
+  }
+
+  const help=row.querySelector('.crm3852-address-help');
+  if(help)help.textContent='주소는 검색 결과에서 선택하고, 동·호수는 숫자 또는 영문만 직접 입력하세요. 숫자만 입력하면 저장 시 동·호가 자동으로 붙습니다.';
+}
+const crm3862OpenListingModalBase=openListingModal;
+openListingModal=function(id){
+  const result=crm3862OpenListingModalBase(id);
+  setTimeout(crm3862EnhanceListingAddress,20);
+  return result;
+};
+Object.assign(window,{openListingModal});
+console.info('CRM v3.8.62 주소검색 + 동호수 직접입력 적용 완료');
