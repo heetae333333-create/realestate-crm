@@ -5219,3 +5219,98 @@ renderListingTable=function(rows,target,mine,adminMode=false){
 };
 Object.assign(window,{openListingCopyModal,renderListingTable});
 console.info('CRM v3.8.74 매물 복사 신규등록 적용 완료');
+
+/* ===== CRM v3.8.75 등록순 고정 순번 · FU 3단 정렬 ===== */
+state.listingFuSort = state.listingFuSort || {};
+
+function crm3875CreatedTime(row){
+  const value=row?.created_at || row?.createdAt || '';
+  const time=value ? new Date(value).getTime() : NaN;
+  return Number.isFinite(time) ? time : 0;
+}
+function crm3875RegistrationOrder(rows){
+  return [...(rows||[])].sort((a,b)=>{
+    const diff=crm3875CreatedTime(a)-crm3875CreatedTime(b);
+    if(diff!==0)return diff;
+    return String(a?.id||'').localeCompare(String(b?.id||''));
+  });
+}
+function crm3875OriginalUniverse(target, rows){
+  if(target==='myListingTable'){
+    return crm3875RegistrationOrder(state.myListings||rows||[]);
+  }
+  if(target==='networkTable'){
+    return crm3875RegistrationOrder((state.listings||[]).filter(x=>x.is_public));
+  }
+  return crm3875RegistrationOrder(rows||[]);
+}
+function crm3875SequenceMap(target,rows){
+  const map=new Map();
+  crm3875OriginalUniverse(target,rows).forEach((x,i)=>map.set(String(x.id),i+1));
+  return map;
+}
+function crm3875DateValue(row,field){
+  const raw=field==='last'
+    ? (row?.last_follow_up_at || row?.last_confirmed_at)
+    : row?.next_follow_up_at;
+  if(!raw)return null;
+  const time=new Date(raw).getTime();
+  return Number.isFinite(time)?time:null;
+}
+function crm3875SortRows(rows,target){
+  const mode=state.listingFuSort[target];
+  const original=crm3875RegistrationOrder(rows||[]);
+  if(!mode?.field||!mode?.direction)return original;
+  return [...original].sort((a,b)=>{
+    const av=crm3875DateValue(a,mode.field),bv=crm3875DateValue(b,mode.field);
+    if(av===null&&bv===null)return crm3875CreatedTime(a)-crm3875CreatedTime(b);
+    if(av===null)return 1;
+    if(bv===null)return -1;
+    const diff=av-bv;
+    if(diff!==0)return mode.direction==='asc'?diff:-diff;
+    return crm3875CreatedTime(a)-crm3875CreatedTime(b);
+  });
+}
+function crm3875SortLabel(target,field,title){
+  const mode=state.listingFuSort[target]||{};
+  const active=mode.field===field;
+  const icon=!active?'↕':mode.direction==='asc'?'↑':'↓';
+  const tip=!active?'오름차순 정렬':mode.direction==='asc'?'내림차순 정렬':'등록순으로 복원';
+  return `<button type="button" class="crm3875-fu-sort ${active?'is-active':''}" onclick="crm3875CycleFuSort('${target}','${field}')" title="${tip}"><span>${title}</span><b>${icon}</b></button>`;
+}
+function crm3875CycleFuSort(target,field){
+  const current=state.listingFuSort[target]||{};
+  let next;
+  if(current.field!==field||!current.direction)next={field,direction:'asc'};
+  else if(current.direction==='asc')next={field,direction:'desc'};
+  else next={field:null,direction:null};
+  state.listingFuSort[target]=next;
+  if(target==='myListingTable')filterMyListings();
+  else if(target==='networkTable')filterNetwork();
+}
+function crm3875PatchTable(target,sortedRows,sequenceMap){
+  const table=document.querySelector(`#${target} table`);
+  if(!table)return;
+  const headers=[...table.querySelectorAll('thead th')];
+  const lastIndex=headers.findIndex(th=>th.textContent.trim().replace(/[↕↑↓]/g,'').trim()==='최종 FU');
+  const nextIndex=headers.findIndex(th=>th.textContent.trim().replace(/[↕↑↓]/g,'').trim()==='예정 FU');
+  if(lastIndex>=0)headers[lastIndex].innerHTML=crm3875SortLabel(target,'last','최종 FU');
+  if(nextIndex>=0)headers[nextIndex].innerHTML=crm3875SortLabel(target,'next','예정 FU');
+
+  const dataRows=[...table.querySelectorAll('tbody tr:not(.crm3813-address-row)')];
+  dataRows.forEach((tr,index)=>{
+    const listing=sortedRows[index];
+    const noCell=tr.querySelector('.crm3824-no-cell') || tr.children[0];
+    if(listing&&noCell)noCell.textContent=sequenceMap.get(String(listing.id))||index+1;
+  });
+}
+
+const crm3875RenderListingTableBase=renderListingTable;
+renderListingTable=function(rows,target,mine,adminMode=false){
+  const sequenceMap=crm3875SequenceMap(target,rows);
+  const sortedRows=crm3875SortRows(rows,target);
+  crm3875RenderListingTableBase(sortedRows,target,mine,adminMode);
+  crm3875PatchTable(target,sortedRows,sequenceMap);
+};
+Object.assign(window,{renderListingTable,crm3875CycleFuSort});
+console.info('CRM v3.8.75 등록순 고정 순번·FU 3단 정렬 적용 완료');

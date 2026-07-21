@@ -1205,3 +1205,16 @@ button .crm3870-admin-tag{pointer-events:none}
 .crm3874-copy-submit{min-width:132px}
 .row-actions .crm3874-copy-btn{order:5}
 .row-actions .danger{order:6}
+
+/* ===== CRM v3.8.75 FU 정렬 헤더 ===== */
+.crm3875-fu-sort{
+  appearance:none;border:0;background:transparent;padding:4px 3px;margin:0;
+  display:inline-flex;align-items:center;justify-content:center;gap:5px;
+  color:inherit;font:inherit;font-weight:800;white-space:nowrap;cursor:pointer;
+}
+.crm3875-fu-sort b{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:18px;height:18px;border-radius:5px;background:#eef2f7;color:#64748b;
+  font-size:12px;line-height:1;
+}
+.crm3875-fu-sort:hover b,.crm3875-fu-sort.is-active b{background:#dbeafe;color:#1d4ed8;}
