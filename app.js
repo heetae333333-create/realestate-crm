@@ -4541,3 +4541,210 @@ filterNetwork=function(){
 };
 Object.assign(window,{renderNetwork,filterNetwork,openNetworkMap,closeNetworkMap});
 console.info('CRM v3.8.67 지도 타일 자동 복구 적용 완료');
+
+/* ===== CRM v3.8.68 카카오맵 전환 ===== */
+state.kakaoMapKey = null;
+state.kakaoMapSdkPromise = null;
+state.kakaoMapOverlays = [];
+state.kakaoMapInfoWindow = null;
+state.kakaoMapClusterer = null;
+
+async function crm3868LoadMapSetting(){
+  try{
+    const {data,error}=await state.client.from('app_settings').select('title').eq('setting_key','kakao_map_javascript_key').maybeSingle();
+    if(error)throw error;
+    state.kakaoMapKey=String(data?.title||'').trim();
+  }catch(e){console.warn('카카오맵 설정 조회 실패',e);state.kakaoMapKey=''}
+  return state.kakaoMapKey;
+}
+async function crm3868SaveMapSetting(key){
+  if(state.profile?.role!=='admin')return toast('관리자만 지도 설정을 변경할 수 있습니다.');
+  const clean=String(key||'').trim();
+  if(!clean)return toast('카카오 JavaScript 키를 입력하세요.');
+  const payload={setting_key:'kakao_map_javascript_key',title:clean,updated_by:state.profile.id,updated_at:new Date().toISOString()};
+  const {error}=await state.client.from('app_settings').upsert(payload,{onConflict:'setting_key'});
+  if(error)return toast(error.message);
+  state.kakaoMapKey=clean;
+  state.kakaoMapSdkPromise=null;
+  document.getElementById('kakaoMapsSdk')?.remove();
+  modal.close();
+  toast('카카오맵 설정을 저장했습니다.');
+  if(state.currentView==='network'&&state.networkMapMode)renderNetwork();
+}
+function crm3868OpenMapSettings(){
+  if(state.profile?.role!=='admin')return toast('관리자만 지도 설정을 변경할 수 있습니다.');
+  openModal('카카오맵 설정',`<div class="stack crm3868-map-setting">
+    <p class="muted">카카오 Developers에서 발급한 <strong>JavaScript 키</strong>를 입력하세요. GitHub Pages 주소를 JavaScript SDK 도메인에 등록해야 합니다.</p>
+    <label>카카오 JavaScript 키<input id="crm3868KakaoKey" value="${escapeHtml(state.kakaoMapKey||'')}" placeholder="JavaScript 키" autocomplete="off"></label>
+    <div class="notice">등록 도메인 예시: <strong>https://heetae333333-create.github.io</strong></div>
+  </div>`,()=>crm3868SaveMapSetting(document.getElementById('crm3868KakaoKey')?.value));
+}
+async function crm3868EnsureKakaoSdk(){
+  if(window.kakao?.maps?.services&&window.kakao?.maps?.MarkerClusterer)return window.kakao;
+  if(state.kakaoMapSdkPromise)return state.kakaoMapSdkPromise;
+  if(!state.kakaoMapKey)await crm3868LoadMapSetting();
+  if(!state.kakaoMapKey)throw new Error('KAKAO_KEY_MISSING');
+  state.kakaoMapSdkPromise=new Promise((resolve,reject)=>{
+    const existing=document.getElementById('kakaoMapsSdk');
+    if(existing)existing.remove();
+    const script=document.createElement('script');
+    script.id='kakaoMapsSdk';
+    script.async=true;
+    script.src=`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(state.kakaoMapKey)}&autoload=false&libraries=services,clusterer`;
+    script.onload=()=>{
+      if(!window.kakao?.maps)return reject(new Error('카카오맵 SDK 초기화 실패'));
+      window.kakao.maps.load(()=>resolve(window.kakao));
+    };
+    script.onerror=()=>reject(new Error('카카오맵 SDK를 불러오지 못했습니다. 도메인과 JavaScript 키를 확인하세요.'));
+    document.head.appendChild(script);
+  }).catch(e=>{state.kakaoMapSdkPromise=null;throw e});
+  return state.kakaoMapSdkPromise;
+}
+function crm3868NormalizeGeocodeAddress(listing){
+  return String(listing.address||'').replace(/\s+/g,' ').trim();
+}
+async function crm3868GeocodeKakao(address){
+  await crm3868EnsureKakaoSdk();
+  const geocoder=new kakao.maps.services.Geocoder();
+  const query=String(address||'').replace(/\s+(?:[0-9A-Za-z]+동)\s+(?:[0-9A-Za-z]+호)$/,'').trim();
+  if(!query)return null;
+  return await new Promise(resolve=>{
+    geocoder.addressSearch(query,(result,status)=>{
+      if(status!==kakao.maps.services.Status.OK||!result?.length)return resolve(null);
+      const r=result[0];
+      resolve({
+        lat:Number(r.y),lng:Number(r.x),
+        jibunAddress:r.address?.address_name||query,
+        roadAddress:r.road_address?.address_name||'',
+        provider:'kakao'
+      });
+    });
+  });
+}
+async function crm3868PersistKakaoCoordinates(listing,coord){
+  if(!listing?.id||!coord)return;
+  try{
+    const {error}=await state.client.rpc('set_listing_kakao_coordinates',{
+      p_listing_id:listing.id,p_lat:coord.lat,p_lng:coord.lng,
+      p_jibun_address:coord.jibunAddress||listing.address||'',p_road_address:coord.roadAddress||''
+    });
+    if(error)throw error;
+    listing.latitude=coord.lat;listing.longitude=coord.lng;listing.coordinate_provider='kakao';
+    listing.jibun_address=coord.jibunAddress||listing.address||'';listing.road_address=coord.roadAddress||'';
+  }catch(e){console.warn('카카오 좌표 저장 실패',e)}
+}
+function crm3868DealClass(type){return type==='매매'?'sale':type==='전세'?'jeonse':'monthly'}
+function crm3868MarkerSvg(listing){
+  const deal=crm3866PreferredDeal(listing),type=deal.deal_type||'매물',price=crm3866MapPrice(listing);
+  const palette=type==='매매'?['#ef4444','#b91c1c']:type==='전세'?['#2563eb','#1d4ed8']:['#7c3aed','#6d28d9'];
+  const safeType=String(type).slice(0,4),safePrice=String(price).slice(0,10);
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="104" height="52" viewBox="0 0 104 52"><defs><filter id="s" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity=".25"/></filter></defs><g filter="url(#s)"><rect x="2" y="2" width="100" height="40" rx="10" fill="white" stroke="${palette[0]}" stroke-width="2"/><path d="M45 42h14l-7 8z" fill="${palette[0]}"/><rect x="2" y="2" width="34" height="40" rx="9" fill="${palette[0]}"/><text x="19" y="27" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" font-weight="700" fill="white">${safeType}</text><text x="69" y="27" text-anchor="middle" font-family="Arial,sans-serif" font-size="13" font-weight="800" fill="#111827">${safePrice}</text></g></svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+function crm3868CreateMarker(listing){
+  const position=new kakao.maps.LatLng(Number(listing.latitude),Number(listing.longitude));
+  const image=new kakao.maps.MarkerImage(crm3868MarkerSvg(listing),new kakao.maps.Size(104,52),{offset:new kakao.maps.Point(52,52)});
+  const marker=new kakao.maps.Marker({position,image,title:listing.title||'매물'});
+  marker.__listing=listing;
+  kakao.maps.event.addListener(marker,'click',()=>{
+    const html=`<div class="crm3868-kakao-popup">${crm3866MapPopup(listing)}</div>`;
+    if(state.kakaoMapInfoWindow)state.kakaoMapInfoWindow.close();
+    state.kakaoMapInfoWindow=new kakao.maps.InfoWindow({content:html,removable:true});
+    state.kakaoMapInfoWindow.open(state.networkMap,marker);
+  });
+  return marker;
+}
+function crm3868ClusterStyles(){
+  return [{
+    width:'48px',height:'48px',background:'rgba(34,197,94,.90)',borderRadius:'24px',color:'#052e16',textAlign:'center',fontWeight:'900',lineHeight:'48px',boxShadow:'0 3px 10px rgba(0,0,0,.18)'
+  },{
+    width:'58px',height:'58px',background:'rgba(16,185,129,.92)',borderRadius:'29px',color:'#022c22',textAlign:'center',fontWeight:'900',lineHeight:'58px',boxShadow:'0 3px 12px rgba(0,0,0,.2)'
+  },{
+    width:'68px',height:'68px',background:'rgba(5,150,105,.94)',borderRadius:'34px',color:'white',textAlign:'center',fontWeight:'900',lineHeight:'68px',boxShadow:'0 4px 14px rgba(0,0,0,.24)'
+  }];
+}
+async function crm3868RenderKakaoMap(rows){
+  const token=++state.networkMapRenderToken;
+  const mapEl=document.getElementById('networkMap');
+  const status=document.getElementById('networkMapStatus');
+  if(!mapEl)return;
+  try{await crm3868EnsureKakaoSdk()}catch(e){
+    const missing=e.message==='KAKAO_KEY_MISSING';
+    mapEl.innerHTML=`<div class="crm3868-map-error"><strong>${missing?'카카오맵 설정이 필요합니다.':'카카오맵을 불러오지 못했습니다.'}</strong><p>${escapeHtml(missing?'관리자가 카카오 JavaScript 키를 등록해 주세요.':e.message)}</p>${state.profile?.role==='admin'?'<button class="primary" onclick="crm3868OpenMapSettings()">카카오맵 설정</button>':''}</div>`;
+    if(status)status.textContent='지도 설정 필요';return;
+  }
+  if(token!==state.networkMapRenderToken)return;
+  mapEl.innerHTML='';
+  const center=new kakao.maps.LatLng(37.5665,126.9780);
+  state.networkMap=new kakao.maps.Map(mapEl,{center,level:7});
+  state.kakaoMapClusterer=new kakao.maps.MarkerClusterer({
+    map:state.networkMap,averageCenter:true,minLevel:6,disableClickZoom:false,gridSize:70,styles:crm3868ClusterStyles()
+  });
+  const bounds=new kakao.maps.LatLngBounds();
+  const valid=[];
+  const pending=[];
+  rows.forEach(x=>{
+    const lat=Number(x.latitude),lng=Number(x.longitude);
+    if(Number.isFinite(lat)&&Number.isFinite(lng)&&x.coordinate_provider==='kakao')valid.push(x);else pending.push(x);
+  });
+  const addListing=x=>{
+    const marker=crm3868CreateMarker(x);valid.push(x);state.kakaoMapClusterer.addMarker(marker);bounds.extend(marker.getPosition());
+  };
+  const initial=valid.slice();valid.length=0;initial.forEach(addListing);
+  if(initial.length)state.networkMap.setBounds(bounds,80,80,80,80);
+  if(status)status.textContent=`카카오 좌표 ${initial.length}건 표시 · ${pending.length}건 확인 중`;
+  for(let i=0;i<pending.length;i++){
+    if(token!==state.networkMapRenderToken||!state.networkMapMode)return;
+    const x=pending[i];
+    if(status)status.textContent=`카카오 주소 좌표 확인 ${i+1}/${pending.length}`;
+    const coord=await crm3868GeocodeKakao(crm3868NormalizeGeocodeAddress(x));
+    if(coord){await crm3868PersistKakaoCoordinates(x,coord);addListing(x)}
+    await new Promise(r=>setTimeout(r,120));
+  }
+  if(valid.length)state.networkMap.setBounds(bounds,80,80,80,80);
+  if(status)status.textContent=`필터 결과 ${rows.length}건 중 지도에 ${valid.length}건 표시${valid.length<rows.length?` · 주소 확인 필요 ${rows.length-valid.length}건`:''}`;
+  setTimeout(()=>state.networkMap?.relayout?.(),50);
+}
+async function crm3868RefreshVisibleCoordinates(){
+  if(state.profile?.role!=='admin')return toast('관리자만 좌표를 다시 맞출 수 있습니다.');
+  const rows=state.filteredNetworkListings||[];
+  if(!rows.length)return toast('현재 필터 결과가 없습니다.');
+  if(!confirm(`현재 필터 결과 ${rows.length}건의 좌표를 카카오 주소 기준으로 다시 맞출까요?`))return;
+  rows.forEach(x=>{x.coordinate_provider='';});
+  await crm3868RenderKakaoMap(rows);
+  toast('카카오 주소 기준으로 좌표를 다시 확인했습니다.');
+}
+
+// 주소 검색 완료 시 카카오 좌표를 즉시 저장할 수 있도록 주소선택 정보를 보관한다.
+const crm3868PostcodeBase=crm3861OpenPostcode;
+crm3861OpenPostcode=function(addressInput,onDone){
+  return crm3868PostcodeBase(addressInput,async(selected,data)=>{
+    onDone?.(selected,data);
+    try{
+      const coord=await crm3868GeocodeKakao(selected);
+      const form=addressInput.closest('form')||document.getElementById('modalForm');
+      if(coord&&form){
+        form.dataset.kakaoLat=String(coord.lat);form.dataset.kakaoLng=String(coord.lng);
+        form.dataset.kakaoJibun=coord.jibunAddress||selected;form.dataset.kakaoRoad=coord.roadAddress||'';
+      }
+    }catch(e){console.warn('주소선택 좌표 준비 실패',e)}
+  });
+};
+
+// 기존 Leaflet 지도 렌더링을 카카오맵으로 교체한다.
+crm3866RenderMap=crm3868RenderKakaoMap;
+renderNetwork=async function(){
+  await loadListings();
+  const adminButtons=state.profile?.role==='admin'?`<button class="ghost" onclick="crm3868OpenMapSettings()">지도 설정</button>${state.networkMapMode?'<button class="ghost" onclick="crm3868RefreshVisibleCoordinates()">좌표 다시 맞추기</button>':''}`:'';
+  $('#topActions').innerHTML=state.networkMapMode
+    ?`${adminButtons}<button class="ghost" onclick="closeNetworkMap()">목록으로 보기</button>`
+    :`${adminButtons}<button class="primary crm3866-map-view-btn" onclick="openNetworkMap()">🗺 지도로 보기</button>`;
+  $('#content').innerHTML=`<div class="panel crm3826-filter-panel crm3866-network-panel">
+    ${crm3826FilterBar('listing')}
+    <div id="networkSummary"></div>
+    ${state.networkMapMode?`<div class="crm3866-map-head"><div><strong>공동매물 카카오맵</strong><span id="networkMapStatus">카카오 주소 좌표를 확인하고 있습니다.</span></div><div class="muted">현재 필터 결과만 지도에 표시됩니다.</div></div><div id="networkMap" class="crm3866-map crm3868-kakao-map"></div>`:'<div id="networkTable"></div>'}
+  </div>`;
+  filterNetwork();
+};
+Object.assign(window,{renderNetwork,crm3861OpenPostcode,crm3868OpenMapSettings,crm3868SaveMapSetting,crm3868RefreshVisibleCoordinates});
+console.info('CRM v3.8.68 카카오맵 전환 적용 완료');

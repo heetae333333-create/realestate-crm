@@ -1174,3 +1174,16 @@ body.crm3850-calendar-dragging .calendar-day{cursor:copy}
 .crm3866-map .leaflet-overlay-pane{z-index:400}
 .crm3866-map .leaflet-marker-pane{z-index:600}
 .crm3866-map .leaflet-popup-pane{z-index:700}
+
+/* ===== CRM v3.8.68 카카오맵 ===== */
+.crm3868-kakao-map{background:#e8eef3!important;position:relative;overflow:hidden}
+.crm3868-map-error{height:100%;min-height:520px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:10px;background:linear-gradient(135deg,#eff6ff,#f8fafc);color:#334155}
+.crm3868-map-error strong{font-size:20px;color:#0f172a}
+.crm3868-map-error p{margin:0;max-width:520px}
+.crm3868-map-setting .notice{padding:12px 14px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:12px;color:#1e40af;font-size:13px}
+.crm3868-kakao-popup{padding:2px;min-width:250px;font-family:inherit}
+.crm3868-kakao-popup .crm3866-map-popup{padding:12px 14px}
+.crm3868-kakao-popup button{margin-top:10px;width:100%;border:0;border-radius:9px;padding:9px 12px;background:#2563eb;color:#fff;font-weight:800;cursor:pointer}
+.crm3868-kakao-map .wrap_controllers{display:none!important}
+.crm3868-kakao-map img{max-width:none!important}
+@media(max-width:720px){.crm3868-map-error{min-height:430px}.crm3868-kakao-map{height:62vh!important}}
