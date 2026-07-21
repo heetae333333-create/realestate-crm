@@ -4045,3 +4045,114 @@ openHistoryModal=async function(...args){const result=await crm3857HistoryBase(.
 
 Object.assign(window,{openCustomerModal,renderCustomers,filterCustomers,loadCustomers,crm3857AddContactRow,crm3857ToggleDeal,openFollowUpModal,openHistoryModal});
 console.info('CRM v3.8.59 고객시트 정렬·UI·진행취소 이력 완료');
+
+/* ===== CRM v3.8.61 고객시트 순서·간편 거래UI·주소검색/동호 선택 ===== */
+filterCustomers=function(){
+  const q=($('#customerSearch')?.value||'').toLowerCase().replace(/\s/g,''),t=$('#customerType')?.value||'',s=$('#customerStatus')?.value||'',d=$('#customerDealType')?.value||'',g=$('#customerGrade')?.value||'';
+  const rows=state.customers.filter(x=>{
+    const search=`${x.name||''} ${x.phone||''} ${crm3857Contacts(x).map(c=>`${c.contact_label||''} ${c.contact_name||''} ${c.phone||''}`).join(' ')}`.toLowerCase().replace(/\s/g,'');
+    return (!q||search.includes(q))&&(!t||x.customer_type===t)&&(!s||x.status===s)&&(!d||crm3857DealOptions(x).some(o=>o.deal_type===d))&&(!g||x.customer_grade===g);
+  });
+  $('#customerTable').innerHTML=rows.length?`<div class="table-wrap"><table class="customer-table crm3857-customer-table crm3861-customer-table"><thead><tr><th>순번</th><th>상태</th><th>고객명</th><th>연락처</th><th>구분</th><th>거래유형</th><th>등급</th><th>희망지역</th><th>방</th><th>희망금액</th><th>진행상황</th><th>최종 FU</th><th>예정 FU</th><th>관리</th></tr></thead><tbody>${rows.map((x,i)=>`<tr><td>${i+1}</td><td>${badge(x.status||'신규인입','blue')}</td><td><button class="crm3857-customer-name" onclick="openCustomerModal('${x.id}')">${escapeHtml(x.name)}</button></td><td>${crm3857ContactHtml(x)}</td><td>${escapeHtml(x.customer_type||'-')}</td><td>${escapeHtml(crm3857DealText(x))}</td><td>${gradeBadge(x.customer_grade)}</td><td>${escapeHtml(x.preferred_area||'-')}</td><td>${customerRoomText(x)}</td><td>${crm3857BudgetText(x)}</td><td>${contractStage(x)}</td><td>${fmtDate(x.last_follow_up_at)}</td><td>${dueBadge(x.next_follow_up_at)}</td><td><div class="row-actions"><button class="success" onclick="openFollowUpModal('customer','${x.id}')">FU</button><button class="ghost" onclick="openHistoryModal('customer','${x.id}')">히스토리</button><button class="ghost" onclick="openContractModal('customer','${x.id}')">진행상황</button><button class="ghost" onclick="openCustomerModal('${x.id}')">수정</button><button class="danger" onclick="deleteCustomer('${x.id}')">삭제</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 고객이 없습니다.</div>';
+};
+
+function crm3861AddressLotKey(address){
+  const p=crm3855ParseLotAddress(address||'');
+  return p.parsed?`${p.district_key}|${p.legal_dong_key}|${p.lot_main_key}|${p.lot_sub_key}`:String(address||'').replace(/\s+/g,'').toLowerCase();
+}
+function crm3861ExistingAddressValues(address){
+  const key=crm3861AddressLotKey(address);
+  return (state.listings||[]).filter(x=>crm3861AddressLotKey(x.address)===key);
+}
+function crm3861SetHiddenValue(input,value){
+  input.value=value||'';
+  input.dispatchEvent(new Event('change',{bubbles:true}));
+}
+function crm3861BuildSelect(labelText,hiddenInput,values,current,placeholder,normalize){
+  const shell=document.createElement('div');
+  shell.className='crm3861-address-choice';
+  const label=document.createElement('span');label.className='crm3861-mini-label';label.textContent=labelText;
+  const select=document.createElement('select');
+  const uniq=[...new Set(values.map(normalize).filter(Boolean))];
+  select.innerHTML=`<option value="">${placeholder}</option>${uniq.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('')}<option value="__manual__">직접 입력</option>`;
+  const manual=document.createElement('input');manual.placeholder=labelText==='동'?'예: 101동':'예: 603호';manual.className='crm3861-manual-value';
+  const normalizedCurrent=normalize(current||'');
+  if(normalizedCurrent&&uniq.includes(normalizedCurrent)){select.value=normalizedCurrent;manual.hidden=true;crm3861SetHiddenValue(hiddenInput,normalizedCurrent)}
+  else if(normalizedCurrent){select.value='__manual__';manual.value=normalizedCurrent;manual.hidden=false;crm3861SetHiddenValue(hiddenInput,normalizedCurrent)}
+  else if(!uniq.length){select.value='__manual__';manual.hidden=false}
+  else manual.hidden=true;
+  const sync=()=>{
+    const manualMode=select.value==='__manual__';manual.hidden=!manualMode;
+    crm3861SetHiddenValue(hiddenInput,manualMode?normalize(manual.value):select.value);
+  };
+  select.onchange=sync;manual.oninput=sync;
+  shell.append(label,select,manual);
+  return {shell,select,manual,refresh(nextValues,nextCurrent){
+    const next=[...new Set(nextValues.map(normalize).filter(Boolean))];
+    select.innerHTML=`<option value="">${placeholder}</option>${next.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('')}<option value="__manual__">직접 입력</option>`;
+    const cur=normalize(nextCurrent||hiddenInput.value||'');
+    if(cur&&next.includes(cur)){select.value=cur;manual.hidden=true;crm3861SetHiddenValue(hiddenInput,cur)}
+    else if(cur){select.value='__manual__';manual.value=cur;manual.hidden=false;crm3861SetHiddenValue(hiddenInput,cur)}
+    else if(!next.length){select.value='__manual__';manual.hidden=false;crm3861SetHiddenValue(hiddenInput,'')}
+    else{select.value='';manual.hidden=true;crm3861SetHiddenValue(hiddenInput,'')}
+  }};
+}
+function crm3861OpenPostcode(addressInput,onDone){
+  if(!window.daum?.Postcode){toast('주소검색 모듈을 불러오지 못했습니다. 잠시 후 다시 시도하세요.');return;}
+  new daum.Postcode({oncomplete(data){
+    const selected=(data.jibunAddress||data.autoJibunAddress||data.roadAddress||'').trim();
+    addressInput.value=selected;
+    addressInput.dispatchEvent(new Event('change',{bubbles:true}));
+    onDone?.(selected,data);
+  }}).open();
+}
+function crm3861EnhanceListingAddress(){
+  const row=document.querySelector('#modalBody .crm3852-address-row');
+  const addressInput=row?.querySelector('[name="address"]');
+  const buildingInput=row?.querySelector('[name="building_no"]');
+  const unitInput=row?.querySelector('[name="unit_no"]');
+  if(!row||!addressInput||!buildingInput||!unitInput||row.dataset.crm3861==='1')return;
+  row.dataset.crm3861='1';
+  const initialBuilding=buildingInput.value,initialUnit=unitInput.value;
+  addressInput.readOnly=true;
+  addressInput.placeholder='주소 검색 버튼을 눌러 지번주소를 선택하세요';
+  const mainLabel=addressInput.closest('label');
+  mainLabel.classList.add('crm3861-address-search-label');
+  const line=document.createElement('div');line.className='crm3861-address-search-line';
+  addressInput.parentNode.insertBefore(line,addressInput);line.appendChild(addressInput);
+  const searchBtn=document.createElement('button');searchBtn.type='button';searchBtn.className='primary crm3861-address-search-btn';searchBtn.textContent='주소 검색';line.appendChild(searchBtn);
+
+  const buildingLabel=buildingInput.closest('label'),unitLabel=unitInput.closest('label');
+  buildingInput.type='hidden';unitInput.type='hidden';
+  buildingLabel.style.display='none';unitLabel.style.display='none';
+  const choiceWrap=document.createElement('div');choiceWrap.className='crm3861-building-unit-wrap';
+  row.insertBefore(choiceWrap,row.querySelector('.crm3852-address-help'));
+  let same=crm3861ExistingAddressValues(addressInput.value);
+  const buildingChoice=crm3861BuildSelect('동',buildingInput,same.map(x=>x.building_no),initialBuilding,'동 선택',crm3852NormalizeBuilding);
+  const unitsForBuilding=()=>same.filter(x=>crm3852NormalizeBuilding(x.building_no)===crm3852NormalizeBuilding(buildingInput.value||'1동')).map(x=>x.unit_no);
+  const unitChoice=crm3861BuildSelect('호수',unitInput,unitsForBuilding(),initialUnit,'호수 선택',crm3852NormalizeUnit);
+  choiceWrap.append(buildingChoice.shell,unitChoice.shell);
+  const refresh=()=>{
+    same=crm3861ExistingAddressValues(addressInput.value);
+    buildingChoice.refresh(same.map(x=>x.building_no),buildingInput.value||initialBuilding);
+    unitChoice.refresh(unitsForBuilding(),unitInput.value||initialUnit);
+  };
+  buildingChoice.select.addEventListener('change',()=>unitChoice.refresh(unitsForBuilding(),unitInput.value));
+  buildingChoice.manual.addEventListener('input',()=>unitChoice.refresh(unitsForBuilding(),unitInput.value));
+  searchBtn.onclick=()=>crm3861OpenPostcode(addressInput,(selected,data)=>{
+    const region=document.querySelector('#modalBody [name="district"]');
+    if(region&&data?.sigungu&&data?.bname)region.value=`${data.sigungu} ${data.bname}`;
+    crm3861SetHiddenValue(buildingInput,'');crm3861SetHiddenValue(unitInput,'');
+    refresh();
+  });
+  const help=row.querySelector('.crm3852-address-help');
+  if(help)help.innerHTML='주소는 검색 결과에서 선택합니다. 기존 등록 자료가 있으면 동·호수가 선택 목록으로 표시되며, 목록에 없을 때만 <strong>직접 입력</strong>을 선택하세요.';
+}
+const crm3861OpenListingModalBase=openListingModal;
+openListingModal=function(id){
+  const result=crm3861OpenListingModalBase(id);
+  setTimeout(crm3861EnhanceListingAddress,0);
+  return result;
+};
+Object.assign(window,{filterCustomers,openListingModal,crm3861OpenPostcode});
+console.info('CRM v3.8.61 고객시트 순서·간편 거래UI·주소검색/동호 선택 적용 완료');
