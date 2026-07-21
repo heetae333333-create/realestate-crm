@@ -4231,3 +4231,41 @@ openListingModal=function(id){
 };
 Object.assign(window,{openListingModal});
 console.info('CRM v3.8.62 주소검색 + 동호수 직접입력 적용 완료');
+
+/* ===== CRM v3.8.63 1동·101동 동번호 표기 통합 중복판정 ===== */
+function crm3863AlphaNumericKey(value, fallback=''){
+  const raw=String(value??'').toUpperCase().replace(/동|호수|호/g,'').replace(/[^0-9A-Z]/g,'');
+  if(!raw)return fallback;
+  if(/^\d+$/.test(raw)){
+    const normalized=raw.replace(/^0+(?=\d)/,'')||'0';
+    return normalized;
+  }
+  return raw;
+}
+function crm3863BuildingKey(value){
+  const key=crm3863AlphaNumericKey(value,'1');
+  if(/^10[1-9]$/.test(key))return String(Number(key)-100);
+  return key;
+}
+function crm3863UnitKey(value){
+  return crm3863AlphaNumericKey(value,'');
+}
+crm3855CanonicalInput=function(address,building,unit){
+  const p=crm3855ParseLotAddress(address);
+  return {...p,building_key:crm3863BuildingKey(building),unit_key:crm3863UnitKey(unit)};
+};
+crm3855CanonicalListing=function(listing){
+  const parsed=crm3855ParseLotAddress(listing?.address||'');
+  return {
+    ...parsed,
+    district_key:listing?.district_key||parsed.district_key,
+    legal_dong_key:listing?.legal_dong_key||parsed.legal_dong_key,
+    lot_main_key:listing?.lot_main_key||parsed.lot_main_key,
+    lot_sub_key:String(listing?.lot_sub_key??parsed.lot_sub_key??'0'),
+    building_key:crm3863BuildingKey(listing?.building_no||listing?.building_key||'1'),
+    unit_key:crm3863UnitKey(listing?.unit_no||listing?.unit_key||''),
+  };
+};
+crm3855BuildingLooksSimilar=function(a,b){return crm3863BuildingKey(a)===crm3863BuildingKey(b)};
+Object.assign(window,{crm3863BuildingKey,crm3863UnitKey});
+console.info('CRM v3.8.63 1동·101동 표기 통합 중복판정 적용 완료');
