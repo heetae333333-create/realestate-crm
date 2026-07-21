@@ -4518,7 +4518,21 @@ async function crm3866RenderMap(rows){
   if(status)status.textContent=`필터 결과 ${rows.length}건 중 지도에 ${shown}건 표시${shown<rows.length?` · 좌표 확인 불가 ${rows.length-shown}건`:''}`;
 }
 function openNetworkMap(){state.networkMapMode=true;renderNetwork()}
-function closeNetworkMap(){state.networkMapMode=false;state.networkMapRenderToken++;if(state.networkMap){state.networkMap.remove();state.networkMap=null}renderNetwork()}
+function closeNetworkMap(){
+  state.networkMapMode=false;
+  state.networkMapRenderToken=(state.networkMapRenderToken||0)+1;
+  try{state.kakaoMapInfoWindow?.close?.()}catch(e){}
+  try{state.kakaoMapClusterer?.clear?.()}catch(e){}
+  try{(state.kakaoMapOverlays||[]).forEach(x=>x?.setMap?.(null))}catch(e){}
+  state.kakaoMapOverlays=[];
+  state.kakaoMapClusterer=null;
+  state.kakaoMapInfoWindow=null;
+  try{
+    if(state.networkMap&&typeof state.networkMap.remove==='function')state.networkMap.remove();
+  }catch(e){}
+  state.networkMap=null;
+  renderNetwork();
+}
 
 renderNetwork=async function(){
   await loadListings();
@@ -5007,44 +5021,4 @@ crm3868CreateMarker=function(listing){
 };
 console.info('CRM v3.8.71 카카오맵 매물 아이콘 개선 완료');
 
-/* ===== CRM v3.8.72 지도 목록 복귀·프로필 ADMIN 표시 수정 ===== */
-closeNetworkMap = function(){
-  state.networkMapMode=false;
-  state.networkMapRenderToken=(state.networkMapRenderToken||0)+1;
-
-  // Leaflet 지도와 카카오맵은 제거 방식이 다르므로 안전하게 정리한다.
-  try{
-    if(state.kakaoMapInfoWindow?.close)state.kakaoMapInfoWindow.close();
-  }catch{}
-  try{
-    if(state.kakaoMapClusterer?.clear)state.kakaoMapClusterer.clear();
-  }catch{}
-  try{
-    if(Array.isArray(state.kakaoMapOverlays)){
-      state.kakaoMapOverlays.forEach(x=>{try{x?.setMap?.(null)}catch{}});
-    }
-  }catch{}
-  state.kakaoMapOverlays=[];
-  state.kakaoMapClusterer=null;
-  state.kakaoMapInfoWindow=null;
-
-  try{
-    // Leaflet에서만 remove()를 실행한다. 카카오맵에는 remove()가 없다.
-    if(state.networkMap&&typeof state.networkMap.remove==='function')state.networkMap.remove();
-  }catch{}
-  state.networkMap=null;
-
-  renderNetwork();
-};
-
-// 프로필 설정 톱니바퀴에는 ADMIN 글자를 표시하지 않는다.
-const crm3872BaseDecorateAdminButtons=crm3870DecorateAdminButtons;
-crm3870DecorateAdminButtons=function(){
-  crm3872BaseDecorateAdminButtons?.();
-  const profileBtn=document.getElementById('editSidebarProfileBtn');
-  profileBtn?.querySelectorAll('.crm3870-admin-tag').forEach(tag=>tag.remove());
-};
-
-Object.assign(window,{closeNetworkMap,crm3870DecorateAdminButtons});
-setTimeout(crm3870DecorateAdminButtons,50);
-console.info('CRM v3.8.72 지도 목록 복귀·프로필 ADMIN 표시 수정 적용 완료');
+console.info('CRM v3.8.73 긴급 복구·지도 목록복귀 안정화 적용 완료');

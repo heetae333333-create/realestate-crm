@@ -1193,3 +1193,6 @@ body.crm3850-calendar-dragging .calendar-day{cursor:copy}
 button .crm3870-admin-tag{pointer-events:none}
 .crm3868-kakao-map img[src^="data:image/svg+xml"]{image-rendering:auto}
 @media(max-width:720px){.crm3870-admin-tag{font-size:7px;padding:1px 3px;margin-left:3px}}
+
+/* CRM v3.8.73 프로필 설정 버튼 ADMIN 글자 숨김 */
+#editSidebarProfileBtn .crm3870-admin-tag{display:none!important;}
