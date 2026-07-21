@@ -4936,3 +4936,73 @@ if(!window.__crm3870AdminObserver){
 Object.assign(window,{openNetworkMap,renderNetwork,crm3868RenderKakaoMap,crm3870DecorateAdminButtons});
 setTimeout(crm3870DecorateAdminButtons,100);
 console.info('CRM v3.8.70 카카오맵 마커 압축·관리자 표시·좌표 자동보정 적용 완료');
+
+
+/* ===== CRM v3.8.71 카카오맵 매물 아이콘 정사각형형·방/전용면적 표시 ===== */
+function crm3871TrimNumber(value, maxDigits=2){
+  const n=Number(value||0);
+  if(!Number.isFinite(n))return '-';
+  return n.toFixed(maxDigits).replace(/\.0+$|(?<=\.[0-9]*?)0+$/,'').replace(/\.$/,'');
+}
+function crm3871Money(value){
+  const n=Number(value||0);
+  if(!n)return '-';
+  if(n>=10000)return `${crm3871TrimNumber(n/10000,2)}억`;
+  return `${Math.round(n).toLocaleString()}만`;
+}
+function crm3871MarkerPrice(listing){
+  const o=crm3866PreferredDeal(listing);
+  if(o.deal_type==='월세'){
+    const deposit=Number(o.price||0);
+    const rent=Number(o.monthly_rent||0);
+    const d=deposit>=10000?crm3871Money(deposit):Math.round(deposit).toLocaleString();
+    return `${d}/${Math.round(rent).toLocaleString()}`;
+  }
+  return crm3871Money(o.price);
+}
+function crm3871RoomLabel(listing){
+  if(listing?.is_one_point_five_room)return '방1.5';
+  const n=Number(listing?.room_count);
+  return Number.isFinite(n)&&n>=0?`방${crm3871TrimNumber(n,1)}`:'방-';
+}
+function crm3871AreaLabel(listing){
+  const n=Number(listing?.area_m2);
+  return Number.isFinite(n)&&n>0?`${crm3871TrimNumber(n,2)}㎡`:'-㎡';
+}
+crm3868MarkerSvg=function(listing){
+  const deal=crm3866PreferredDeal(listing),type=deal.deal_type||'매물';
+  const typeShort=type==='매매'?'매':type==='전세'?'전':type==='월세'?'월':'매';
+  const price=crm3871MarkerPrice(listing);
+  const room=crm3871RoomLabel(listing);
+  const area=crm3871AreaLabel(listing);
+  const palette=type==='매매'?['#ef4444','#b91c1c']:type==='전세'?['#2563eb','#1d4ed8']:['#7c3aed','#6d28d9'];
+  const priceSize=price.length>=9?9:price.length>=7?10:11;
+  const esc=v=>String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="78" height="58" viewBox="0 0 78 58">
+    <defs><filter id="s" x="-25%" y="-25%" width="150%" height="165%"><feDropShadow dx="0" dy="1.4" stdDeviation="1.5" flood-opacity=".23"/></filter></defs>
+    <g filter="url(#s)">
+      <rect x="1.5" y="1.5" width="75" height="49" rx="8" fill="white" stroke="${palette[0]}" stroke-width="1.7"/>
+      <path d="M34 50h10l-5 6z" fill="${palette[0]}"/>
+      <rect x="1.5" y="1.5" width="21" height="27" rx="7" fill="${palette[0]}"/>
+      <text x="12" y="19.5" text-anchor="middle" font-family="Arial,sans-serif" font-size="11.5" font-weight="800" fill="white">${typeShort}</text>
+      <text x="49" y="19.5" text-anchor="middle" font-family="Arial,sans-serif" font-size="${priceSize}" font-weight="800" fill="#111827">${esc(price)}</text>
+      <line x1="8" y1="30" x2="70" y2="30" stroke="#e5e7eb" stroke-width="1"/>
+      <text x="39" y="43" text-anchor="middle" font-family="Arial,sans-serif" font-size="8.8" font-weight="700" fill="#4b5563">${esc(room)} · ${esc(area)}</text>
+    </g>
+  </svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+};
+crm3868CreateMarker=function(listing){
+  const position=new kakao.maps.LatLng(Number(listing.latitude),Number(listing.longitude));
+  const image=new kakao.maps.MarkerImage(crm3868MarkerSvg(listing),new kakao.maps.Size(78,58),{offset:new kakao.maps.Point(39,58)});
+  const marker=new kakao.maps.Marker({position,image,title:listing.title||'매물'});
+  marker.__listing=listing;
+  kakao.maps.event.addListener(marker,'click',()=>{
+    const html=`<div class="crm3868-kakao-popup">${crm3866MapPopup(listing)}</div>`;
+    if(state.kakaoMapInfoWindow)state.kakaoMapInfoWindow.close();
+    state.kakaoMapInfoWindow=new kakao.maps.InfoWindow({content:html,removable:true});
+    state.kakaoMapInfoWindow.open(state.networkMap,marker);
+  });
+  return marker;
+};
+console.info('CRM v3.8.71 카카오맵 매물 아이콘 개선 완료');
