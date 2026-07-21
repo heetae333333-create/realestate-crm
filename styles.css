@@ -1141,3 +1141,25 @@ body.crm3850-calendar-dragging .calendar-day{cursor:copy}
 .crm3864-listing-feature-filter input{width:16px;height:16px;margin:0}
 .crm3864-listing-feature-filter .ghost{padding:6px 10px;margin-left:auto}
 @media(max-width:760px){.crm3864-feature-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.crm3864-listing-feature-filter .ghost{margin-left:0}}
+
+/* ===== CRM v3.8.66 공동매물망 지도 ===== */
+.crm3866-map-view-btn{display:inline-flex;align-items:center;gap:7px}
+.crm3866-network-panel{overflow:visible}
+.crm3866-map-head{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:14px 0 10px;padding:12px 15px;border:1px solid #dce5f2;border-radius:12px;background:#fff}
+.crm3866-map-head>div:first-child{display:flex;align-items:center;gap:12px;min-width:0}
+.crm3866-map-head strong{font-size:16px;white-space:nowrap}
+.crm3866-map-head span{font-size:13px;color:#64748b}
+.crm3866-map{width:100%;height:min(70vh,720px);min-height:540px;border:1px solid #d8e0ec;border-radius:15px;overflow:hidden;background:#eef2f7;z-index:1}
+.crm3866-map .leaflet-control-zoom a{font-weight:900}
+.crm3866-map-pin-wrap{background:transparent!important;border:0!important}
+.crm3866-map-pin{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:76px;max-width:100px;padding:5px 9px 7px;border:2px solid #19a55a;border-radius:10px;background:#fff;color:#0f172a;box-shadow:0 3px 10px rgba(15,23,42,.22);white-space:nowrap;line-height:1.05}
+.crm3866-map-pin:after{content:"";position:absolute;left:50%;bottom:-8px;transform:translateX(-50%);border:7px solid transparent;border-top-color:#19a55a;border-bottom:0}
+.crm3866-map-pin span{font-size:10px;font-weight:800;color:#16904f}
+.crm3866-map-pin strong{margin-top:2px;font-size:13px;font-weight:900}
+.crm3866-map-cluster-wrap{background:transparent!important}
+.crm3866-map-cluster{display:flex;align-items:center;justify-content:center;width:46px;height:46px;border:5px solid rgba(36,211,118,.3);border-radius:50%;background:#4ddb8c;color:#083c25;font-size:16px;font-weight:900;box-shadow:0 2px 8px rgba(15,23,42,.18)}
+.crm3866-map-popup{min-width:220px;font-size:13px;line-height:1.45}
+.crm3866-map-popup>strong{display:block;margin-bottom:4px;font-size:16px}
+.crm3866-map-popup-price{margin:7px 0;font-weight:800;color:#0f6d3f}
+.crm3866-map-popup button{width:100%;margin-top:9px;padding:8px;border:0;border-radius:8px;background:#1769e0;color:#fff;font-weight:800;cursor:pointer}
+@media(max-width:760px){.crm3866-map{height:68vh;min-height:470px;border-radius:10px}.crm3866-map-head{align-items:flex-start;flex-direction:column;gap:5px}.crm3866-map-head>div:first-child{align-items:flex-start;flex-direction:column;gap:3px}}

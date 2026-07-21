@@ -4375,3 +4375,141 @@ Object.assign(window,{openCustomerModal,filterCustomers,crm3864ClearListingFeatu
 console.info('CRM v3.8.64 고객 희망 매물특징 및 매물필터 연동 적용 완료');
 
 console.info('CRM v3.8.65 고객 테이블 설치 오류 안내 및 스키마 보완 적용 완료');
+
+/* ===== CRM v3.8.66 공동매물망 지도 보기 ===== */
+state.networkMapMode = false;
+state.networkMap = null;
+state.networkMapCluster = null;
+state.networkMapRenderToken = 0;
+
+function crm3866CompactMoney(value){
+  const n=Number(value||0);
+  if(!n)return '-';
+  if(n>=10000){
+    const eok=Math.floor(n/10000), rem=n%10000;
+    if(!rem)return `${eok}억`;
+    const cheon=Math.floor(rem/1000), rest=rem%1000;
+    return `${eok}억${cheon?`${cheon}천`:''}${rest?rest.toLocaleString():''}`;
+  }
+  return n.toLocaleString();
+}
+function crm3866PreferredDeal(listing){
+  const opts=crm38DealOptions(listing);
+  return opts.find(o=>o.is_preferred)||opts[0]||{deal_type:listing.transaction_type||'매매',price:listing.price,monthly_rent:listing.monthly_rent};
+}
+function crm3866MapPrice(listing){
+  const o=crm3866PreferredDeal(listing);
+  return o.deal_type==='월세'?`${crm3866CompactMoney(o.price)}/${crm3866CompactMoney(o.monthly_rent)}`:crm3866CompactMoney(o.price);
+}
+function crm3866FullAddress(listing){
+  const parts=[listing.address,listing.building_no,listing.unit_no].map(v=>String(v||'').trim()).filter(Boolean);
+  return parts.join(' ').replace(/\s+/g,' ').trim();
+}
+function crm3866MapMarkerHtml(listing){
+  const o=crm3866PreferredDeal(listing);
+  return `<div class="crm3866-map-pin"><span>${escapeHtml(o.deal_type||'매물')}</span><strong>${escapeHtml(crm3866MapPrice(listing))}</strong></div>`;
+}
+function crm3866MapPopup(listing){
+  const owner=listing.owner?.full_name||listing.owner_name||'-';
+  return `<div class="crm3866-map-popup">
+    <strong>${escapeHtml(listing.title||'매물')}</strong>
+    <div>${escapeHtml(crm3866FullAddress(listing)||listing.district||'주소 미입력')}</div>
+    <div class="crm3866-map-popup-price">${listingPriceText(listing)}</div>
+    <div class="muted">${escapeHtml(listing.property_type||'-')} · 담당 ${escapeHtml(owner)}</div>
+    <button type="button" onclick="openListingModal('${listing.id}')">상세보기</button>
+  </div>`;
+}
+function crm3866GeocodeCache(){
+  try{return JSON.parse(localStorage.getItem('crm3866_geocode_cache')||'{}')}catch{return{}}
+}
+function crm3866SaveGeocodeCache(cache){
+  try{localStorage.setItem('crm3866_geocode_cache',JSON.stringify(cache))}catch{}
+}
+function crm3866GeocodeKey(address){return String(address||'').toLowerCase().replace(/서울특별시|서울시/g,'서울').replace(/\s+/g,'').trim()}
+async function crm3866GeocodeAddress(address){
+  const key=crm3866GeocodeKey(address),cache=crm3866GeocodeCache();
+  if(cache[key])return cache[key];
+  const query=String(address||'').replace(/\s+\d+(동|호)$/g,'').trim();
+  if(!query)return null;
+  const url=`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=kr&accept-language=ko&q=${encodeURIComponent(query)}`;
+  try{
+    const res=await fetch(url,{headers:{Accept:'application/json'}});
+    if(!res.ok)return null;
+    const data=await res.json();
+    if(!data?.length)return null;
+    const result={lat:Number(data[0].lat),lng:Number(data[0].lon)};
+    if(Number.isFinite(result.lat)&&Number.isFinite(result.lng)){cache[key]=result;crm3866SaveGeocodeCache(cache);return result}
+  }catch(e){console.warn('주소 좌표 변환 실패',address,e)}
+  return null;
+}
+async function crm3866PersistCoordinates(id,lat,lng){
+  try{await state.client.rpc('set_listing_coordinates',{p_listing_id:id,p_lat:lat,p_lng:lng})}catch(e){console.warn(e)}
+}
+function crm3866MapIcon(listing){
+  return L.divIcon({className:'crm3866-map-pin-wrap',html:crm3866MapMarkerHtml(listing),iconSize:[86,42],iconAnchor:[43,42],popupAnchor:[0,-38]});
+}
+function crm3866ClusterIcon(cluster){
+  const count=cluster.getChildCount();
+  return L.divIcon({html:`<div class="crm3866-map-cluster">${count}</div>`,className:'crm3866-map-cluster-wrap',iconSize:[46,46]});
+}
+function crm3866AddMapMarker(listing,bounds){
+  const lat=Number(listing.latitude),lng=Number(listing.longitude);
+  if(!Number.isFinite(lat)||!Number.isFinite(lng))return false;
+  const marker=L.marker([lat,lng],{icon:crm3866MapIcon(listing),title:listing.title||'매물'}).bindPopup(crm3866MapPopup(listing),{maxWidth:330});
+  state.networkMapCluster.addLayer(marker);bounds.push([lat,lng]);return true;
+}
+async function crm3866RenderMap(rows){
+  const token=++state.networkMapRenderToken;
+  const mapEl=document.getElementById('networkMap');if(!mapEl||!window.L)return;
+  if(state.networkMap){state.networkMap.remove();state.networkMap=null}
+  state.networkMap=L.map(mapEl,{zoomControl:true,minZoom:6,maxZoom:19}).setView([37.5665,126.9780],11);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(state.networkMap);
+  state.networkMapCluster=L.markerClusterGroup({
+    showCoverageOnHover:false,spiderfyOnMaxZoom:true,removeOutsideVisibleBounds:true,maxClusterRadius:58,
+    iconCreateFunction:crm3866ClusterIcon
+  });
+  state.networkMap.addLayer(state.networkMapCluster);
+  const bounds=[];let shown=0;
+  rows.forEach(x=>{if(crm3866AddMapMarker(x,bounds))shown++});
+  const status=document.getElementById('networkMapStatus');
+  if(status)status.textContent=`지도에 ${shown}건 표시 · 좌표 확인 중`;
+  if(bounds.length)state.networkMap.fitBounds(bounds,{padding:[45,45],maxZoom:16});
+  setTimeout(()=>state.networkMap?.invalidateSize(),50);
+
+  const missing=rows.filter(x=>!Number.isFinite(Number(x.latitude))||!Number.isFinite(Number(x.longitude)));
+  for(let i=0;i<missing.length;i++){
+    if(token!==state.networkMapRenderToken||!state.networkMapMode)return;
+    const x=missing[i],address=crm3866FullAddress(x)||x.address;
+    if(status)status.textContent=`지도에 ${shown}건 표시 · 주소 좌표 변환 ${i+1}/${missing.length}`;
+    const coord=await crm3866GeocodeAddress(address);
+    if(coord){x.latitude=coord.lat;x.longitude=coord.lng;crm3866AddMapMarker(x,bounds);shown++;crm3866PersistCoordinates(x.id,coord.lat,coord.lng)}
+    if(i<missing.length-1)await new Promise(r=>setTimeout(r,1100));
+  }
+  if(token!==state.networkMapRenderToken)return;
+  if(bounds.length)state.networkMap.fitBounds(bounds,{padding:[45,45],maxZoom:16});
+  if(status)status.textContent=`필터 결과 ${rows.length}건 중 지도에 ${shown}건 표시${shown<rows.length?` · 좌표 확인 불가 ${rows.length-shown}건`:''}`;
+}
+function openNetworkMap(){state.networkMapMode=true;renderNetwork()}
+function closeNetworkMap(){state.networkMapMode=false;state.networkMapRenderToken++;if(state.networkMap){state.networkMap.remove();state.networkMap=null}renderNetwork()}
+
+renderNetwork=async function(){
+  await loadListings();
+  $('#topActions').innerHTML=state.networkMapMode
+    ?'<button class="ghost" onclick="closeNetworkMap()">목록으로 보기</button>'
+    :'<button class="primary crm3866-map-view-btn" onclick="openNetworkMap()">🗺 지도로 보기</button>';
+  $('#content').innerHTML=`<div class="panel crm3826-filter-panel crm3866-network-panel">
+    ${crm3826FilterBar('listing')}
+    <div id="networkSummary"></div>
+    ${state.networkMapMode?`<div class="crm3866-map-head"><div><strong>공동매물 지도</strong><span id="networkMapStatus">좌표를 확인하고 있습니다.</span></div><div class="muted">현재 필터 결과만 지도에 표시됩니다.</div></div><div id="networkMap" class="crm3866-map"></div>`:'<div id="networkTable"></div>'}
+  </div>`;
+  filterNetwork();
+};
+filterNetwork=function(){
+  const publicRows=state.listings.filter(x=>x.is_public);
+  const rows=crm3826FilterRows(publicRows,'listing');
+  state.filteredNetworkListings=rows;
+  crm3826RenderSummary('networkSummary',rows,'공동매물망 필터 결과');
+  if(state.networkMapMode)crm3866RenderMap(rows);else renderListingTable(rows,'networkTable',false);
+};
+Object.assign(window,{renderNetwork,filterNetwork,openNetworkMap,closeNetworkMap});
+console.info('CRM v3.8.66 공동매물망 지도 보기 적용 완료');
