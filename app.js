@@ -5314,3 +5314,136 @@ renderListingTable=function(rows,target,mine,adminMode=false){
 };
 Object.assign(window,{renderListingTable,crm3875CycleFuSort});
 console.info('CRM v3.8.75 등록순 고정 순번·FU 3단 정렬 적용 완료');
+
+/* ===== CRM v3.8.76 내 매물 엑셀 일괄등록 · 전용 양식 ===== */
+const CRM3876_LISTING_TYPES=['아파트','오피스텔','단독','다가구','다세대','상가','사무실','토지','기타'];
+const CRM3876_DEAL_TYPES=['매매','전세','월세'];
+const CRM3876_TEMPLATE_HEADERS=[
+  '매물명*','매물유형*','주소(지번까지)*','동','호수*','거래유형*','선호유형*',
+  '매매가(만원)','전세가(만원)','월세보증금(만원)','월세(만원)','상태','공개여부','지역',
+  '관리비(만원)','전용면적(㎡)','방개수','1.5룸','화장실개수','옵션','대출가능','기준시가(만원)',
+  '입주조건','입주가능일','매물특징','연락처','상세설명(비밀메모)'
+];
+function crm3876Clean(v){return String(v??'').trim()}
+function crm3876Num(v){const s=String(v??'').replace(/,/g,'').trim();if(!s)return null;const n=Number(s);return Number.isFinite(n)?n:null}
+function crm3876Yes(v,yes=['O','Y','YES','TRUE','공개','가능']){return yes.includes(crm3876Clean(v).toUpperCase())}
+function crm3876DealTypes(v){
+  const text=crm3876Clean(v).replace(/\s+/g,'');
+  return CRM3876_DEAL_TYPES.filter(t=>text.includes(t));
+}
+function crm3876Status(v){const s=crm3876Clean(v);return s==='거래완료'||s==='complete'?'complete':'available'}
+function crm3876Features(v){return crm3876Clean(v).split(/[;,/]/).map(x=>x.trim()).filter(x=>CRM36_LISTING_FEATURES.includes(x))}
+function crm3876Contacts(v){
+  const raw=crm3876Clean(v);if(!raw)return [];
+  return raw.split(/\s*;\s*/).map((part,i)=>{
+    const p=part.split('|').map(x=>x.trim());
+    if(p.length===1)return {contact_role:'소유주',contact_name:null,phone:p[0],sort_order:i};
+    if(p.length===2)return {contact_role:p[0]||'기타',contact_name:null,phone:p[1],sort_order:i};
+    return {contact_role:p[0]||'기타',contact_name:p[1]||null,phone:p[2]||'',sort_order:i};
+  }).filter(x=>x.phone);
+}
+function crm3876ParseRow(r,rowNo){
+  const title=crm3876Clean(r['매물명*']||r['매물명']);
+  const propertyType=crm3876Clean(r['매물유형*']||r['매물유형']);
+  const address=crm3876Clean(r['주소(지번까지)*']||r['주소(지번까지)']||r['주소']);
+  const building=typeof crm3852NormalizeBuilding==='function'?crm3852NormalizeBuilding(r['동']):crm3876Clean(r['동'])||'1동';
+  const unit=typeof crm3852NormalizeUnit==='function'?crm3852NormalizeUnit(r['호수*']||r['호수']):crm3876Clean(r['호수*']||r['호수']);
+  const types=crm3876DealTypes(r['거래유형*']||r['거래유형']);
+  let preferred=crm3876Clean(r['선호유형*']||r['선호유형']);if(!types.includes(preferred))preferred=types[0]||'';
+  const errors=[];
+  if(!title)errors.push('매물명');if(!propertyType)errors.push('매물유형');if(!address)errors.push('주소');if(!unit)errors.push('호수');if(!types.length)errors.push('거래유형');
+  if(propertyType&&!CRM3876_LISTING_TYPES.includes(propertyType))errors.push('매물유형 값 오류');
+  const prices={매매:crm3876Num(r['매매가(만원)']),전세:crm3876Num(r['전세가(만원)']),월세:crm3876Num(r['월세보증금(만원)'])};
+  types.forEach(t=>{if(!prices[t])errors.push(`${t} 금액`)});
+  if(types.includes('월세')&&!crm3876Num(r['월세(만원)']))errors.push('월세');
+  const contacts=crm3876Contacts(r['연락처']);
+  const mainContact=contacts[0]?.phone||null;
+  const move=crm3876Clean(r['입주조건']);
+  const payload={
+    owner_id:state.profile.id,original_owner_id:state.profile.id,title,property_type:propertyType,address,building_no:building,unit_no:unit,
+    district:crm3876Clean(r['지역'])||null,transaction_type:preferred||types[0],price:prices[preferred||types[0]],monthly_rent:(preferred||types[0])==='월세'?crm3876Num(r['월세(만원)']):null,
+    status:crm3876Status(r['상태']),is_public:crm3876Clean(r['공개여부'])!=='비공개',management_fee:crm3876Num(r['관리비(만원)']),area_m2:crm3876Num(r['전용면적(㎡)']),
+    room_count:crm3876Yes(r['1.5룸'])?1:crm3876Num(r['방개수']),is_one_point_five_room:crm3876Yes(r['1.5룸']),bathroom_count:crm3876Num(r['화장실개수']),options:crm3876Clean(r['옵션'])||null,
+    loan_available:crm3876Clean(r['대출가능'])?crm3876Yes(r['대출가능']):null,official_price:crm3876Num(r['기준시가(만원)']),
+    move_in_immediate:move==='즉시입주',move_in_negotiable:move==='협의가능',move_in_date:move==='즉시입주'?null:(crm3876Clean(r['입주가능일'])||null),
+    feature_tags:crm3876Features(r['매물특징']),contact_phone:mainContact,description:crm3876Clean(r['상세설명(비밀메모)'])||null,
+    last_confirmed_at:null,last_follow_up_at:null,next_follow_up_at:null,latitude:null,longitude:null,coordinate_provider:null
+  };
+  if(payload.loan_available!==true)payload.official_price=null;
+  if(typeof crm3852AddressKey==='function')payload.address_normalized=crm3852AddressKey(address);
+  if(typeof crm3855CanonicalInput==='function'){
+    const k=crm3855CanonicalInput(address,building,unit);Object.assign(payload,{district_key:k.district_key||null,legal_dong_key:k.legal_dong_key||null,lot_main_key:k.lot_main_key||null,lot_sub_key:k.lot_sub_key||'0',building_key:k.building_key||null,unit_key:k.unit_key||null});
+  }
+  const deals=types.map((t,i)=>({deal_type:t,price:prices[t],monthly_rent:t==='월세'?crm3876Num(r['월세(만원)']):null,is_preferred:t===preferred,sort_order:i}));
+  return {rowNo,label:title||`행 ${rowNo}`,valid:!errors.length,errors,payload,deals,contacts};
+}
+function crm3876DownloadTemplate(){
+  if(!window.XLSX)return toast('엑셀 라이브러리를 불러오지 못했습니다.');
+  const sample={
+    '매물명*':'해성 오피스텔','매물유형*':'오피스텔','주소(지번까지)*':'서울 강서구 화곡동 1039-27','동':'1','호수*':'203','거래유형*':'매매+전세','선호유형*':'전세',
+    '매매가(만원)':20000,'전세가(만원)':17000,'월세보증금(만원)':'','월세(만원)':'','상태':'거래가능','공개여부':'공개','지역':'강서구 화곡동','관리비(만원)':10,
+    '전용면적(㎡)':21.56,'방개수':1,'1.5룸':'O','화장실개수':1,'옵션':'에어컨, 냉장고, 세탁기','대출가능':'O','기준시가(만원)':15000,
+    '입주조건':'협의가능','입주가능일':'2026-08-01','매물특징':'엘리베이터;주차;반려동물 가능','연락처':'소유주|김OO|010-1111-2222;임차인|이OO|010-3333-4444','상세설명(비밀메모)':'내부 메모'
+  };
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.json_to_sheet([sample],{header:CRM3876_TEMPLATE_HEADERS});
+  ws['!cols']=CRM3876_TEMPLATE_HEADERS.map(h=>({wch:Math.min(30,Math.max(12,h.length+4))}));
+  XLSX.utils.book_append_sheet(wb,ws,'매물등록양식');
+  const guide=[['항목','입력방법'],['필수항목','열 이름에 * 표시'],['거래유형','매매, 전세, 월세 또는 매매+전세처럼 +로 복수 선택'],['선호유형','선택한 거래유형 중 하나'],['금액','만원 단위 숫자만 입력'],['동/호수','숫자 또는 영문 입력. 동 공란은 1동 처리'],['상태','거래가능 또는 거래완료'],['공개여부','공개 또는 비공개'],['1.5룸/대출가능','O 또는 X'],['입주조건','즉시입주, 협의가능, 날짜지정 중 하나'],['매물특징','세미콜론(;)으로 구분'],['연락처','구분|이름|전화번호 형식, 여러 명은 세미콜론(;)으로 구분'],['사진','엑셀 일괄등록에서는 사진을 넣을 수 없습니다. 등록 후 내부사진 메뉴에서 추가하세요.']];
+  const gs=XLSX.utils.aoa_to_sheet(guide);gs['!cols']=[{wch:18},{wch:75}];XLSX.utils.book_append_sheet(wb,gs,'작성안내');
+  XLSX.writeFile(wb,'매물_일괄등록_양식.xlsx');
+}
+function crm3876OpenImport(){const input=document.createElement('input');input.type='file';input.accept='.xlsx,.xls';input.onchange=()=>crm3876PreviewImport(input.files?.[0]);input.click()}
+async function crm3876PreviewImport(file){
+  if(!file)return;if(!window.XLSX)return toast('엑셀 라이브러리를 불러오지 못했습니다.');
+  try{
+    const wb=XLSX.read(await file.arrayBuffer(),{cellDates:true});const sheet=wb.Sheets[wb.SheetNames[0]];const raw=XLSX.utils.sheet_to_json(sheet,{defval:'',raw:false});
+    const rows=raw.map((r,i)=>crm3876ParseRow(r,i+2));state.crm3876Import={fileName:file.name,rows,selected:new Set(rows.map((r,i)=>r.valid?i:null).filter(i=>i!==null))};crm3876RenderImportPreview();
+  }catch(e){console.error(e);toast('엑셀 파일을 읽지 못했습니다.')}
+}
+function crm3876ToggleImport(i,checked){const s=state.crm3876Import?.selected;if(!s)return;checked?s.add(i):s.delete(i);crm3876UpdateImportCount()}
+function crm3876ToggleAll(checked){const st=state.crm3876Import;if(!st)return;st.rows.forEach((r,i)=>{if(r.valid)(checked?st.selected.add(i):st.selected.delete(i))});crm3876RenderImportPreview()}
+function crm3876UpdateImportCount(){const st=state.crm3876Import;const el=$('#crm3876ImportCount');if(el)el.textContent=`${st?.selected.size||0}건 선택`;const b=$('#modalSubmit');if(b)b.disabled=!st?.selected.size}
+function crm3876RenderImportPreview(){
+  const st=state.crm3876Import;if(!st)return;
+  $('#modalTitle').textContent='매물 엑셀 일괄등록';
+  $('#modalBody').innerHTML=`<div class="crm3876-import-head"><div><strong>${escapeHtml(st.fileName)}</strong><div class="muted">유효한 행만 선택됩니다. 중복 매물은 등록 과정에서 자동 제외됩니다.</div></div><button class="ghost" type="button" onclick="crm3876DownloadTemplate()">양식 다시 받기</button></div>
+  <div class="crm3876-import-toolbar"><label><input type="checkbox" onchange="crm3876ToggleAll(this.checked)" ${st.rows.filter(r=>r.valid).every((r,i)=>st.selected.has(st.rows.indexOf(r)))?'checked':''}> 유효 행 전체</label><b id="crm3876ImportCount">${st.selected.size}건 선택</b></div>
+  <div class="table-wrap crm3876-preview"><table><thead><tr><th>선택</th><th>행</th><th>매물명</th><th>거래유형</th><th>주소·동·호</th><th>상태</th></tr></thead><tbody>${st.rows.map((r,i)=>`<tr class="${r.valid?'':'invalid-row'}"><td><input type="checkbox" ${st.selected.has(i)?'checked':''} ${r.valid?'':'disabled'} onchange="crm3876ToggleImport(${i},this.checked)"></td><td>${r.rowNo}</td><td><strong>${escapeHtml(r.label)}</strong>${r.errors.length?`<div class="crm3876-error">${escapeHtml(r.errors.join(', '))} 확인</div>`:''}</td><td>${escapeHtml(r.deals.map(d=>d.deal_type).join('·')||'-')}</td><td>${escapeHtml(`${r.payload.address||''} ${r.payload.building_no||''} ${r.payload.unit_no||''}`)}</td><td>${r.payload.status==='complete'?'거래완료':'거래가능'}</td></tr>`).join('')}</tbody></table></div>`;
+  $('#modalSubmit').style.display='';$('#modalSubmit').textContent='선택 매물 등록';$('#modalSubmit').disabled=!st.selected.size;$('#modalSubmit').onclick=e=>{e.preventDefault();crm3876ExecuteImport()};$('#modal').showModal();
+}
+async function crm3876IsDuplicate(row){
+  if(typeof crm3855FindCandidates!=='function')return null;
+  const {key,rows}=await crm3855FindCandidates(row.payload.address,row.payload.building_no,row.payload.unit_no,null);
+  const exact=rows.filter(x=>crm3855CanonicalListing(x).building_key===key.building_key);
+  return exact.find(x=>crm3854ListingDealTypes(x).some(t=>row.deals.some(d=>d.deal_type===t)))||null;
+}
+async function crm3876ExecuteImport(){
+  const st=state.crm3876Import;if(!st?.selected.size)return;
+  const rows=[...st.selected].sort((a,b)=>a-b).map(i=>st.rows[i]).filter(Boolean);if(!confirm(`${rows.length}건을 내 매물로 등록할까요?`))return;
+  const btn=$('#modalSubmit');btn.disabled=true;let success=0,duplicate=0,failed=0;const messages=[];
+  for(let i=0;i<rows.length;i++){
+    const row=rows[i];btn.textContent=`등록 중 ${i+1}/${rows.length}`;
+    try{
+      const dup=await crm3876IsDuplicate(row);if(dup){duplicate++;messages.push(`${row.rowNo}행: 중복 (${dup.owner?.full_name||'다른 중개사'} · ${dup.title})`);continue}
+      const {data,error}=await state.client.from('listings').insert(row.payload).select('id').single();if(error)throw error;
+      const id=data.id;
+      const {error:de}=await state.client.from('listing_deal_options').insert(row.deals.map(x=>({...x,listing_id:id})));if(de)throw de;
+      if(row.contacts.length){const {error:ce}=await state.client.from('listing_contacts').insert(row.contacts.map(x=>({...x,listing_id:id})));if(ce)throw ce}
+      success++;
+    }catch(e){failed++;messages.push(`${row.rowNo}행: ${e?.message||'등록 실패'}`)}
+  }
+  $('#modal').close();await loadListings();renderMyListings();
+  alert(`매물 엑셀 등록 완료\n\n등록 ${success}건\n중복 제외 ${duplicate}건\n실패 ${failed}건${messages.length?`\n\n${messages.slice(0,12).join('\n')}${messages.length>12?'\n...':''}`:''}`);
+}
+const crm3876RenderMyListingsBase=renderMyListings;
+renderMyListings=async function(){
+  await crm3876RenderMyListingsBase();
+  const actions=$('#topActions');if(actions&&!actions.querySelector('.crm3876-excel-import')){
+    const template=document.createElement('button');template.type='button';template.className='ghost';template.textContent='엑셀 양식';template.onclick=crm3876DownloadTemplate;
+    const imp=document.createElement('button');imp.type='button';imp.className='primary crm3876-excel-import';imp.textContent='엑셀 일괄등록';imp.onclick=crm3876OpenImport;
+    actions.insertBefore(template,actions.firstChild);actions.insertBefore(imp,actions.firstChild);
+  }
+};
+Object.assign(window,{renderMyListings,crm3876DownloadTemplate,crm3876OpenImport,crm3876ToggleImport,crm3876ToggleAll,crm3876ExecuteImport});
+console.info('CRM v3.8.76 매물 엑셀 일괄등록 적용 완료');

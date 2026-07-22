@@ -1218,3 +1218,6 @@ button .crm3870-admin-tag{pointer-events:none}
   font-size:12px;line-height:1;
 }
 .crm3875-fu-sort:hover b,.crm3875-fu-sort.is-active b{background:#dbeafe;color:#1d4ed8;}
+
+/* CRM v3.8.76 매물 엑셀 일괄등록 */
+.crm3876-import-head,.crm3876-import-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px}.crm3876-import-head{padding:14px 16px;background:#f6f9ff;border:1px solid #dbe7ff;border-radius:14px;margin-bottom:12px}.crm3876-import-toolbar{padding:10px 4px}.crm3876-preview{max-height:52vh}.crm3876-preview th,.crm3876-preview td{white-space:nowrap;vertical-align:middle}.crm3876-preview .invalid-row{background:#fff5f5;color:#6b7280}.crm3876-error{font-size:12px;color:#dc2626;margin-top:4px}@media(max-width:700px){.crm3876-import-head{align-items:flex-start;flex-direction:column}.crm3876-preview{max-height:58vh}}
