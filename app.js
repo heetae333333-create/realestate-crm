@@ -5447,3 +5447,71 @@ renderMyListings=async function(){
 };
 Object.assign(window,{renderMyListings,crm3876DownloadTemplate,crm3876OpenImport,crm3876ToggleImport,crm3876ToggleAll,crm3876ExecuteImport});
 console.info('CRM v3.8.76 매물 엑셀 일괄등록 적용 완료');
+
+
+/* ===== CRM v3.8.77 엑셀 일괄등록 완료 처리 · 일반 매물 수정 복구 ===== */
+function crm3877ResetSharedModal(label='저장'){
+  const submit=document.querySelector('#modalSubmit');
+  if(!submit)return;
+  submit.disabled=false;
+  submit.textContent=label;
+  submit.style.display='';
+  submit.classList.remove('crm3876-import-running');
+}
+
+const crm3877OpenListingModalBase=openListingModal;
+openListingModal=function(id){
+  // 엑셀 일괄등록에서 사용한 공용 버튼 상태가 일반 매물창에 남지 않도록 먼저 초기화
+  crm3877ResetSharedModal('저장');
+  const result=crm3877OpenListingModalBase(id);
+  setTimeout(()=>crm3877ResetSharedModal('저장'),0);
+  return result;
+};
+
+async function crm3877WithTimeout(task,ms=25000){
+  let timer;
+  try{
+    return await Promise.race([
+      Promise.resolve(task),
+      new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('등록 요청 시간이 초과되었습니다. 다시 시도해 주세요.')),ms)})
+    ]);
+  }finally{clearTimeout(timer)}
+}
+
+crm3876ExecuteImport=async function(){
+  const st=state.crm3876Import;if(!st?.selected.size)return;
+  const rows=[...st.selected].sort((a,b)=>a-b).map(i=>st.rows[i]).filter(Boolean);
+  if(!confirm(`${rows.length}건을 내 매물로 등록할까요?`))return;
+  const btn=document.querySelector('#modalSubmit');
+  btn.disabled=true;btn.classList.add('crm3876-import-running');
+  let success=0,duplicate=0,failed=0;const messages=[];
+  try{
+    for(let i=0;i<rows.length;i++){
+      const row=rows[i];btn.textContent=`등록 중 ${i+1}/${rows.length}`;
+      try{
+        const dup=await crm3877WithTimeout(crm3876IsDuplicate(row));
+        if(dup){duplicate++;messages.push(`${row.rowNo}행: 중복 (${dup.owner?.full_name||'다른 중개사'} · ${dup.title})`);continue}
+        const inserted=await crm3877WithTimeout(state.client.from('listings').insert(row.payload).select('id').single());
+        if(inserted.error)throw inserted.error;
+        const id=inserted.data.id;
+        const dealResult=await crm3877WithTimeout(state.client.from('listing_deal_options').insert(row.deals.map(x=>({...x,listing_id:id}))));
+        if(dealResult.error)throw dealResult.error;
+        if(row.contacts.length){
+          const contactResult=await crm3877WithTimeout(state.client.from('listing_contacts').insert(row.contacts.map(x=>({...x,listing_id:id}))));
+          if(contactResult.error)throw contactResult.error;
+        }
+        success++;
+      }catch(e){failed++;messages.push(`${row.rowNo}행: ${e?.message||'등록 실패'}`)}
+    }
+  }finally{
+    // 완료 여부와 관계없이 일괄등록창을 닫고 공용 모달 버튼을 원래 상태로 복구
+    try{document.querySelector('#modal')?.close()}catch(_){ }
+    state.crm3876Import=null;
+    crm3877ResetSharedModal('저장');
+  }
+  try{await loadListings();await renderMyListings()}catch(e){console.error('엑셀 등록 후 목록 새로고침 실패',e)}
+  alert(`매물 엑셀 등록 완료\n\n등록 ${success}건\n중복 제외 ${duplicate}건\n실패 ${failed}건${messages.length?`\n\n${messages.slice(0,12).join('\n')}${messages.length>12?'\n...':''}`:''}`);
+};
+
+Object.assign(window,{openListingModal,crm3876ExecuteImport});
+console.info('CRM v3.8.77 엑셀 등록 완료 처리 및 일반 매물 수정창 복구 적용 완료');
