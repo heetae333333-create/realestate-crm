@@ -384,11 +384,35 @@ async function downloadAllListingPhotos(listingId){
 }
 
 async function addListingPhotos(listingId){
-  const listing=state.listings.find(x=>x.id===listingId);if(!canManageListing(listing))return toast('사진을 추가할 권한이 없습니다.');
-  const files=$('#galleryPhotoFiles')?.files;if(!files?.length)return toast('업로드할 사진을 선택하세요.');
-  const result=await uploadListingPhotos(listingId,files);
-  toast(`사진 ${result.uploaded}장 업로드${result.failed?`, ${result.failed}장 실패`:''}`);
-  await renderListingPhotoGallery(listing);
+  const listing=state.listings.find(x=>x.id===listingId);
+  if(!canManageListing(listing))return toast('사진을 추가할 권한이 없습니다.');
+
+  // 사진관리 화면 종류와 관계없이 버튼을 누르면 바로 파일 선택창을 연다.
+  // 예전 화면의 #galleryPhotoFiles가 있으면 재사용하고, 없으면 임시 input을 만든다.
+  let input=$('#galleryPhotoFiles');
+  if(!input){
+    input=document.createElement('input');
+    input.type='file';
+    input.accept='image/*';
+    input.multiple=true;
+    input.id='galleryPhotoFiles';
+    input.style.display='none';
+    document.body.appendChild(input);
+  }
+
+  input.value='';
+  input.onchange=async()=>{
+    const files=input.files;
+    if(!files?.length){
+      if(input.parentElement===document.body)input.remove();
+      return;
+    }
+    const result=await uploadListingPhotos(listingId,files);
+    toast(`사진 ${result.uploaded}장 업로드${result.failed?`, ${result.failed}장 실패`:''}`);
+    if(input.parentElement===document.body)input.remove();
+    await renderListingPhotoGallery(listing);
+  };
+  input.click();
 }
 async function deleteListingPhoto(listingId,photoId,path){
   const listing=state.listings.find(x=>x.id===listingId);if(!canManageListing(listing))return toast('사진을 삭제할 권한이 없습니다.');
