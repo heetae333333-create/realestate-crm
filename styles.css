@@ -1480,3 +1480,39 @@ button .crm3870-admin-tag{pointer-events:none}
   .customer-table .crm3857-contact-list{max-width:184px}
   .customer-table .crm3857-contact-item strong{max-width:180px}
 }
+
+/* ===== CRM v3.8.93 희망지역 줄바꿈·말줄임 ===== */
+.customer-table .crm3893-preferred-area{
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:2;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  word-break:keep-all;
+  line-height:1.45;
+  max-height:2.9em;
+  width:100%;
+  max-width:190px;
+  margin:0 auto;
+  text-align:center;
+}
+.customer-table th.crm3893-preferred-area-col,
+.customer-table td.crm3893-preferred-area-col{
+  width:190px;
+  min-width:190px;
+  max-width:190px;
+  white-space:normal !important;
+  padding-left:10px;
+  padding-right:10px;
+}
+@media(max-width:900px){
+  .customer-table th.crm3893-preferred-area-col,
+  .customer-table td.crm3893-preferred-area-col{
+    width:165px;
+    min-width:165px;
+    max-width:165px;
+  }
+  .customer-table .crm3893-preferred-area{max-width:165px}
+}
