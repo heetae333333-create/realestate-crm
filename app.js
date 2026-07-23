@@ -5561,3 +5561,111 @@ crm3864ClearListingFeatures=function(prefix){
 
 Object.assign(window,{crm3864ClearListingFeatures,crm3879ResetListingFilters});
 console.info('CRM v3.8.79 매물 필터 전체 초기화 적용 완료');
+
+/* ===== CRM v3.8.80 상단 버튼 2단 배치 · 고객/내 매물 선택삭제 ===== */
+state.crm3880SelectedCustomers = state.crm3880SelectedCustomers || new Set();
+state.crm3880SelectedListings = state.crm3880SelectedListings || new Set();
+
+function crm3880UpdateBulkButtons(){
+  const cBtn=document.getElementById('crm3880CustomerDeleteBtn');
+  if(cBtn){const n=state.crm3880SelectedCustomers.size;cBtn.disabled=!n;cBtn.textContent=`선택 고객 삭제 (${n})`}
+  const lBtn=document.getElementById('crm3880ListingDeleteBtn');
+  if(lBtn){const n=state.crm3880SelectedListings.size;lBtn.disabled=!n;lBtn.textContent=`선택 매물 삭제 (${n})`}
+}
+function crm3880ToggleCustomer(id,checked){checked?state.crm3880SelectedCustomers.add(id):state.crm3880SelectedCustomers.delete(id);crm3880UpdateBulkButtons()}
+function crm3880ToggleAllCustomers(checked){
+  document.querySelectorAll('#customerTable .crm3880-customer-check').forEach(el=>{el.checked=checked;checked?state.crm3880SelectedCustomers.add(el.value):state.crm3880SelectedCustomers.delete(el.value)});
+  crm3880UpdateBulkButtons();
+}
+function crm3880ToggleListing(id,checked){checked?state.crm3880SelectedListings.add(id):state.crm3880SelectedListings.delete(id);crm3880UpdateBulkButtons()}
+function crm3880ToggleAllListings(checked){
+  document.querySelectorAll('#myListingTable .crm3880-listing-check').forEach(el=>{el.checked=checked;checked?state.crm3880SelectedListings.add(el.value):state.crm3880SelectedListings.delete(el.value)});
+  crm3880UpdateBulkButtons();
+}
+async function crm3880DeleteSelectedCustomers(){
+  const ids=[...state.crm3880SelectedCustomers];if(!ids.length)return;
+  if(!confirm(`선택한 고객 ${ids.length}명을 삭제할까요?\n삭제한 고객정보와 관련 기록은 복구할 수 없습니다.`))return;
+  const btn=document.getElementById('crm3880CustomerDeleteBtn');if(btn)btn.disabled=true;
+  const {error}=await state.client.from('customers').delete().in('id',ids);
+  if(error){crm3880UpdateBulkButtons();return toast(error.message)}
+  state.crm3880SelectedCustomers.clear();toast(`고객 ${ids.length}명을 삭제했습니다.`);await loadCustomers();await renderCustomers();
+}
+async function crm3880DeleteSelectedListings(){
+  const ids=[...state.crm3880SelectedListings];if(!ids.length)return;
+  if(!confirm(`선택한 매물 ${ids.length}건을 삭제할까요?\n등록된 내부사진도 함께 삭제되며 복구할 수 없습니다.`))return;
+  const btn=document.getElementById('crm3880ListingDeleteBtn');if(btn)btn.disabled=true;
+  let success=0,failed=0;
+  for(const id of ids){
+    try{
+      const {data:photos,error:pRead}=await state.client.from('listing_photos').select('storage_path').eq('listing_id',id);if(pRead)throw pRead;
+      const paths=(photos||[]).map(x=>x.storage_path).filter(Boolean);
+      if(paths.length){const {error:sErr}=await state.client.storage.from('listing-photos').remove(paths);if(sErr)throw sErr}
+      const {error}=await state.client.from('listings').delete().eq('id',id);if(error)throw error;
+      success++;
+    }catch(e){console.error('선택 매물 삭제 실패',id,e);failed++}
+  }
+  state.crm3880SelectedListings.clear();toast(`매물 ${success}건 삭제${failed?`, ${failed}건 실패`:''}`);await loadListings();await renderMyListings();
+}
+function crm3880ArrangeMyListingActions(){
+  const top=document.getElementById('topActions');if(!top)return;
+  const buttons=[...top.querySelectorAll(':scope > button, :scope > .crm37-quick-actions button')];
+  const find=text=>buttons.find(b=>b.textContent.replace(/\s+/g,' ').trim().includes(text));
+  const quickCustomer=find('고객 빠른 등록'),quickListing=find('매물 빠른 등록'),addListing=find('매물 등록');
+  const excelImport=find('엑셀 일괄등록'),excelTemplate=find('엑셀 양식');
+  top.innerHTML='';top.classList.add('crm3880-two-row-actions');
+  const main=document.createElement('div');main.className='crm3880-action-row crm3880-main-actions';
+  [quickCustomer,quickListing,addListing].filter(Boolean).forEach(b=>main.appendChild(b));
+  const sub=document.createElement('div');sub.className='crm3880-action-row crm3880-sub-actions';
+  [excelImport,excelTemplate].filter(Boolean).forEach(b=>sub.appendChild(b));
+  const del=document.createElement('button');del.type='button';del.id='crm3880ListingDeleteBtn';del.className='danger';del.disabled=true;del.textContent='선택 매물 삭제 (0)';del.onclick=crm3880DeleteSelectedListings;sub.appendChild(del);
+  top.append(main,sub);crm3880UpdateBulkButtons();
+}
+function crm3880ArrangeCustomerActions(){
+  const top=document.getElementById('topActions');if(!top)return;
+  const buttons=[...top.querySelectorAll(':scope > button, :scope > .crm37-quick-actions button')];
+  const find=text=>buttons.find(b=>b.textContent.replace(/\s+/g,' ').trim().includes(text));
+  const quickCustomer=find('고객 빠른 등록'),quickListing=find('매물 빠른 등록'),addCustomer=find('고객 등록');
+  top.innerHTML='';top.classList.add('crm3880-two-row-actions');
+  const main=document.createElement('div');main.className='crm3880-action-row crm3880-main-actions';
+  [quickCustomer,quickListing,addCustomer].filter(Boolean).forEach(b=>main.appendChild(b));
+  const sub=document.createElement('div');sub.className='crm3880-action-row crm3880-sub-actions';
+  const del=document.createElement('button');del.type='button';del.id='crm3880CustomerDeleteBtn';del.className='danger';del.disabled=true;del.textContent='선택 고객 삭제 (0)';del.onclick=crm3880DeleteSelectedCustomers;sub.appendChild(del);
+  top.append(main,sub);crm3880UpdateBulkButtons();
+}
+function crm3880PatchCustomerTable(){
+  const table=document.querySelector('#customerTable table');if(!table)return;
+  const head=table.querySelector('thead tr');if(!head||head.querySelector('.crm3880-select-head'))return;
+  const th=document.createElement('th');th.className='crm3880-select-head';th.innerHTML='<input type="checkbox" aria-label="현재 고객 전체 선택" onchange="crm3880ToggleAllCustomers(this.checked)">';head.insertBefore(th,head.firstElementChild);
+  [...table.querySelectorAll('tbody tr')].forEach((tr,i)=>{
+    const rows=state.customers.filter(x=>{const q=(document.getElementById('customerSearch')?.value||'').toLowerCase().replace(/\s/g,''),t=document.getElementById('customerType')?.value||'',s=document.getElementById('customerStatus')?.value||'',d=document.getElementById('customerDealType')?.value||'',g=document.getElementById('customerGrade')?.value||'';const search=`${x.name||''} ${x.phone||''} ${(typeof crm3857Contacts==='function'?crm3857Contacts(x):[]).map(c=>`${c.contact_label||''} ${c.contact_name||''} ${c.phone||''}`).join(' ')}`.toLowerCase().replace(/\s/g,'');return (!q||search.includes(q))&&(!t||x.customer_type===t)&&(!s||x.status===s)&&(!d||(typeof crm3857DealOptions==='function'?crm3857DealOptions(x):[]).some(o=>o.deal_type===d))&&(!g||x.customer_grade===g)});
+    const customer=rows[i];if(!customer)return;
+    const td=document.createElement('td');td.className='crm3880-select-cell';td.innerHTML=`<input type="checkbox" class="crm3880-customer-check" value="${customer.id}" ${state.crm3880SelectedCustomers.has(customer.id)?'checked':''} onchange="crm3880ToggleCustomer('${customer.id}',this.checked)">`;tr.insertBefore(td,tr.firstElementChild);
+  });
+  crm3880UpdateBulkButtons();
+}
+function crm3880PatchMyListingTable(rows){
+  const table=document.querySelector('#myListingTable table');if(!table)return;
+  const head=table.querySelector('thead tr');if(!head||head.querySelector('.crm3880-select-head'))return;
+  const th=document.createElement('th');th.className='crm3880-select-head';th.innerHTML='<input type="checkbox" aria-label="현재 매물 전체 선택" onchange="crm3880ToggleAllListings(this.checked)">';head.insertBefore(th,head.firstElementChild);
+  const sorted=typeof crm3875SortRows==='function'?crm3875SortRows(rows,'myListingTable'):rows;
+  const allRows=[...table.querySelectorAll('tbody tr')];let dataIndex=0;
+  allRows.forEach(tr=>{
+    const td=document.createElement('td');td.className='crm3880-select-cell';
+    if(tr.classList.contains('crm3813-address-row')){td.innerHTML='';tr.insertBefore(td,tr.firstElementChild);return}
+    const listing=sorted[dataIndex++];if(!listing)return;
+    td.innerHTML=`<input type="checkbox" class="crm3880-listing-check" value="${listing.id}" ${state.crm3880SelectedListings.has(listing.id)?'checked':''} onchange="crm3880ToggleListing('${listing.id}',this.checked)">`;tr.insertBefore(td,tr.firstElementChild);
+  });
+  crm3880UpdateBulkButtons();
+}
+
+const crm3880RenderMyListingsBase=renderMyListings;
+renderMyListings=async function(){await crm3880RenderMyListingsBase();crm3880ArrangeMyListingActions();crm3880PatchMyListingTable(typeof crm3826FilterRows==='function'?crm3826FilterRows(state.myListings||[],'myListing'):(state.myListings||[]))};
+const crm3880RenderCustomersBase=renderCustomers;
+renderCustomers=async function(){await crm3880RenderCustomersBase();crm3880ArrangeCustomerActions();crm3880PatchCustomerTable()};
+const crm3880FilterCustomersBase=filterCustomers;
+filterCustomers=function(){crm3880FilterCustomersBase();crm3880PatchCustomerTable()};
+const crm3880RenderListingTableBase=renderListingTable;
+renderListingTable=function(rows,target,mine,adminMode=false){crm3880RenderListingTableBase(rows,target,mine,adminMode);if(target==='myListingTable'&&mine&&!adminMode)crm3880PatchMyListingTable(rows)};
+
+Object.assign(window,{renderMyListings,renderCustomers,filterCustomers,renderListingTable,crm3880ToggleCustomer,crm3880ToggleAllCustomers,crm3880ToggleListing,crm3880ToggleAllListings,crm3880DeleteSelectedCustomers,crm3880DeleteSelectedListings});
+console.info('CRM v3.8.80 상단 버튼 2단 배치 및 고객·내 매물 선택삭제 적용 완료');

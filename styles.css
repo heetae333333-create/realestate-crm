@@ -1221,3 +1221,13 @@ button .crm3870-admin-tag{pointer-events:none}
 
 /* CRM v3.8.76 매물 엑셀 일괄등록 */
 .crm3876-import-head,.crm3876-import-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px}.crm3876-import-head{padding:14px 16px;background:#f6f9ff;border:1px solid #dbe7ff;border-radius:14px;margin-bottom:12px}.crm3876-import-toolbar{padding:10px 4px}.crm3876-preview{max-height:52vh}.crm3876-preview th,.crm3876-preview td{white-space:nowrap;vertical-align:middle}.crm3876-preview .invalid-row{background:#fff5f5;color:#6b7280}.crm3876-error{font-size:12px;color:#dc2626;margin-top:4px}@media(max-width:700px){.crm3876-import-head{align-items:flex-start;flex-direction:column}.crm3876-preview{max-height:58vh}}
+
+/* ===== CRM v3.8.80 상단 버튼 2단 배치 · 선택삭제 ===== */
+#topActions.crm3880-two-row-actions{display:flex;flex-direction:column;align-items:flex-end;gap:9px}
+.crm3880-action-row{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.crm3880-sub-actions{padding-top:8px;border-top:1px solid #dbe3ef;width:100%}
+.crm3880-sub-actions button{min-height:40px}
+.crm3880-select-head,.crm3880-select-cell{width:42px;min-width:42px;text-align:center!important;padding-left:8px!important;padding-right:8px!important}
+.crm3880-select-head input,.crm3880-select-cell input{width:17px;height:17px;accent-color:#2563eb;cursor:pointer}
+#crm3880ListingDeleteBtn:disabled,#crm3880CustomerDeleteBtn:disabled{opacity:.45;cursor:not-allowed}
+@media(max-width:760px){#topActions.crm3880-two-row-actions{align-items:stretch}.crm3880-action-row{justify-content:flex-start}.crm3880-sub-actions{padding-top:7px}}
