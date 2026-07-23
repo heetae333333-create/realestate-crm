@@ -5669,3 +5669,89 @@ renderListingTable=function(rows,target,mine,adminMode=false){crm3880RenderListi
 
 Object.assign(window,{renderMyListings,renderCustomers,filterCustomers,renderListingTable,crm3880ToggleCustomer,crm3880ToggleAllCustomers,crm3880ToggleListing,crm3880ToggleAllListings,crm3880DeleteSelectedCustomers,crm3880DeleteSelectedListings});
 console.info('CRM v3.8.80 상단 버튼 2단 배치 및 고객·내 매물 선택삭제 적용 완료');
+
+/* CRM v3.8.81 - 계약서 등록 버튼 및 저장 안정화 */
+(function(){
+  const baseOpenContractDocumentForm = window.openContractDocumentForm || openContractDocumentForm;
+
+  window.openContractDocumentForm = function(){
+    baseOpenContractDocumentForm();
+    const form=document.getElementById('modalForm');
+    const submit=document.getElementById('modalSubmit');
+    if(!form||!submit) return;
+    submit.type='button';
+    submit.disabled=false;
+    submit.textContent='등록';
+    submit.onclick=window.saveContractDocument;
+    form.onsubmit=function(e){
+      e.preventDefault();
+      window.saveContractDocument(e);
+    };
+  };
+
+  window.saveContractDocument = async function(e){
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    const submit=document.getElementById('modalSubmit');
+    if(submit?.disabled) return;
+
+    const get=id=>document.getElementById(id);
+    const title=get('cdListingTitle')?.value.trim()||'';
+    const address=get('cdAddress')?.value.trim()||'';
+    const file=get('cdFile')?.files?.[0];
+    if(!title||!address) return toast('매물명과 주소를 입력하세요.');
+    if(!file) return toast('계약서 파일을 선택하세요.');
+    if(file.size>20*1024*1024) return toast('파일은 20MB 이하만 등록할 수 있습니다.');
+
+    let uploadedPath='';
+    try{
+      if(submit){submit.disabled=true;submit.textContent='등록 중...';}
+      const safeName=(file.name||'contract-file').normalize('NFKD').replace(/[^a-zA-Z0-9._-]/g,'_').replace(/_+/g,'_');
+      uploadedPath=`contracts/${crypto.randomUUID()}-${safeName}`;
+
+      const {error:uploadError}=await state.client.storage.from('contract-documents').upload(uploadedPath,file,{upsert:false,contentType:file.type||undefined});
+      if(uploadError) throw new Error(`파일 업로드 실패: ${uploadError.message}`);
+
+      const row={
+        document_type:'계약서',
+        file_name:file.name,
+        storage_path:uploadedPath,
+        uploaded_by:state.profile.id,
+        listing_title:title,
+        contract_address:address,
+        deal_terms:get('cdTerms')?.value.trim()||null,
+        brokerage_type:get('cdBrokerageType')?.value||'단타',
+        party1_name:get('cdParty1Name')?.value.trim()||null,
+        party1_phone:formatPhone(get('cdParty1Phone')?.value||'')||null,
+        party2_name:get('cdParty2Name')?.value.trim()||null,
+        party2_phone:formatPhone(get('cdParty2Phone')?.value||'')||null,
+        precontract_date:get('cdPrecontractDate')?.value||null,
+        contract_date:get('cdContractDate')?.value||null,
+        balance_date:get('cdBalanceDate')?.value||null,
+        contract_notes:get('cdNotes')?.value.trim()||null
+      };
+
+      const {error:insertError}=await state.client.from('contract_documents').insert(row);
+      if(insertError){
+        await state.client.storage.from('contract-documents').remove([uploadedPath]);
+        uploadedPath='';
+        const msg=String(insertError.message||'');
+        if(/column|schema cache|contract_address|listing_title/i.test(msg)){
+          throw new Error('계약서 저장용 데이터베이스 항목이 설치되지 않았습니다. 압축파일의 UPDATE_v3.8.81_계약서등록_복구.sql을 Supabase에서 실행해 주세요.');
+        }
+        throw new Error(`계약정보 저장 실패: ${msg}`);
+      }
+
+      document.getElementById('modal')?.close();
+      toast('계약서를 등록했습니다.');
+      await loadContractDocuments();
+    }catch(err){
+      console.error('contract document save failed',err);
+      toast(err?.message||'계약서 등록 중 오류가 발생했습니다.');
+    }finally{
+      if(submit){submit.disabled=false;submit.textContent='등록';}
+    }
+  };
+
+  console.info('CRM v3.8.81 계약서 등록 안정화 로드 완료');
+})();
