@@ -1579,3 +1579,7 @@ button .crm3870-admin-tag{pointer-events:none}
 
 /* CRM v3.9.0 */
 .crm390-draft-tag{font-size:11px;color:#2563eb;margin-left:8px;font-weight:600}.crm390-detail-tools{display:flex;gap:8px;flex-wrap:wrap;padding:10px 0 14px;border-bottom:1px solid #e5e7eb;margin-bottom:14px}.crm390-match-card,.crm390-snapshot,.crm390-audit-row{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:14px;border:1px solid #e5e7eb;border-radius:12px;margin-bottom:10px;background:#fff}.crm390-merge-row{display:flex;gap:12px;align-items:center;padding:13px;border:1px solid #e5e7eb;border-radius:10px;margin:8px 0;cursor:pointer}.crm390-admin-tools{display:flex;gap:8px;flex-wrap:wrap}.crm390-admin-tools small{color:#b7791f;background:#fff3cd;padding:2px 5px;border-radius:5px;font-size:9px;margin-left:4px}.crm390-audit-row>span{min-width:0}.crm390-match-card>div{min-width:0}@media(max-width:700px){.crm390-match-card,.crm390-snapshot,.crm390-audit-row{align-items:flex-start;flex-direction:column}.crm390-admin-tools{width:100%}}
+
+/* CRM v3.9.1 */
+.crm390-detail-tools{display:flex;gap:8px;flex-wrap:wrap;padding:12px;margin:0 0 14px;border:1px solid #cfe0ff;border-radius:14px;background:#f5f9ff;position:sticky;top:0;z-index:3}
+.crm391-check-list{display:grid;gap:8px}.crm391-check-row{display:flex;justify-content:space-between;gap:16px;padding:12px 14px;border:1px solid #e2e8f0;border-radius:10px}.crm391-check-row .ok{color:#15803d}.crm391-check-row .bad{color:#dc2626}
