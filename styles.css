@@ -1235,3 +1235,25 @@ button .crm3870-admin-tag{pointer-events:none}
 /* ===== CRM v3.8.82 선택삭제 모드 ===== */
 .crm3882-select-cancel{min-height:40px}
 /* 선택 모드가 아닐 때는 체크박스 열 자체가 생성되지 않아 기존 표 폭을 그대로 유지합니다. */
+
+/* ===== CRM v3.8.85 간편 계약관리 ===== */
+.crm3885-contract-page{display:grid;gap:16px}
+.crm3885-contract-head{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:22px}
+.crm3885-contract-head h2{margin:0 0 6px}
+.crm3885-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.crm3885-summary>div{background:#fff;border:1px solid #dbe3ef;border-radius:14px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between}
+.crm3885-summary span{font-size:13px;color:#64748b;font-weight:700}.crm3885-summary strong{font-size:22px}
+.crm3885-filters{grid-template-columns:minmax(260px,1.5fr) repeat(2,minmax(150px,.6fr))}
+.crm3885-contract-table th,.crm3885-contract-table td{text-align:center;vertical-align:middle;white-space:nowrap}
+.crm3885-contract-table .crm3885-address{text-align:left;white-space:normal;min-width:260px}
+.crm3885-link{background:none;border:0;padding:0;color:#0f172a;font-weight:800;text-decoration:underline;text-underline-offset:3px;text-align:left}
+.crm3885-party-gap{margin-top:6px}.crm3885-quick-form{display:grid;gap:14px}.crm3885-form-note{background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:12px 14px;color:#1d4ed8;font-size:13px}
+.crm3885-form-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.crm3885-form-grid label{margin:0}.crm3885-form-grid input,.crm3885-form-grid select,.crm3885-form-grid textarea{margin-top:6px}
+.crm3885-detail{display:grid;gap:14px}.crm3885-hero{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:18px;border-radius:16px;background:linear-gradient(135deg,#eff6ff,#f8fafc);border:1px solid #cbd5e1}.crm3885-hero h3{margin:7px 0 4px}.crm3885-hero p{margin:0;color:#475569}.crm3885-status{font-size:12px;font-weight:800;color:#2563eb}
+.crm3885-detail-section{border:1px solid #dbe3ef;border-radius:14px;padding:16px;background:#fff}.crm3885-detail-section h4{margin:0 0 12px}.crm3885-section-title{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.crm3885-stage{display:grid;grid-template-columns:minmax(150px,.8fr) minmax(150px,1fr) minmax(120px,.7fr) auto;gap:10px;align-items:center;padding:11px 0;border-top:1px solid #edf2f7}.crm3885-stage:first-of-type{border-top:0}.crm3885-stage-name{display:flex;align-items:center;justify-content:space-between;gap:10px}.crm3885-stage-name label,.crm3885-na{display:flex;align-items:center;gap:6px;font-size:13px}.crm3885-stage.disabled{opacity:.5;background:#f8fafc}
+.crm3885-notices{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.crm3885-notices label{display:flex;align-items:center;gap:8px;border:1px solid #dbe3ef;border-radius:10px;padding:12px;font-weight:700}
+.crm3885-fee-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:end}.crm3885-check{display:flex;align-items:center;justify-content:center;gap:8px;height:48px;border:1px solid #dbe3ef;border-radius:10px;font-weight:800}
+.crm3885-history{display:grid;gap:8px;max-height:250px;overflow:auto}.crm3885-history>div{display:grid;grid-template-columns:180px 1fr;gap:12px;padding:10px;border-radius:10px;background:#f8fafc}.crm3885-history span{white-space:pre-wrap}
+.crm3885-file-viewer{display:grid;gap:12px}.crm3885-file-actions{display:flex;justify-content:flex-end}.crm3885-viewer-top{display:flex;justify-content:center;align-items:center;gap:14px}.crm3885-preview{height:min(65vh,720px);background:#f1f5f9;border:1px solid #dbe3ef;border-radius:14px;display:flex;align-items:center;justify-content:center;overflow:auto}.crm3885-preview img{max-width:100%;max-height:100%;object-fit:contain}.crm3885-preview iframe{width:100%;height:100%;border:0}.crm3885-nopreview{display:grid;gap:14px;text-align:center}.crm3885-thumbs{display:flex;gap:7px;overflow-x:auto;padding:4px}.crm3885-thumbs button{display:flex;align-items:center;gap:6px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.crm3885-thumbs button.active{border-color:#2563eb;background:#eff6ff}.crm3885-thumbs span{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#e2e8f0}.crm3885-file-manage{display:flex;justify-content:center;gap:8px}
+@media(max-width:900px){.crm3885-summary{grid-template-columns:repeat(2,1fr)}.crm3885-filters,.crm3885-form-grid,.crm3885-fee-grid{grid-template-columns:1fr}.crm3885-notices{grid-template-columns:repeat(2,1fr)}.crm3885-stage{grid-template-columns:1fr 1fr}.crm3885-contract-head{align-items:flex-start}.crm3885-history>div{grid-template-columns:1fr}.crm3885-preview{height:55vh}}
