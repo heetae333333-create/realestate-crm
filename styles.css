@@ -1516,3 +1516,49 @@ button .crm3870-admin-tag{pointer-events:none}
   }
   .customer-table .crm3893-preferred-area{max-width:165px}
 }
+
+/* ===== CRM v3.8.94 고객 입주희망일 ===== */
+.crm3894-move-in-col{
+  width:140px;
+  min-width:140px;
+  max-width:140px;
+  text-align:center;
+  white-space:normal !important;
+}
+.crm3894-move-in-text{
+  display:block;
+  max-width:126px;
+  margin:0 auto;
+  line-height:1.35;
+  word-break:keep-all;
+  overflow-wrap:anywhere;
+}
+.crm3894-move-in-editor{
+  border:1px solid #dbe4f0;
+  border-radius:14px;
+  padding:14px;
+  background:#f8fafc;
+}
+.crm3894-move-in-head{
+  display:flex;
+  align-items:baseline;
+  gap:10px;
+  margin-bottom:10px;
+}
+.crm3894-move-in-head span{font-size:12px;color:#64748b}
+.crm3894-move-in-grid{
+  display:grid;
+  grid-template-columns:150px minmax(220px,1fr);
+  gap:10px;
+  align-items:center;
+}
+.crm3894-period-inputs{
+  display:grid;
+  grid-template-columns:minmax(170px,1fr) 110px;
+  gap:10px;
+}
+.crm3894-period-inputs[hidden],#crm3894MoveInDate[hidden]{display:none !important}
+@media(max-width:720px){
+  .crm3894-move-in-grid{grid-template-columns:1fr}
+  .crm3894-period-inputs{grid-template-columns:1fr 100px}
+}

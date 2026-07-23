@@ -6863,3 +6863,121 @@ console.info('CRM v3.8.91 고객명·연락처 줄바꿈 및 관리버튼 2단 �
   setTimeout(patchPreferredArea,0);
   console.info('CRM v3.8.93 희망지역 2줄 줄바꿈 및 말줄임 적용 완료');
 })();
+
+/* ===== CRM v3.8.94 고객 입주희망일 목록 표시 · 날짜/초중말 입력 ===== */
+(()=>{
+  function crm3894MoveInText(customer){
+    const period=String(customer?.desired_move_in_period||'').trim();
+    if(period)return period;
+    const date=customer?.desired_move_in_date;
+    return date?fmtDate(date):'-';
+  }
+
+  function crm3894PatchCustomerMoveInColumn(){
+    document.querySelectorAll('#customerTable table.customer-table').forEach(table=>{
+      const headers=[...table.querySelectorAll('thead th')];
+      if(headers.some(th=>th.textContent.trim()==='입주희망일'))return;
+      const featureIndex=headers.findIndex(th=>th.textContent.trim()==='희망특징');
+      if(featureIndex<0)return;
+      const th=document.createElement('th');
+      th.textContent='입주희망일';
+      th.className='crm3894-move-in-col';
+      headers[featureIndex].before(th);
+      const rows=[...table.querySelectorAll('tbody tr')];
+      const source=state.filteredCustomers||state.customers||[];
+      rows.forEach((tr,index)=>{
+        const customer=source[index];
+        const td=document.createElement('td');
+        td.className='crm3894-move-in-col';
+        td.innerHTML=`<span class="crm3894-move-in-text" title="${escapeHtml(crm3894MoveInText(customer))}">${escapeHtml(crm3894MoveInText(customer))}</span>`;
+        tr.children[featureIndex]?.before(td);
+      });
+    });
+  }
+
+  function crm3894BuildMoveInEditor(customer){
+    const exact=customer?.desired_move_in_date?String(customer.desired_move_in_date).slice(0,10):'';
+    const period=String(customer?.desired_move_in_period||'').trim();
+    let mode='date',month='',part='초순';
+    const m=period.match(/^(\d{4}-\d{2})\s*(초순|중순|말)$/);
+    if(m){mode='period';month=m[1];part=m[2];}
+    return `<div class="crm3894-move-in-editor span-2">
+      <div class="crm3894-move-in-head"><strong>입주 희망일</strong><span>정확한 날짜 또는 월의 초순·중순·말로 입력할 수 있습니다.</span></div>
+      <div class="crm3894-move-in-grid">
+        <select id="crm3894MoveInMode">
+          <option value="date" ${mode==='date'?'selected':''}>날짜 지정</option>
+          <option value="period" ${mode==='period'?'selected':''}>초순·중순·말</option>
+        </select>
+        <input id="crm3894MoveInDate" type="date" value="${escapeHtml(exact)}" ${mode==='period'?'hidden':''}>
+        <div id="crm3894MoveInPeriodWrap" class="crm3894-period-inputs" ${mode==='date'?'hidden':''}>
+          <input id="crm3894MoveInMonth" type="month" value="${escapeHtml(month)}">
+          <select id="crm3894MoveInPart"><option ${part==='초순'?'selected':''}>초순</option><option ${part==='중순'?'selected':''}>중순</option><option ${part==='말'?'selected':''}>말</option></select>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  const baseOpen=window.openCustomerModal||openCustomerModal;
+  openCustomerModal=function(id=null){
+    const before=id?(state.customers.find(x=>x.id===id)||null):null;
+    baseOpen(id);
+    const body=document.getElementById('modalBody');
+    if(!body)return;
+
+    const old=document.getElementById('crm3888DesiredMoveIn');
+    const oldLabel=old?.closest('label');
+    if(oldLabel)oldLabel.style.display='none';
+    if(old)old.type='hidden';
+
+    const basicCard=[...body.querySelectorAll('.crm3857-form-card')].find(x=>x.querySelector('h3')?.textContent.trim()==='기본 정보');
+    const grid=basicCard?.querySelector('.form-grid');
+    if(grid&&!document.getElementById('crm3894MoveInMode'))grid.insertAdjacentHTML('beforeend',crm3894BuildMoveInEditor(before));
+
+    const mode=document.getElementById('crm3894MoveInMode');
+    const date=document.getElementById('crm3894MoveInDate');
+    const periodWrap=document.getElementById('crm3894MoveInPeriodWrap');
+    mode?.addEventListener('change',()=>{
+      const isDate=mode.value==='date';
+      date.hidden=!isDate;
+      periodWrap.hidden=isDate;
+    });
+
+    const submit=document.getElementById('modalSubmit');
+    const baseHandler=submit?.onclick;
+    if(!submit||typeof baseHandler!=='function')return;
+    submit.onclick=async function(e){
+      const selectedMode=mode?.value||'date';
+      const exactDate=selectedMode==='date'?(date?.value||null):null;
+      const month=document.getElementById('crm3894MoveInMonth')?.value||'';
+      const part=document.getElementById('crm3894MoveInPart')?.value||'';
+      const period=selectedMode==='period'&&month&&part?`${month} ${part}`:null;
+      if(old)old.value=exactDate||'';
+
+      await baseHandler.call(this,e);
+      if(document.getElementById('modal')?.open)return;
+      if(!id)return;
+
+      const oldText=before?.desired_move_in_period||before?.desired_move_in_date||'-';
+      const newText=period||exactDate||'-';
+      const {error}=await state.client.from('customers').update({desired_move_in_date:exactDate,desired_move_in_period:period}).eq('id',id);
+      if(error){toast(`입주 희망일 저장 실패: ${error.message}`);return;}
+      if(String(oldText)!==String(newText)){
+        await state.client.from('interaction_history').insert({customer_id:id,listing_id:null,created_by:state.profile.id,follow_up_date:today(),contact_method:'조건이력',content:`입주 희망일: ${oldText} → ${newText}`,next_follow_up_at:null});
+      }
+      const target=state.customers.find(x=>x.id===id);
+      if(target){target.desired_move_in_date=exactDate;target.desired_move_in_period=period;}
+      setTimeout(crm3894PatchCustomerMoveInColumn,0);
+    };
+  };
+
+  const baseRender=window.renderCustomers||renderCustomers;
+  renderCustomers=async function(){const result=await baseRender();setTimeout(crm3894PatchCustomerMoveInColumn,0);return result};
+  const baseFilter=window.filterCustomers||filterCustomers;
+  filterCustomers=function(){const result=baseFilter();setTimeout(crm3894PatchCustomerMoveInColumn,0);return result};
+
+  const observer=new MutationObserver(()=>requestAnimationFrame(crm3894PatchCustomerMoveInColumn));
+  observer.observe(document.documentElement,{childList:true,subtree:true});
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(crm3894PatchCustomerMoveInColumn,0));
+  Object.assign(window,{openCustomerModal,renderCustomers,filterCustomers});
+  console.info('CRM v3.8.94 고객 입주희망일 목록 및 날짜/초중말 입력 적용 완료');
+})();
