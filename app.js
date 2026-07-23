@@ -6794,3 +6794,41 @@ console.info('CRM v3.8.87 고객 엑셀 일괄등록 및 양식 적용 완료');
 
 /* ===== CRM v3.8.91 고객표 가독성 개선 ===== */
 console.info('CRM v3.8.91 고객명·연락처 줄바꿈 및 관리버튼 2단 배치 적용 완료');
+
+/* ===== CRM v3.8.92 표 스크롤 방식 통일 ===== */
+(()=>{
+  function bindShiftWheelScroll(wrap){
+    if(!wrap || wrap.dataset.crm3892ShiftWheel==='1') return;
+    wrap.dataset.crm3892ShiftWheel='1';
+
+    wrap.addEventListener('wheel',e=>{
+      const canScrollX=wrap.scrollWidth>wrap.clientWidth;
+
+      // 일반 휠은 브라우저 기본 세로 스크롤을 그대로 사용합니다.
+      if(!e.shiftKey){
+        e.stopImmediatePropagation();
+        return;
+      }
+
+      // Shift + 휠일 때만 표를 좌우로 이동합니다.
+      if(!canScrollX) return;
+      const amount=Math.abs(e.deltaY)>=Math.abs(e.deltaX)?e.deltaY:e.deltaX;
+      if(!amount) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      wrap.scrollLeft+=amount;
+    },{capture:true,passive:false});
+  }
+
+  function patchScrollAreas(){
+    document.querySelectorAll('.customer-table-scroll,.listing-table-wrap,.crm3890-listing-scroll').forEach(bindShiftWheelScroll);
+  }
+
+  const observer=new MutationObserver(()=>requestAnimationFrame(patchScrollAreas));
+  observer.observe(document.documentElement,{childList:true,subtree:true});
+  window.addEventListener('resize',()=>setTimeout(patchScrollAreas,0));
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(patchScrollAreas,0));
+  setTimeout(patchScrollAreas,0);
+
+  console.info('CRM v3.8.92 일반 휠 세로 · Shift+휠 가로 스크롤 적용 완료');
+})();
