@@ -6424,3 +6424,246 @@ crm3880ArrangeCustomerActions=function(){
 
 Object.assign(window,{crm3887DownloadTemplate,crm3887OpenImport,crm3887PreviewImport,crm3887ToggleImport,crm3887ToggleAll,crm3887ExecuteImport,crm3880ArrangeCustomerActions});
 console.info('CRM v3.8.87 고객 엑셀 일괄등록 및 양식 적용 완료');
+
+/* ===== CRM v3.8.88 고객 가로스크롤 · 예정 FU 분리 · 조건이력 ===== */
+(function(){
+  const crm3888BaseOpenCustomerModal = window.openCustomerModal || openCustomerModal;
+  const crm3888BaseOpenFollowUpModal = window.openFollowUpModal || openFollowUpModal;
+  const crm3888BaseOpenHistoryModal = window.openHistoryModal || openHistoryModal;
+  const crm3888BaseRenderCustomers = window.renderCustomers || renderCustomers;
+  const crm3888BaseFilterCustomers = window.filterCustomers || filterCustomers;
+
+  function crm3888Money(v){
+    if(v===null||v===undefined||v==='') return '-';
+    return `${Number(v).toLocaleString('ko-KR')}만원`;
+  }
+  function crm3888Bool(v,yes='O',no='X'){return v===true?yes:v===false?no:'미확인'}
+  function crm3888RoomText(v,oneFive){return oneFive?'1.5룸':(v===null||v===undefined||v===''?'-':`${v}룸`)}
+  function crm3888FeatureText(arr){return Array.isArray(arr)&&arr.length?arr.join(', '):'-'}
+  function crm3888DealMap(customer){
+    const rows=typeof crm3857DealOptions==='function'?crm3857DealOptions(customer):[];
+    return new Map(rows.map(x=>[x.deal_type,{budget_max:x.budget_max??null,desired_monthly_rent:x.desired_monthly_rent??null}]));
+  }
+  function crm3888ReadDraft(){
+    const form=document.getElementById('modalForm');
+    const fd=new FormData(form);
+    const deals=typeof crm3857ReadDealOptions==='function'?crm3857ReadDealOptions():[];
+    return {
+      status:fd.get('status')||null,
+      grade:fd.get('customer_grade')||null,
+      area:fd.get('preferred_area')||null,
+      rooms:document.getElementById('desiredOnePointFiveCheck')?.checked?1:(fd.get('desired_rooms')?Number(fd.get('desired_rooms')):null),
+      oneFive:!!document.getElementById('desiredOnePointFiveCheck')?.checked,
+      loan:fd.get('loan_available')==='true',
+      equityUnknown:!!document.getElementById('equityUnknownCheck')?.checked,
+      equity:document.getElementById('equityUnknownCheck')?.checked?null:(fd.get('equity_capital')?Number(fd.get('equity_capital')):null),
+      features:typeof crm3864ReadCustomerFeatures==='function'?crm3864ReadCustomerFeatures():[],
+      moveIn:document.getElementById('crm3888DesiredMoveIn')?.value||null,
+      deals
+    };
+  }
+  function crm3888ConditionLines(before,draft){
+    const lines=[];
+    const oldDeals=crm3888DealMap(before),newDeals=new Map(draft.deals.map(x=>[x.deal_type,x]));
+    const oldTypes=[...oldDeals.keys()],newTypes=[...newDeals.keys()];
+    if(oldTypes.join('+')!==newTypes.join('+')) lines.push(`거래유형: ${oldTypes.join('+')||'-'} → ${newTypes.join('+')||'-'}`);
+    ['매매','전세','월세'].forEach(type=>{
+      const a=oldDeals.get(type),b=newDeals.get(type);
+      if(!a&&!b)return;
+      if(type==='월세'){
+        const oldText=a?`보증금 ${crm3888Money(a.budget_max)} / 월 ${crm3888Money(a.desired_monthly_rent)}`:'없음';
+        const newText=b?`보증금 ${crm3888Money(b.budget_max)} / 월 ${crm3888Money(b.desired_monthly_rent)}`:'없음';
+        if(oldText!==newText)lines.push(`월세조건: ${oldText} → ${newText}`);
+      }else{
+        const av=a?.budget_max??null,bv=b?.budget_max??null;
+        if(String(av??'')!==String(bv??''))lines.push(`${type} 희망금액: ${crm3888Money(av)} → ${crm3888Money(bv)}`);
+      }
+    });
+    const pairs=[
+      ['희망지역',before.preferred_area||'-',draft.area||'-'],
+      ['방 개수',crm3888RoomText(before.desired_rooms,before.desired_one_point_five_room),crm3888RoomText(draft.rooms,draft.oneFive)],
+      ['1.5룸 여부',before.desired_one_point_five_room?'O':'X',draft.oneFive?'O':'X'],
+      ['대출 여부',crm3888Bool(before.loan_available),crm3888Bool(draft.loan)],
+      ['자기자본금',before.equity_unknown?'모름':crm3888Money(before.equity_capital),draft.equityUnknown?'모름':crm3888Money(draft.equity)],
+      ['희망 매물 특징',crm3888FeatureText(before.desired_feature_tags),crm3888FeatureText(draft.features)],
+      ['입주 희망일',before.desired_move_in_date||'-',draft.moveIn||'-'],
+      ['고객 상태',before.status||'-',draft.status||'-'],
+      ['고객 등급',before.customer_grade||'-',draft.grade||'-']
+    ];
+    pairs.forEach(([label,a,b])=>{if(String(a)!==String(b))lines.push(`${label}: ${a} → ${b}`)});
+    return lines;
+  }
+
+  openCustomerModal=function(id=null){
+    const before=id?(state.customers.find(x=>x.id===id)||null):null;
+    crm3888BaseOpenCustomerModal(id);
+    const body=document.getElementById('modalBody');
+    if(!body)return;
+    if(id){
+      body.insertAdjacentHTML('afterbegin',`<div class="crm3888-customer-nav"><button type="button" class="active">고객정보</button><button type="button" onclick="openCustomerFuHub('${id}','records')">FU 기록</button><button type="button" onclick="openCustomerFuHub('${id}','schedule')">예정 FU</button><button type="button" onclick="openCustomerFuHub('${id}','conditions')">조건이력</button></div>`);
+    }
+    const fuInput=body.querySelector('[name="next_follow_up_at"]');
+    if(fuInput){
+      const old=before?.next_follow_up_at?String(before.next_follow_up_at).slice(0,10):'';
+      const label=fuInput.closest('label');
+      if(label){label.style.display='none';fuInput.type='hidden';fuInput.value=old;}
+    }
+    const basicCard=[...body.querySelectorAll('.crm3857-form-card')].find(x=>x.querySelector('h3')?.textContent.trim()==='기본 정보');
+    if(basicCard&&!document.getElementById('crm3888DesiredMoveIn')){
+      const grid=basicCard.querySelector('.form-grid');
+      grid?.insertAdjacentHTML('beforeend',`<label>입주 희망일<input id="crm3888DesiredMoveIn" type="date" value="${before?.desired_move_in_date||''}"></label>`);
+    }
+    if(!id||!before)return;
+    const submit=document.getElementById('modalSubmit');
+    const baseHandler=submit?.onclick;
+    if(!submit||typeof baseHandler!=='function')return;
+    submit.onclick=async function(e){
+      const draft=crm3888ReadDraft();
+      await baseHandler.call(this,e);
+      const modal=document.getElementById('modal');
+      if(modal?.open)return;
+      const {error:moveErr}=await state.client.from('customers').update({desired_move_in_date:draft.moveIn}).eq('id',id);
+      if(moveErr){toast(`입주 희망일 저장 실패: ${moveErr.message}`);return;}
+      const lines=crm3888ConditionLines(before,draft);
+      if(lines.length){
+        const {error:hErr}=await state.client.from('interaction_history').insert({customer_id:id,listing_id:null,created_by:state.profile.id,follow_up_date:today(),contact_method:'조건이력',content:lines.join('\n'),next_follow_up_at:null});
+        if(hErr)toast(`고객정보는 저장됐지만 조건이력 기록 실패: ${hErr.message}`);
+      }
+      await loadCustomers();
+      await renderCustomers();
+    };
+  };
+
+  function crm3888Tabs(customerId,active){
+    return `<div class="crm3888-fu-tabs"><button type="button" class="${active==='records'?'active':''}" onclick="openCustomerFuHub('${customerId}','records')">FU 기록</button><button type="button" class="${active==='schedule'?'active':''}" onclick="openCustomerFuHub('${customerId}','schedule')">예정 FU</button><button type="button" class="${active==='conditions'?'active':''}" onclick="openCustomerFuHub('${customerId}','conditions')">조건이력</button></div>`;
+  }
+  async function crm3888SyncNextFu(customerId){
+    const {data,error}=await state.client.from('customer_fu_schedules').select('scheduled_at').eq('customer_id',customerId).eq('completed',false).order('scheduled_at',{ascending:true}).limit(1);
+    if(error)throw error;
+    const next=data?.[0]?.scheduled_at?String(data[0].scheduled_at).slice(0,10):null;
+    await state.client.from('customers').update({next_follow_up_at:next}).eq('id',customerId);
+    const customer=state.customers.find(x=>x.id===customerId);if(customer)customer.next_follow_up_at=next;
+  }
+  async function crm3888RenderRecords(customer){
+    const {data,error}=await state.client.from('interaction_history').select('*, writer:profiles!interaction_history_created_by_fkey(full_name)').eq('customer_id',customer.id).neq('contact_method','조건이력').order('follow_up_date',{ascending:false}).order('created_at',{ascending:false});
+    if(error)return `<div class="crm3888-empty">${escapeHtml(error.message)}</div>`;
+    return `<div class="crm3888-fu-form"><label>기록 일자<input id="crm3888RecordDate" type="date" value="${today()}"></label><label>상담 종류<select id="crm3888RecordMethod"><option>전화</option><option>방문</option><option>문자/톡</option><option>매물추천</option><option>계약상담</option><option>기타</option></select></label><label class="span-2">상담·진행 내용<textarea id="crm3888RecordContent" rows="5" placeholder="통화 내용, 고객 반응, 다음 조치 등을 기록하세요."></textarea></label><div class="crm3888-fu-form-actions"><button type="button" class="primary" onclick="crm3888SaveRecord('${customer.id}')">FU 기록 저장</button></div></div>${data?.length?`<div class="crm3888-record-list">${data.map(h=>`<article class="crm3888-record-item"><div class="crm3888-item-head"><div><strong>${escapeHtml(h.contact_method||'FU')}</strong> · ${fmtDate(h.follow_up_date)}</div><span class="muted">${escapeHtml(h.writer?.full_name||'')}</span></div><div>${escapeHtml(h.content||'').replace(/\n/g,'<br>')}</div></article>`).join('')}</div>`:'<div class="crm3888-empty">아직 FU 기록이 없습니다.</div>'}`;
+  }
+  async function crm3888RenderSchedules(customer){
+    if(!state.members?.length){try{await loadMembers()}catch(_){}}
+    const {data,error}=await state.client.from('customer_fu_schedules').select('*, assignee:profiles!customer_fu_schedules_assigned_to_fkey(full_name)').eq('customer_id',customer.id).order('completed',{ascending:true}).order('scheduled_at',{ascending:true});
+    if(error){
+      if(/customer_fu_schedules|schema cache/i.test(error.message||''))return '<div class="crm3888-empty">v3.8.88 SQL을 Supabase에서 먼저 실행해 주세요.</div>';
+      return `<div class="crm3888-empty">${escapeHtml(error.message)}</div>`;
+    }
+    const members=(state.members||[]).filter(x=>x.status==='approved');
+    const now=Date.now();
+    return `<div class="crm3888-fu-form"><input id="crm3888ScheduleId" type="hidden"><label>예정일<input id="crm3888ScheduleDate" type="date" value="${today()}"></label><label>시간<input id="crm3888ScheduleTime" type="time" value="09:00"></label><label class="span-2">FU 사유<input id="crm3888ScheduleReason" placeholder="예: 조건 재확인, 방문 전 연락"></label><label>담당자<select id="crm3888ScheduleAssignee">${members.map(m=>`<option value="${m.id}" ${m.id===state.profile.id?'selected':''}>${escapeHtml(m.full_name||'-')}</option>`).join('')}</select></label><div class="crm3888-fu-form-actions"><button type="button" class="ghost" onclick="crm3888ResetScheduleForm()">입력 초기화</button><button type="button" class="primary" onclick="crm3888SaveSchedule('${customer.id}')">예정 FU 저장</button></div></div>${data?.length?`<div class="crm3888-schedule-list">${data.map(s=>{const overdue=!s.completed&&new Date(s.scheduled_at).getTime()<now;const d=new Date(s.scheduled_at);return `<article class="crm3888-schedule-item ${overdue?'overdue':''} ${s.completed?'completed':''}"><div class="crm3888-item-head"><div><div class="${overdue?'crm3888-due-red':'crm3888-due-normal'}">${d.toLocaleString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}${overdue?' · 지남':''}</div><div class="muted">담당 ${escapeHtml(s.assignee?.full_name||'-')}</div></div><div class="crm3888-item-actions">${s.completed?badge('완료','green'):`<button type="button" class="ghost" onclick="crm3888EditSchedule('${s.id}','${customer.id}')">수정</button><button type="button" class="success" onclick="crm3888CompleteSchedule('${s.id}','${customer.id}')">완료</button><button type="button" class="danger" onclick="crm3888DeleteSchedule('${s.id}','${customer.id}')">삭제</button>`}</div></div><strong>${escapeHtml(s.reason||'-')}</strong></article>`}).join('')}</div>`:'<div class="crm3888-empty">등록된 예정 FU가 없습니다.</div>'}`;
+  }
+  async function crm3888RenderConditions(customer){
+    const {data,error}=await state.client.from('interaction_history').select('*, writer:profiles!interaction_history_created_by_fkey(full_name)').eq('customer_id',customer.id).eq('contact_method','조건이력').order('created_at',{ascending:false});
+    if(error)return `<div class="crm3888-empty">${escapeHtml(error.message)}</div>`;
+    return data?.length?`<div class="crm3888-condition-list">${data.map(h=>`<article class="crm3888-condition-item"><div class="crm3888-item-head"><strong>${new Date(h.created_at||h.follow_up_date).toLocaleString('ko-KR')}</strong><span class="muted">${escapeHtml(h.writer?.full_name||'')}</span></div><pre>${escapeHtml(h.content||'')}</pre></article>`).join('')}</div>`:'<div class="crm3888-empty">변경된 고객 조건이 없습니다.</div>';
+  }
+  async function openCustomerFuHub(customerId,tab='records'){
+    const customer=state.customers.find(x=>x.id===customerId);
+    if(!customer)return toast('고객을 찾지 못했습니다.');
+    document.getElementById('modalTitle').textContent=`${customer.name} · 고객 FU 관리`;
+    document.getElementById('modalSubmit').style.display='none';
+    document.getElementById('modalBody').innerHTML=crm3888Tabs(customerId,tab)+'<div class="crm3888-empty">불러오는 중입니다.</div>';
+    document.getElementById('modal').showModal();
+    let html='';
+    if(tab==='schedule')html=await crm3888RenderSchedules(customer);
+    else if(tab==='conditions')html=await crm3888RenderConditions(customer);
+    else html=await crm3888RenderRecords(customer);
+    document.getElementById('modalBody').innerHTML=crm3888Tabs(customerId,tab)+html;
+    const restore=()=>{document.getElementById('modalSubmit').style.display='';document.getElementById('modal').removeEventListener('close',restore)};
+    document.getElementById('modal').addEventListener('close',restore,{once:true});
+  }
+  async function crm3888SaveRecord(customerId){
+    const date=document.getElementById('crm3888RecordDate')?.value,method=document.getElementById('crm3888RecordMethod')?.value,content=document.getElementById('crm3888RecordContent')?.value.trim();
+    if(!date||!content)return toast('기록일자와 상담 내용을 입력하세요.');
+    const {error}=await state.client.from('interaction_history').insert({customer_id:customerId,listing_id:null,created_by:state.profile.id,follow_up_date:date,contact_method:method,content,next_follow_up_at:null});
+    if(error)return toast(error.message);
+    await state.client.from('customers').update({last_follow_up_at:date}).eq('id',customerId);
+    const customer=state.customers.find(x=>x.id===customerId);if(customer)customer.last_follow_up_at=date;
+    toast('FU 기록을 저장했습니다.');openCustomerFuHub(customerId,'records');renderCustomers();
+  }
+  async function crm3888SaveSchedule(customerId){
+    const id=document.getElementById('crm3888ScheduleId')?.value,date=document.getElementById('crm3888ScheduleDate')?.value,time=document.getElementById('crm3888ScheduleTime')?.value||'09:00',reason=document.getElementById('crm3888ScheduleReason')?.value.trim(),assigned=document.getElementById('crm3888ScheduleAssignee')?.value||state.profile.id;
+    if(!date||!reason)return toast('예정일과 FU 사유를 입력하세요.');
+    const scheduledAt=new Date(`${date}T${time}:00`).toISOString();
+    const row={customer_id:customerId,scheduled_at:scheduledAt,reason,assigned_to:assigned,updated_at:new Date().toISOString()};
+    let error;
+    if(id){({error}=await state.client.from('customer_fu_schedules').update(row).eq('id',id));}
+    else{({error}=await state.client.from('customer_fu_schedules').insert({...row,created_by:state.profile.id}));}
+    if(error)return toast(error.message);
+    await crm3888SyncNextFu(customerId);toast(id?'예정 FU를 수정했습니다.':'예정 FU를 등록했습니다.');openCustomerFuHub(customerId,'schedule');renderCustomers();
+  }
+  async function crm3888EditSchedule(scheduleId,customerId){
+    const {data,error}=await state.client.from('customer_fu_schedules').select('*').eq('id',scheduleId).single();if(error)return toast(error.message);
+    const d=new Date(data.scheduled_at),pad=n=>String(n).padStart(2,'0');
+    document.getElementById('crm3888ScheduleId').value=data.id;
+    document.getElementById('crm3888ScheduleDate').value=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    document.getElementById('crm3888ScheduleTime').value=`${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    document.getElementById('crm3888ScheduleReason').value=data.reason||'';
+    document.getElementById('crm3888ScheduleAssignee').value=data.assigned_to||state.profile.id;
+    document.getElementById('crm3888ScheduleReason').focus();
+  }
+  function crm3888ResetScheduleForm(){
+    const id=document.getElementById('crm3888ScheduleId');if(id)id.value='';
+    const date=document.getElementById('crm3888ScheduleDate');if(date)date.value=today();
+    const time=document.getElementById('crm3888ScheduleTime');if(time)time.value='09:00';
+    const reason=document.getElementById('crm3888ScheduleReason');if(reason)reason.value='';
+  }
+  async function crm3888CompleteSchedule(scheduleId,customerId){
+    const {data,error}=await state.client.from('customer_fu_schedules').select('*').eq('id',scheduleId).single();if(error)return toast(error.message);
+    const now=new Date().toISOString();
+    const {error:uErr}=await state.client.from('customer_fu_schedules').update({completed:true,completed_at:now,updated_at:now}).eq('id',scheduleId);if(uErr)return toast(uErr.message);
+    const d=new Date(data.scheduled_at);
+    const content=`예정 FU 완료\n예정일: ${d.toLocaleString('ko-KR')}\n사유: ${data.reason}`;
+    const {error:hErr}=await state.client.from('interaction_history').insert({customer_id:customerId,listing_id:null,created_by:state.profile.id,follow_up_date:today(),contact_method:'예정 FU 완료',content,next_follow_up_at:null});if(hErr)return toast(hErr.message);
+    await state.client.from('customers').update({last_follow_up_at:today()}).eq('id',customerId);
+    await crm3888SyncNextFu(customerId);toast('완료 처리되어 FU 기록으로 이동했습니다.');openCustomerFuHub(customerId,'schedule');renderCustomers();
+  }
+  async function crm3888DeleteSchedule(scheduleId,customerId){
+    if(!confirm('이 예정 FU를 삭제할까요?'))return;
+    const {error}=await state.client.from('customer_fu_schedules').delete().eq('id',scheduleId);if(error)return toast(error.message);
+    await crm3888SyncNextFu(customerId);toast('예정 FU를 삭제했습니다.');openCustomerFuHub(customerId,'schedule');renderCustomers();
+  }
+
+  openFollowUpModal=async function(entityType,id){
+    if(entityType==='customer')return openCustomerFuHub(id,'records');
+    return crm3888BaseOpenFollowUpModal(entityType,id);
+  };
+  openHistoryModal=async function(entityType,id){
+    if(entityType==='customer')return openCustomerFuHub(id,'conditions');
+    return crm3888BaseOpenHistoryModal(entityType,id);
+  };
+
+  function crm3888PatchCustomerScroll(){
+    const host=document.getElementById('customerTable');if(!host)return;
+    const wrap=host.querySelector('.table-wrap');const table=host.querySelector('table.customer-table');if(!wrap||!table)return;
+    wrap.classList.add('customer-table-scroll');
+    if(!wrap.dataset.crm3888Wheel){
+      wrap.dataset.crm3888Wheel='1';
+      wrap.addEventListener('wheel',e=>{if(e.shiftKey&&Math.abs(e.deltaY)>Math.abs(e.deltaX)){e.preventDefault();wrap.scrollLeft+=e.deltaY}},{passive:false});
+    }
+    [...table.querySelectorAll('th,td')].forEach(x=>{x.classList.remove('crm3888-sticky-col');x.style.removeProperty('--crm3888-left')});
+    const heads=[...table.querySelectorAll('thead th')];
+    const wanted=[];
+    heads.forEach((th,i)=>{const t=th.textContent.replace(/\s+/g,'').trim();if(th.classList.contains('crm3880-select-head')||['순번','상태','고객명'].includes(t))wanted.push(i)});
+    let left=0;
+    wanted.forEach(i=>{
+      const width=Math.ceil(heads[i]?.getBoundingClientRect().width||70);
+      table.querySelectorAll('tr').forEach(tr=>{const cell=tr.children[i];if(cell){cell.classList.add('crm3888-sticky-col');cell.style.setProperty('--crm3888-left',`${left}px`)}});
+      left+=width;
+    });
+  }
+  renderCustomers=async function(){await crm3888BaseRenderCustomers();setTimeout(crm3888PatchCustomerScroll,0)};
+  filterCustomers=function(){const r=crm3888BaseFilterCustomers();setTimeout(crm3888PatchCustomerScroll,0);return r};
+  window.addEventListener('resize',()=>{if(state.view==='customers')crm3888PatchCustomerScroll()});
+
+  Object.assign(window,{openCustomerModal,openFollowUpModal,openHistoryModal,openCustomerFuHub,crm3888SaveRecord,crm3888SaveSchedule,crm3888EditSchedule,crm3888ResetScheduleForm,crm3888CompleteSchedule,crm3888DeleteSchedule,renderCustomers,filterCustomers});
+  console.info('CRM v3.8.88 고객 가로스크롤·예정 FU 분리·조건이력 적용 완료');
+})();

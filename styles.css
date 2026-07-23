@@ -1267,3 +1267,57 @@ button .crm3870-admin-tag{pointer-events:none}
 
 /* CRM v3.8.87 고객 엑셀 일괄등록 */
 .crm3887-duplicate{display:inline-block;padding:4px 7px;border-radius:999px;background:#fff7ed;color:#c2410c;font-size:12px;font-weight:700;white-space:nowrap}
+
+/* ===== CRM v3.8.88 고객 가로스크롤 · FU 탭 · 조건이력 ===== */
+.customer-table-scroll{
+  width:100%;
+  max-width:100%;
+  overflow-x:auto;
+  overflow-y:visible;
+  padding-bottom:10px;
+  scrollbar-gutter:stable;
+  overscroll-behavior-x:contain;
+  -webkit-overflow-scrolling:touch;
+}
+.customer-table-scroll .customer-table{
+  min-width:1500px;
+  width:max-content;
+  table-layout:auto;
+}
+.customer-table-scroll::-webkit-scrollbar{height:12px}
+.customer-table-scroll::-webkit-scrollbar-thumb{background:#94a3b8;border-radius:999px;border:3px solid #f8fafc}
+.customer-table-scroll::-webkit-scrollbar-track{background:#eef2f7;border-radius:999px}
+.customer-table .crm3888-sticky-col{
+  position:sticky;
+  left:var(--crm3888-left,0px);
+  z-index:3;
+  background:#fff;
+  box-shadow:1px 0 0 #e5e7eb;
+}
+.customer-table thead .crm3888-sticky-col{z-index:6;background:#f8fafc}
+.customer-table tbody tr:hover .crm3888-sticky-col{background:#f8fbff}
+.crm3888-customer-nav{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px;padding:8px;background:#f1f5f9;border-radius:14px}
+.crm3888-customer-nav button{border:0;background:transparent;padding:9px 14px;border-radius:10px;font-weight:800;color:#475569}
+.crm3888-customer-nav button.active{background:#fff;color:#0f766e;box-shadow:0 1px 4px rgba(15,23,42,.12)}
+.crm3888-fu-tabs{display:flex;gap:8px;padding:7px;background:#eef2f7;border-radius:14px;margin-bottom:16px}
+.crm3888-fu-tabs button{border:0;background:transparent;padding:10px 16px;border-radius:10px;font-weight:800;color:#475569}
+.crm3888-fu-tabs button.active{background:#fff;color:#0f766e;box-shadow:0 1px 4px rgba(15,23,42,.12)}
+.crm3888-fu-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:16px;border:1px solid #dbe4ef;border-radius:16px;background:#f8fafc;margin-bottom:16px}
+.crm3888-fu-form .span-2{grid-column:1/-1}
+.crm3888-fu-form-actions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px}
+.crm3888-schedule-list,.crm3888-condition-list,.crm3888-record-list{display:grid;gap:10px}
+.crm3888-schedule-item,.crm3888-condition-item,.crm3888-record-item{border:1px solid #dbe4ef;border-radius:14px;padding:14px;background:#fff}
+.crm3888-schedule-item.overdue{border-color:#fecaca;background:#fff7f7}
+.crm3888-schedule-item.completed{opacity:.72;background:#f8fafc}
+.crm3888-item-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px}
+.crm3888-item-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.crm3888-due-red{color:#dc2626;font-weight:900}
+.crm3888-due-normal{color:#0f172a;font-weight:900}
+.crm3888-condition-item pre{margin:8px 0 0;white-space:pre-wrap;font-family:inherit;line-height:1.65;color:#334155}
+.crm3888-empty{padding:28px;text-align:center;color:#64748b;border:1px dashed #cbd5e1;border-radius:14px;background:#f8fafc}
+.crm3888-next-fu-time{display:block;font-size:11px;color:#64748b;margin-top:2px}
+@media(max-width:720px){
+  .crm3888-fu-form{grid-template-columns:1fr}
+  .crm3888-fu-form .span-2,.crm3888-fu-form-actions{grid-column:1}
+  .customer-table-scroll .customer-table{min-width:1450px}
+}
