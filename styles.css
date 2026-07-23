@@ -1257,3 +1257,10 @@ button .crm3870-admin-tag{pointer-events:none}
 .crm3885-history{display:grid;gap:8px;max-height:250px;overflow:auto}.crm3885-history>div{display:grid;grid-template-columns:180px 1fr;gap:12px;padding:10px;border-radius:10px;background:#f8fafc}.crm3885-history span{white-space:pre-wrap}
 .crm3885-file-viewer{display:grid;gap:12px}.crm3885-file-actions{display:flex;justify-content:flex-end}.crm3885-viewer-top{display:flex;justify-content:center;align-items:center;gap:14px}.crm3885-preview{height:min(65vh,720px);background:#f1f5f9;border:1px solid #dbe3ef;border-radius:14px;display:flex;align-items:center;justify-content:center;overflow:auto}.crm3885-preview img{max-width:100%;max-height:100%;object-fit:contain}.crm3885-preview iframe{width:100%;height:100%;border:0}.crm3885-nopreview{display:grid;gap:14px;text-align:center}.crm3885-thumbs{display:flex;gap:7px;overflow-x:auto;padding:4px}.crm3885-thumbs button{display:flex;align-items:center;gap:6px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.crm3885-thumbs button.active{border-color:#2563eb;background:#eff6ff}.crm3885-thumbs span{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#e2e8f0}.crm3885-file-manage{display:flex;justify-content:center;gap:8px}
 @media(max-width:900px){.crm3885-summary{grid-template-columns:repeat(2,1fr)}.crm3885-filters,.crm3885-form-grid,.crm3885-fee-grid{grid-template-columns:1fr}.crm3885-notices{grid-template-columns:repeat(2,1fr)}.crm3885-stage{grid-template-columns:1fr 1fr}.crm3885-contract-head{align-items:flex-start}.crm3885-history>div{grid-template-columns:1fr}.crm3885-preview{height:55vh}}
+
+
+/* ===== CRM v3.8.86 계약시트 날짜 3단 정렬 ===== */
+.crm3886-sort-head{display:inline-flex;align-items:center;justify-content:center;gap:5px;width:100%;padding:0;border:0;background:transparent;color:inherit;font:inherit;font-weight:800;cursor:pointer;white-space:nowrap}
+.crm3886-sort-head:hover{color:#2563eb}
+.crm3886-sort-head span{display:inline-flex;align-items:center;justify-content:center;min-width:14px;font-size:12px;color:#64748b}
+.crm3886-sort-head:hover span{color:#2563eb}

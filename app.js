@@ -5961,6 +5961,34 @@ async function crm3885LoadFiles(caseId){
   return data||[];
 }
 
+state.contractCaseSort=state.contractCaseSort||{key:'',direction:''};
+function crm3886SortIcon(key){
+  const s=state.contractCaseSort||{};
+  if(s.key!==key||!s.direction)return '↕';
+  return s.direction==='asc'?'↑':'↓';
+}
+function crm3886SortCases(rows){
+  const s=state.contractCaseSort||{};
+  if(!s.key||!s.direction)return [...rows];
+  return [...rows].sort((a,b)=>{
+    const av=a?.[s.key]||'';
+    const bv=b?.[s.key]||'';
+    if(!av&&!bv)return 0;
+    if(!av)return 1;
+    if(!bv)return -1;
+    const cmp=String(av).localeCompare(String(bv));
+    return s.direction==='asc'?cmp:-cmp;
+  });
+}
+function crm3886ToggleContractDateSort(key){
+  const s=state.contractCaseSort||{key:'',direction:''};
+  if(s.key!==key){state.contractCaseSort={key,direction:'asc'};}
+  else if(s.direction==='asc'){state.contractCaseSort={key,direction:'desc'};}
+  else if(s.direction==='desc'){state.contractCaseSort={key:'',direction:''};}
+  else{state.contractCaseSort={key,direction:'asc'};}
+  crm3885FilterCases();
+}
+
 renderDocuments=async function(){
   const rows=await crm3885LoadCases();
   const q='';
@@ -6003,7 +6031,8 @@ function crm3885FilterCases(){
 }
 function crm3885RenderCaseTable(rows){
   const el=$('#documentList');if(!el)return;
-  el.innerHTML=rows.length?`<div class="table-wrap"><table class="crm3885-contract-table"><thead><tr><th>순번</th><th>진행상태</th><th>계약번호</th><th>주소·동호수</th><th>유형·금액</th><th>계약자</th><th>본계약일</th><th>잔금일</th><th>중개보수</th><th>안내</th><th>계약서</th><th>관리</th></tr></thead><tbody>${rows.map((c,i)=>{
+  rows=crm3886SortCases(rows);
+  el.innerHTML=rows.length?`<div class="table-wrap"><table class="crm3885-contract-table"><thead><tr><th>순번</th><th>진행상태</th><th>계약번호</th><th>주소·동호수</th><th>유형·금액</th><th>계약자</th><th><button type="button" class="crm3886-sort-head" onclick="crm3886ToggleContractDateSort('contract_date')">본계약일 <span>${crm3886SortIcon('contract_date')}</span></button></th><th><button type="button" class="crm3886-sort-head" onclick="crm3886ToggleContractDateSort('balance_date')">잔금일 <span>${crm3886SortIcon('balance_date')}</span></button></th><th>중개보수</th><th>안내</th><th>계약서</th><th>관리</th></tr></thead><tbody>${rows.map((c,i)=>{
     const labels=crm3885PartyLabels(c.deal_type);
     const progress=crm3885Progress(c);
     const amount=c.deal_type==='월세'?`${crm3885Money(c.amount)} / 월 ${crm3885Money(c.monthly_rent)}`:crm3885Money(c.amount);
@@ -6229,5 +6258,5 @@ async function crm3885DeleteCase(id){
   const {error}=await state.client.from('contract_cases').delete().eq('id',id);if(error)return toast(error.message);toast('계약을 삭제했습니다.');await renderDocuments();
 }
 
-Object.assign(window,{renderDocuments,openContractDocumentForm,crm3885FilterCases,crm3885SaveQuickCase,crm3885SyncQuickForm,openContractCaseDetail,crm3885SaveDetail,crm3885ToggleInterimNA,crm3885OpenFiles,crm3885RenderViewer,crm3885AddFiles,crm3885MoveFile,crm3885DeleteFile,crm3885DeleteCase});
+Object.assign(window,{renderDocuments,openContractDocumentForm,crm3885FilterCases,crm3885SaveQuickCase,crm3885SyncQuickForm,openContractCaseDetail,crm3885SaveDetail,crm3885ToggleInterimNA,crm3885OpenFiles,crm3885RenderViewer,crm3885AddFiles,crm3885MoveFile,crm3885DeleteFile,crm3885DeleteCase,crm3886ToggleContractDateSort});
 console.info('CRM v3.8.85 간편 계약등록·상세관리·다중파일 보기 적용 완료');
