@@ -6260,3 +6260,167 @@ async function crm3885DeleteCase(id){
 
 Object.assign(window,{renderDocuments,openContractDocumentForm,crm3885FilterCases,crm3885SaveQuickCase,crm3885SyncQuickForm,openContractCaseDetail,crm3885SaveDetail,crm3885ToggleInterimNA,crm3885OpenFiles,crm3885RenderViewer,crm3885AddFiles,crm3885MoveFile,crm3885DeleteFile,crm3885DeleteCase,crm3886ToggleContractDateSort});
 console.info('CRM v3.8.85 간편 계약등록·상세관리·다중파일 보기 적용 완료');
+
+/* ===== CRM v3.8.87 고객 엑셀 일괄등록 · 전용 양식 ===== */
+const CRM3887_CUSTOMER_TEMPLATE_HEADERS=[
+  '고객명*','고객구분*','상태','등급','희망지역','거래유형*',
+  '매매희망금액(만원)','전세희망금액(만원)','월세보증금(만원)','희망월세(만원)',
+  '희망방개수','1.5룸','대출여부','자기자본금(만원)','자기자본모름',
+  '예정FU','희망매물특징','연락처*','상담메모'
+];
+function crm3887Clean(v){return String(v??'').trim()}
+function crm3887Num(v){const s=crm3887Clean(v).replace(/,/g,'');if(!s)return null;const n=Number(s);return Number.isFinite(n)?n:null}
+function crm3887Yes(v){return ['O','Y','YES','TRUE','1','가능'].includes(crm3887Clean(v).toUpperCase())}
+function crm3887Date(v){
+  const s=crm3887Clean(v);if(!s)return null;
+  const m=s.match(/(20\d{2})[^0-9]?(\d{1,2})[^0-9]?(\d{1,2})/);
+  if(m)return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+  const d=new Date(s);return Number.isNaN(d.getTime())?null:d.toISOString().slice(0,10);
+}
+function crm3887DealTypes(v){
+  const seen=new Set();
+  return crm3887Clean(v).split(/[+,;/]/).map(x=>x.trim()).filter(t=>CRM3857_DEAL_TYPES.includes(t)&&!seen.has(t)&&seen.add(t));
+}
+function crm3887Contacts(v){
+  const raw=crm3887Clean(v);if(!raw)return [];
+  return raw.split(/\s*;\s*/).map((part,i)=>{
+    const p=part.split('|').map(x=>x.trim());
+    if(p.length===1)return {contact_label:'본인',contact_name:null,phone:crm381FormatPhone(p[0]),sort_order:i};
+    if(p.length===2)return {contact_label:p[0]||'연락처',contact_name:null,phone:crm381FormatPhone(p[1]),sort_order:i};
+    return {contact_label:p[0]||'연락처',contact_name:p[1]||null,phone:crm381FormatPhone(p[2]),sort_order:i};
+  }).filter(x=>x.phone);
+}
+function crm3887Features(v){
+  const allowed=typeof CRM3864_FEATURES!=='undefined'?CRM3864_FEATURES:(typeof CRM36_LISTING_FEATURES!=='undefined'?CRM36_LISTING_FEATURES:[]);
+  return crm3887Clean(v).split(/[;,/]/).map(x=>x.trim()).filter(x=>allowed.includes(x));
+}
+function crm3887DuplicateNames(contacts){
+  const phones=new Set(contacts.map(x=>String(x.phone||'').replace(/\D/g,'')).filter(Boolean));
+  if(!phones.size)return [];
+  return (state.customers||[]).filter(c=>crm3857Contacts(c).some(x=>phones.has(String(x.phone||'').replace(/\D/g,'')))).map(x=>x.name).filter(Boolean);
+}
+function crm3887ParseRow(r,rowNo){
+  const name=crm3887Clean(r['고객명*']||r['고객명']);
+  const customerType=crm3887Clean(r['고객구분*']||r['고객구분'])||'매수';
+  const status=crm3887Clean(r['상태'])||'신규인입';
+  const grade=crm3887Clean(r['등급']).toUpperCase()||'C';
+  const types=crm3887DealTypes(r['거래유형*']||r['거래유형']);
+  const contacts=crm3887Contacts(r['연락처*']||r['연락처']);
+  const budgets={
+    매매:crm3887Num(r['매매희망금액(만원)']),
+    전세:crm3887Num(r['전세희망금액(만원)']),
+    월세:crm3887Num(r['월세보증금(만원)'])
+  };
+  const rent=crm3887Num(r['희망월세(만원)']);
+  const errors=[];
+  if(!name)errors.push('고객명');
+  if(!['매수','임차'].includes(customerType))errors.push('고객구분 값 오류');
+  if(!CRM3857_CUSTOMER_STATUSES.includes(status))errors.push('상태 값 오류');
+  if(!['A','B','C','D'].includes(grade))errors.push('등급 값 오류');
+  if(!types.length)errors.push('거래유형');
+  types.forEach(t=>{if(!budgets[t])errors.push(`${t} 희망금액`)});
+  if(types.includes('월세')&&!rent)errors.push('희망월세');
+  if(!contacts.length)errors.push('연락처');
+  const room15=crm3887Yes(r['1.5룸']);
+  const equityUnknown=crm3887Yes(r['자기자본모름']);
+  const deals=types.map((deal_type,i)=>({deal_type,budget_max:budgets[deal_type],desired_monthly_rent:deal_type==='월세'?rent:null,is_preferred:i===0,sort_order:i}));
+  const primary=deals[0]||{};
+  const payload={
+    owner_id:state.profile.id,name,phone:contacts[0]?.phone||null,customer_type:customerType,status,customer_grade:grade,
+    deal_type:types.join('+'),preferred_area:crm3887Clean(r['희망지역'])||null,
+    desired_rooms:room15?1:crm3887Num(r['희망방개수']),desired_one_point_five_room:room15,
+    budget_max:primary.budget_max??null,desired_monthly_rent:deals.find(x=>x.deal_type==='월세')?.desired_monthly_rent??null,
+    loan_available:crm3887Clean(r['대출여부'])?crm3887Yes(r['대출여부']):null,
+    equity_unknown:equityUnknown,equity_capital:equityUnknown?null:crm3887Num(r['자기자본금(만원)']),
+    next_follow_up_at:crm3887Date(r['예정FU']),desired_feature_tags:crm3887Features(r['희망매물특징']),
+    notes:crm3887Clean(r['상담메모'])||null
+  };
+  const duplicates=crm3887DuplicateNames(contacts);
+  return {rowNo,label:name||`행 ${rowNo}`,valid:!errors.length,errors,payload,deals,contacts,duplicates};
+}
+function crm3887DownloadTemplate(){
+  if(!window.XLSX)return toast('엑셀 라이브러리를 불러오지 못했습니다.');
+  const sample={
+    '고객명*':'홍길동','고객구분*':'임차','상태':'신규인입','등급':'C','희망지역':'강서구 화곡동','거래유형*':'전세+월세',
+    '매매희망금액(만원)':'','전세희망금액(만원)':25000,'월세보증금(만원)':3000,'희망월세(만원)':100,
+    '희망방개수':2,'1.5룸':'X','대출여부':'O','자기자본금(만원)':10000,'자기자본모름':'X','예정FU':'2026-08-15',
+    '희망매물특징':'엘리베이터;주차;반려동물 가능','연락처*':'본인|홍길동|010-1111-2222;배우자|김영희|010-3333-4444','상담메모':'역세권 선호'
+  };
+  const wb=XLSX.utils.book_new(),ws=XLSX.utils.json_to_sheet([sample],{header:CRM3887_CUSTOMER_TEMPLATE_HEADERS});
+  ws['!cols']=CRM3887_CUSTOMER_TEMPLATE_HEADERS.map(h=>({wch:Math.min(42,Math.max(12,h.length+5))}));
+  XLSX.utils.book_append_sheet(wb,ws,'고객등록양식');
+  const guide=[['항목','입력방법'],['필수항목','열 이름에 * 표시'],['고객구분','매수 또는 임차'],['상태','신규인입 / 매물추천 / 방문 / 계약 / 보류 / 영업종료'],['거래유형','매매, 전세, 월세 또는 전세+월세처럼 +로 구분'],['유형별 금액','선택한 거래유형에 해당하는 금액을 만원 단위로 입력'],['1.5룸·대출여부·자기자본모름','O 또는 X'],['희망매물특징','세미콜론(;)으로 구분'],['연락처','구분|이름|전화번호 형식, 여러 명은 세미콜론(;)으로 구분'],['예정FU','yyyy-mm-dd 형식']];
+  const gs=XLSX.utils.aoa_to_sheet(guide);gs['!cols']=[{wch:25},{wch:78}];XLSX.utils.book_append_sheet(wb,gs,'작성안내');
+  XLSX.writeFile(wb,'고객_일괄등록_양식.xlsx');
+}
+function crm3887OpenImport(){const input=document.createElement('input');input.type='file';input.accept='.xlsx,.xls';input.onchange=()=>crm3887PreviewImport(input.files?.[0]);input.click()}
+async function crm3887PreviewImport(file){
+  if(!file)return;if(!window.XLSX)return toast('엑셀 라이브러리를 불러오지 못했습니다.');
+  try{
+    const wb=XLSX.read(await file.arrayBuffer(),{cellDates:true}),sheet=wb.Sheets[wb.SheetNames[0]],raw=XLSX.utils.sheet_to_json(sheet,{defval:'',raw:false});
+    const rows=raw.map((r,i)=>crm3887ParseRow(r,i+2));
+    state.crm3887Import={fileName:file.name,rows,selected:new Set(rows.map((r,i)=>r.valid?i:null).filter(i=>i!==null))};
+    crm3887RenderImportPreview();
+  }catch(e){console.error(e);toast('고객 엑셀 파일을 읽지 못했습니다.')}
+}
+function crm3887ToggleImport(i,checked){const st=state.crm3887Import;if(!st)return;checked?st.selected.add(i):st.selected.delete(i);crm3887UpdateImportCount()}
+function crm3887ToggleAll(checked){const st=state.crm3887Import;if(!st)return;st.rows.forEach((r,i)=>{if(r.valid)(checked?st.selected.add(i):st.selected.delete(i))});crm3887RenderImportPreview()}
+function crm3887UpdateImportCount(){const st=state.crm3887Import;const el=$('#crm3887ImportCount');if(el)el.textContent=`${st?.selected.size||0}건 선택`;const b=$('#modalSubmit');if(b)b.disabled=!st?.selected.size}
+function crm3887RenderImportPreview(){
+  const st=state.crm3887Import;if(!st)return;
+  $('#modalTitle').textContent='고객 엑셀 일괄등록';
+  $('#modalBody').innerHTML=`<div class="crm3876-import-head"><div><strong>${escapeHtml(st.fileName)}</strong><div class="muted">유효한 행만 선택됩니다. 같은 전화번호가 있으면 중복 가능성을 표시합니다.</div></div><button class="ghost" type="button" onclick="crm3887DownloadTemplate()">양식 다시 받기</button></div>
+  <div class="crm3876-import-toolbar"><label><input type="checkbox" onchange="crm3887ToggleAll(this.checked)" ${st.rows.filter(r=>r.valid).every(r=>st.selected.has(st.rows.indexOf(r)))?'checked':''}> 유효 행 전체</label><b id="crm3887ImportCount">${st.selected.size}건 선택</b></div>
+  <div class="table-wrap crm3876-preview"><table><thead><tr><th>선택</th><th>행</th><th>고객명</th><th>연락처</th><th>거래유형</th><th>희망금액</th><th>검토</th></tr></thead><tbody>${st.rows.map((r,i)=>`<tr class="${r.valid?'':'invalid-row'}"><td><input type="checkbox" ${st.selected.has(i)?'checked':''} ${r.valid?'':'disabled'} onchange="crm3887ToggleImport(${i},this.checked)"></td><td>${r.rowNo}</td><td><strong>${escapeHtml(r.label)}</strong>${r.errors.length?`<div class="crm3876-error">${escapeHtml(r.errors.join(', '))} 확인</div>`:''}</td><td>${escapeHtml(r.contacts.map(x=>`${x.contact_label} ${x.contact_name||''} ${x.phone}`).join(' / ')||'-')}</td><td>${escapeHtml(r.deals.map(x=>x.deal_type).join('·')||'-')}</td><td>${r.deals.map(x=>`<div>${escapeHtml(x.deal_type)} ${fmtMoney(x.budget_max)}${x.deal_type==='월세'?` / 월 ${fmtMoney(x.desired_monthly_rent)}`:''}</div>`).join('')}</td><td>${r.duplicates.length?`<span class="crm3887-duplicate">동일 전화번호: ${escapeHtml(r.duplicates.join(', '))}</span>`:'-'}</td></tr>`).join('')}</tbody></table></div>`;
+  const submit=$('#modalSubmit');submit.style.display='';submit.type='button';submit.textContent='선택 고객 등록';submit.disabled=!st.selected.size;submit.onclick=crm3887ExecuteImport;
+  $('#modal').showModal();
+}
+async function crm3887ExecuteImport(){
+  const st=state.crm3887Import;if(!st||!st.selected.size)return toast('등록할 고객을 선택하세요.');
+  const submit=$('#modalSubmit');let success=0,failed=0;const messages=[];const selected=[...st.selected].sort((a,b)=>a-b);
+  submit.disabled=true;
+  try{
+    for(let n=0;n<selected.length;n++){
+      const r=st.rows[selected[n]];submit.textContent=`등록 중 ${n+1}/${selected.length}`;
+      let customerId=null;
+      try{
+        const {data,error}=await state.client.from('customers').insert(r.payload).select('id').single();if(error)throw error;customerId=data.id;
+        const [{error:dErr},{error:cErr}]=await Promise.all([
+          state.client.from('customer_deal_options').insert(r.deals.map(x=>({...x,customer_id:customerId}))),
+          state.client.from('customer_contacts').insert(r.contacts.map(x=>({...x,customer_id:customerId})))
+        ]);
+        if(dErr||cErr)throw(dErr||cErr);
+        success++;
+      }catch(e){
+        if(customerId)await state.client.from('customers').delete().eq('id',customerId);
+        failed++;messages.push(`${r.rowNo}행 ${r.label}: ${e.message||'등록 실패'}`);console.error('고객 엑셀 등록 실패',r,e);
+      }
+    }
+  }finally{
+    try{$('#modal')?.close()}catch(_){ }
+    state.crm3887Import=null;submit.disabled=false;submit.textContent='저장';
+  }
+  await loadCustomers();await renderCustomers();
+  alert(`고객 엑셀 등록 완료\n\n등록 ${success}건\n실패 ${failed}건${messages.length?`\n\n${messages.slice(0,12).join('\n')}${messages.length>12?'\n...':''}`:''}`);
+}
+
+// 고객시트의 빠른등록 버튼 아래 줄에 고객 엑셀 버튼을 배치합니다.
+crm3880ArrangeCustomerActions=function(){
+  const top=document.getElementById('topActions');if(!top)return;
+  const buttons=[...top.querySelectorAll('button')];
+  const pick=text=>buttons.find(b=>b.textContent.replace(/\s+/g,' ').trim().includes(text));
+  const quickCustomer=pick('고객 빠른 등록'),quickListing=pick('매물 빠른 등록'),addCustomer=pick('고객 등록');
+  top.innerHTML='';top.classList.add('crm3880-two-row-actions');
+  const main=document.createElement('div');main.className='crm3880-action-row crm3880-main-actions';
+  [quickCustomer,quickListing,addCustomer].filter(Boolean).forEach(b=>main.appendChild(b));
+  const sub=document.createElement('div');sub.className='crm3880-action-row crm3880-sub-actions';
+  const imp=document.createElement('button');imp.type='button';imp.className='primary';imp.textContent='엑셀 일괄등록';imp.onclick=crm3887OpenImport;
+  const tpl=document.createElement('button');tpl.type='button';tpl.className='ghost';tpl.textContent='엑셀 양식';tpl.onclick=crm3887DownloadTemplate;
+  sub.append(imp,tpl);
+  const del=document.createElement('button');del.type='button';del.id='crm3880CustomerDeleteBtn';del.className='danger';del.onclick=crm3882CustomerDeleteAction;sub.appendChild(del);
+  if(state.crm3882CustomerSelectMode){const cancel=document.createElement('button');cancel.type='button';cancel.className='ghost crm3882-select-cancel';cancel.textContent='선택 종료';cancel.onclick=crm3882ExitCustomerSelectMode;sub.appendChild(cancel)}
+  top.append(main,sub);crm3880UpdateBulkButtons();
+};
+
+Object.assign(window,{crm3887DownloadTemplate,crm3887OpenImport,crm3887PreviewImport,crm3887ToggleImport,crm3887ToggleAll,crm3887ExecuteImport,crm3880ArrangeCustomerActions});
+console.info('CRM v3.8.87 고객 엑셀 일괄등록 및 양식 적용 완료');

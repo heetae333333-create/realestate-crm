@@ -1264,3 +1264,6 @@ button .crm3870-admin-tag{pointer-events:none}
 .crm3886-sort-head:hover{color:#2563eb}
 .crm3886-sort-head span{display:inline-flex;align-items:center;justify-content:center;min-width:14px;font-size:12px;color:#64748b}
 .crm3886-sort-head:hover span{color:#2563eb}
+
+/* CRM v3.8.87 고객 엑셀 일괄등록 */
+.crm3887-duplicate{display:inline-block;padding:4px 7px;border-radius:999px;background:#fff7ed;color:#c2410c;font-size:12px;font-weight:700;white-space:nowrap}
