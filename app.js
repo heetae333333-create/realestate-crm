@@ -1977,7 +1977,7 @@ function openContractDocumentForm(){
     <label>계약서 파일<input id="cdFile" type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.hwp,.hwpx"></label>
     <label class="span-2">메모<textarea id="cdNotes" rows="3" placeholder="특약이나 확인할 내용을 간단히 적으세요."></textarea></label>
   </div>`;
-  ['cdParty1Phone','cdParty2Phone'].forEach(id=>{const e=$('#'+id);e?.addEventListener('input',()=>e.value=formatPhone(e.value))});
+  ['cdParty1Phone','cdParty2Phone'].forEach(id=>{const e=$('#'+id);e?.addEventListener('input',()=>e.value=crm381FormatPhone(e.value))});
   $('#modalSubmit').style.display='';
   $('#modalSubmit').textContent='등록';
   $('#modalSubmit').onclick=saveContractDocument;
@@ -1996,8 +1996,8 @@ async function saveContractDocument(e){
   const row={
     document_type:'계약서',file_name:file.name,storage_path:path,uploaded_by:state.profile.id,
     listing_title:$('#cdListingTitle').value.trim(),contract_address:$('#cdAddress').value.trim(),deal_terms:$('#cdTerms').value.trim()||null,
-    brokerage_type:$('#cdBrokerageType').value,party1_name:$('#cdParty1Name').value.trim()||null,party1_phone:formatPhone($('#cdParty1Phone').value)||null,
-    party2_name:$('#cdParty2Name').value.trim()||null,party2_phone:formatPhone($('#cdParty2Phone').value)||null,
+    brokerage_type:$('#cdBrokerageType').value,party1_name:$('#cdParty1Name').value.trim()||null,party1_phone:crm381FormatPhone($('#cdParty1Phone').value)||null,
+    party2_name:$('#cdParty2Name').value.trim()||null,party2_phone:crm381FormatPhone($('#cdParty2Phone').value)||null,
     precontract_date:$('#cdPrecontractDate').value||null,contract_date:$('#cdContractDate').value||null,balance_date:$('#cdBalanceDate').value||null,contract_notes:$('#cdNotes').value.trim()||null
   };
   const {error}=await state.client.from('contract_documents').insert(row);
@@ -5722,9 +5722,9 @@ console.info('CRM v3.8.80 상단 버튼 2단 배치 및 고객·내 매물 선�
         deal_terms:get('cdTerms')?.value.trim()||null,
         brokerage_type:get('cdBrokerageType')?.value||'단타',
         party1_name:get('cdParty1Name')?.value.trim()||null,
-        party1_phone:formatPhone(get('cdParty1Phone')?.value||'')||null,
+        party1_phone:crm381FormatPhone(get('cdParty1Phone')?.value||'')||null,
         party2_name:get('cdParty2Name')?.value.trim()||null,
-        party2_phone:formatPhone(get('cdParty2Phone')?.value||'')||null,
+        party2_phone:crm381FormatPhone(get('cdParty2Phone')?.value||'')||null,
         precontract_date:get('cdPrecontractDate')?.value||null,
         contract_date:get('cdContractDate')?.value||null,
         balance_date:get('cdBalanceDate')?.value||null,
