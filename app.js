@@ -5539,3 +5539,25 @@ crm3876ExecuteImport=async function(){
 
 Object.assign(window,{openListingModal,crm3876ExecuteImport});
 console.info('CRM v3.8.77 엑셀 등록 완료 처리 및 일반 매물 수정창 복구 적용 완료');
+
+/* ===== CRM v3.8.79 매물 필터 전체 초기화 ===== */
+function crm3879ResetListingFilters(prefix){
+  const ids=[`${prefix}Search`,`${prefix}Tx`,`${prefix}Type`,`${prefix}Status`,`${prefix}Max`];
+  ids.forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el)return;
+    if(el.tagName==='SELECT') el.selectedIndex=0;
+    else el.value='';
+  });
+  document.querySelectorAll(`.crm3864-listing-feature-check[data-prefix="${prefix}"]`).forEach(el=>{el.checked=false});
+  if(prefix==='myListing') filterMyListings();
+  else filterNetwork();
+}
+
+// 기존 '매물 특징 초기화' 버튼을 검색어·거래·유형·상태·최대금액·특징을 모두 지우는 전체 초기화 버튼으로 변경
+crm3864ClearListingFeatures=function(prefix){
+  crm3879ResetListingFilters(prefix);
+};
+
+Object.assign(window,{crm3864ClearListingFeatures,crm3879ResetListingFilters});
+console.info('CRM v3.8.79 매물 필터 전체 초기화 적용 완료');
