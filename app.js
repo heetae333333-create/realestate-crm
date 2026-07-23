@@ -5755,3 +5755,139 @@ console.info('CRM v3.8.80 상단 버튼 2단 배치 및 고객·내 매물 선�
 
   console.info('CRM v3.8.81 계약서 등록 안정화 로드 완료');
 })();
+
+/* ===== CRM v3.8.82 빠른등록 노출정리 · 선택삭제 모드 ===== */
+state.crm3882CustomerSelectMode = false;
+state.crm3882ListingSelectMode = false;
+
+// 빠른등록 버튼은 대시보드 본문, 내 고객, 내 매물 시트에서만 표시합니다.
+crm37AddQuickActions = function(){
+  if(!['customers','myListings'].includes(state.view)) return;
+  const top=document.getElementById('topActions');
+  if(!top) return;
+  const existing=[...top.querySelectorAll('button')].map(b=>b.textContent.replace(/\s+/g,' ').trim());
+  if(existing.some(t=>t.includes('고객 빠른 등록')) || existing.some(t=>t.includes('매물 빠른 등록'))) return;
+  top.insertAdjacentHTML('afterbegin',`<span class="crm37-quick-actions"><button class="ghost" onclick="crm37OpenQuickCustomer()">⚡ 고객 빠른 등록</button><button class="ghost" onclick="crm37OpenQuickListing()">⚡ 매물 빠른 등록</button></span>`);
+};
+
+function crm3882UniqueButton(buttons,text){
+  const matches=buttons.filter(b=>b.textContent.replace(/\s+/g,' ').trim().includes(text));
+  matches.slice(1).forEach(b=>b.remove());
+  return matches[0]||null;
+}
+function crm3882ExitCustomerSelectMode(){
+  state.crm3882CustomerSelectMode=false;
+  state.crm3880SelectedCustomers.clear();
+  renderCustomers();
+}
+function crm3882ExitListingSelectMode(){
+  state.crm3882ListingSelectMode=false;
+  state.crm3880SelectedListings.clear();
+  renderMyListings();
+}
+function crm3882CustomerDeleteAction(){
+  if(!state.crm3882CustomerSelectMode){
+    state.crm3882CustomerSelectMode=true;
+    state.crm3880SelectedCustomers.clear();
+    renderCustomers();
+    return;
+  }
+  if(!state.crm3880SelectedCustomers.size){toast('삭제할 고객을 체크하세요.');return;}
+  crm3880DeleteSelectedCustomers();
+}
+function crm3882ListingDeleteAction(){
+  if(!state.crm3882ListingSelectMode){
+    state.crm3882ListingSelectMode=true;
+    state.crm3880SelectedListings.clear();
+    renderMyListings();
+    return;
+  }
+  if(!state.crm3880SelectedListings.size){toast('삭제할 매물을 체크하세요.');return;}
+  crm3880DeleteSelectedListings();
+}
+
+crm3880UpdateBulkButtons = function(){
+  const cBtn=document.getElementById('crm3880CustomerDeleteBtn');
+  if(cBtn){
+    const n=state.crm3880SelectedCustomers.size;
+    cBtn.disabled=false;
+    cBtn.textContent=state.crm3882CustomerSelectMode?`선택 고객 삭제 (${n})`:'선택 고객 삭제';
+  }
+  const lBtn=document.getElementById('crm3880ListingDeleteBtn');
+  if(lBtn){
+    const n=state.crm3880SelectedListings.size;
+    lBtn.disabled=false;
+    lBtn.textContent=state.crm3882ListingSelectMode?`선택 매물 삭제 (${n})`:'선택 매물 삭제';
+  }
+};
+
+crm3880ArrangeMyListingActions = function(){
+  const top=document.getElementById('topActions');if(!top)return;
+  const buttons=[...top.querySelectorAll('button')];
+  const quickCustomer=crm3882UniqueButton(buttons,'고객 빠른 등록');
+  const quickListing=crm3882UniqueButton(buttons,'매물 빠른 등록');
+  const addListing=crm3882UniqueButton(buttons,'매물 등록');
+  const excelImport=crm3882UniqueButton(buttons,'엑셀 일괄등록');
+  const excelTemplate=crm3882UniqueButton(buttons,'엑셀 양식');
+  top.innerHTML='';top.classList.add('crm3880-two-row-actions');
+  const main=document.createElement('div');main.className='crm3880-action-row crm3880-main-actions';
+  [quickCustomer,quickListing,addListing].filter(Boolean).forEach(b=>main.appendChild(b));
+  const sub=document.createElement('div');sub.className='crm3880-action-row crm3880-sub-actions';
+  [excelImport,excelTemplate].filter(Boolean).forEach(b=>sub.appendChild(b));
+  const del=document.createElement('button');del.type='button';del.id='crm3880ListingDeleteBtn';del.className='danger';del.onclick=crm3882ListingDeleteAction;sub.appendChild(del);
+  if(state.crm3882ListingSelectMode){
+    const cancel=document.createElement('button');cancel.type='button';cancel.className='ghost crm3882-select-cancel';cancel.textContent='선택 종료';cancel.onclick=crm3882ExitListingSelectMode;sub.appendChild(cancel);
+  }
+  top.append(main,sub);crm3880UpdateBulkButtons();
+};
+
+crm3880ArrangeCustomerActions = function(){
+  const top=document.getElementById('topActions');if(!top)return;
+  const buttons=[...top.querySelectorAll('button')];
+  const quickCustomer=crm3882UniqueButton(buttons,'고객 빠른 등록');
+  const quickListing=crm3882UniqueButton(buttons,'매물 빠른 등록');
+  const addCustomer=crm3882UniqueButton(buttons,'고객 등록');
+  top.innerHTML='';top.classList.add('crm3880-two-row-actions');
+  const main=document.createElement('div');main.className='crm3880-action-row crm3880-main-actions';
+  [quickCustomer,quickListing,addCustomer].filter(Boolean).forEach(b=>main.appendChild(b));
+  const sub=document.createElement('div');sub.className='crm3880-action-row crm3880-sub-actions';
+  const del=document.createElement('button');del.type='button';del.id='crm3880CustomerDeleteBtn';del.className='danger';del.onclick=crm3882CustomerDeleteAction;sub.appendChild(del);
+  if(state.crm3882CustomerSelectMode){
+    const cancel=document.createElement('button');cancel.type='button';cancel.className='ghost crm3882-select-cancel';cancel.textContent='선택 종료';cancel.onclick=crm3882ExitCustomerSelectMode;sub.appendChild(cancel);
+  }
+  top.append(main,sub);crm3880UpdateBulkButtons();
+};
+
+const crm3882PatchCustomerTableBase=crm3880PatchCustomerTable;
+crm3880PatchCustomerTable=function(){
+  if(!state.crm3882CustomerSelectMode)return;
+  crm3882PatchCustomerTableBase();
+};
+const crm3882PatchMyListingTableBase=crm3880PatchMyListingTable;
+crm3880PatchMyListingTable=function(rows){
+  if(!state.crm3882ListingSelectMode)return;
+  crm3882PatchMyListingTableBase(rows);
+};
+
+// 삭제가 끝난 뒤 선택 모드를 자동 종료합니다.
+const crm3882DeleteCustomersBase=crm3880DeleteSelectedCustomers;
+crm3880DeleteSelectedCustomers=async function(){
+  const before=state.crm3880SelectedCustomers.size;
+  await crm3882DeleteCustomersBase();
+  if(before && state.crm3880SelectedCustomers.size===0) state.crm3882CustomerSelectMode=false;
+};
+const crm3882DeleteListingsBase=crm3880DeleteSelectedListings;
+crm3880DeleteSelectedListings=async function(){
+  const before=state.crm3880SelectedListings.size;
+  await crm3882DeleteListingsBase();
+  if(before && state.crm3880SelectedListings.size===0) state.crm3882ListingSelectMode=false;
+};
+
+Object.assign(window,{
+  crm37AddQuickActions,crm3880ArrangeMyListingActions,crm3880ArrangeCustomerActions,
+  crm3880PatchCustomerTable,crm3880PatchMyListingTable,crm3880UpdateBulkButtons,
+  crm3880DeleteSelectedCustomers,crm3880DeleteSelectedListings,
+  crm3882CustomerDeleteAction,crm3882ListingDeleteAction,
+  crm3882ExitCustomerSelectMode,crm3882ExitListingSelectMode
+});
+console.info('CRM v3.8.82 빠른등록 노출정리 및 선택삭제 모드 적용 완료');

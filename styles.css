@@ -1231,3 +1231,7 @@ button .crm3870-admin-tag{pointer-events:none}
 .crm3880-select-head input,.crm3880-select-cell input{width:17px;height:17px;accent-color:#2563eb;cursor:pointer}
 #crm3880ListingDeleteBtn:disabled,#crm3880CustomerDeleteBtn:disabled{opacity:.45;cursor:not-allowed}
 @media(max-width:760px){#topActions.crm3880-two-row-actions{align-items:stretch}.crm3880-action-row{justify-content:flex-start}.crm3880-sub-actions{padding-top:7px}}
+
+/* ===== CRM v3.8.82 선택삭제 모드 ===== */
+.crm3882-select-cancel{min-height:40px}
+/* 선택 모드가 아닐 때는 체크박스 열 자체가 생성되지 않아 기존 표 폭을 그대로 유지합니다. */
