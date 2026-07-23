@@ -6726,3 +6726,68 @@ console.info('CRM v3.8.87 고객 엑셀 일괄등록 및 양식 적용 완료');
   Object.assign(window,{renderCustomers,filterCustomers});
   console.info('CRM v3.8.89 고객표 상단 즉시 가로스크롤 적용 완료');
 })();
+
+/* ===== CRM v3.8.90 매물표 즉시 가로스크롤 · 고객명 줄바꿈 ===== */
+(()=>{
+  function crm3890AttachTopScroll(wrap){
+    if(!wrap || wrap.closest('#customerTable')) return;
+    const table=wrap.querySelector('table.listing-table');
+    if(!table) return;
+    wrap.classList.add('crm3890-listing-scroll');
+
+    let top=wrap.previousElementSibling;
+    if(!top || !top.classList.contains('crm3890-top-scroll')){
+      top=document.createElement('div');
+      top.className='crm3890-top-scroll';
+      top.setAttribute('aria-label','매물 목록 가로 스크롤');
+      top.innerHTML='<div class="crm3890-top-scroll-inner"></div>';
+      wrap.parentNode.insertBefore(top,wrap);
+    }
+    const inner=top.firstElementChild;
+    const syncWidth=()=>{
+      inner.style.width=`${Math.max(table.scrollWidth,wrap.clientWidth)}px`;
+      top.style.display=table.scrollWidth>wrap.clientWidth?'block':'none';
+    };
+    syncWidth();
+
+    if(!top.dataset.crm3890Sync){
+      top.dataset.crm3890Sync='1';
+      let lock=false;
+      top.addEventListener('scroll',()=>{
+        if(lock)return;lock=true;wrap.scrollLeft=top.scrollLeft;
+        requestAnimationFrame(()=>lock=false);
+      });
+      wrap.addEventListener('scroll',()=>{
+        if(lock)return;lock=true;top.scrollLeft=wrap.scrollLeft;
+        requestAnimationFrame(()=>lock=false);
+      });
+    }
+
+    if(!wrap.dataset.crm3890Wheel){
+      wrap.dataset.crm3890Wheel='1';
+      wrap.addEventListener('wheel',e=>{
+        if(wrap.scrollWidth<=wrap.clientWidth)return;
+        const horizontal=Math.abs(e.deltaX)>Math.abs(e.deltaY);
+        const amount=horizontal?e.deltaX:e.deltaY;
+        if(!amount)return;
+        const max=wrap.scrollWidth-wrap.clientWidth;
+        const next=Math.max(0,Math.min(max,wrap.scrollLeft+amount));
+        if(next!==wrap.scrollLeft){e.preventDefault();wrap.scrollLeft=next;}
+      },{passive:false});
+    }
+    top.scrollLeft=wrap.scrollLeft;
+    requestAnimationFrame(syncWidth);
+  }
+
+  function crm3890PatchAllTables(){
+    document.querySelectorAll('.listing-table-wrap').forEach(crm3890AttachTopScroll);
+  }
+
+  const observer=new MutationObserver(()=>requestAnimationFrame(crm3890PatchAllTables));
+  observer.observe(document.documentElement,{childList:true,subtree:true});
+  window.addEventListener('resize',()=>setTimeout(crm3890PatchAllTables,0));
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(crm3890PatchAllTables,0));
+  setTimeout(crm3890PatchAllTables,0);
+
+  console.info('CRM v3.8.90 매물표 상단 즉시 가로스크롤 및 고객명 줄바꿈 적용 완료');
+})();

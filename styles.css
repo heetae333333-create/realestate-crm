@@ -1339,3 +1339,62 @@ button .crm3870-admin-tag{pointer-events:none}
 .crm3889-top-scroll::-webkit-scrollbar-thumb{background:#64748b;border-radius:999px;border:3px solid #eef2f7}
 .crm3889-top-scroll::-webkit-scrollbar-track{background:#eef2f7;border-radius:999px}
 .customer-table-scroll{scroll-behavior:auto}
+
+/* ===== CRM v3.8.90 매물표 즉시 가로스크롤 · 고객명 줄바꿈 ===== */
+.crm3890-listing-scroll{
+  width:100%;
+  max-width:100%;
+  overflow-x:auto;
+  overflow-y:visible;
+  padding-bottom:10px;
+  scrollbar-gutter:stable;
+  overscroll-behavior-x:contain;
+  -webkit-overflow-scrolling:touch;
+}
+.crm3890-listing-scroll .listing-table{
+  min-width:1500px;
+  width:max-content;
+}
+.crm3890-listing-scroll::-webkit-scrollbar{height:12px}
+.crm3890-listing-scroll::-webkit-scrollbar-thumb{background:#94a3b8;border-radius:999px;border:3px solid #f8fafc}
+.crm3890-listing-scroll::-webkit-scrollbar-track{background:#eef2f7;border-radius:999px}
+.crm3890-top-scroll{
+  width:100%;
+  height:16px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  margin:0 0 6px;
+  border-radius:999px;
+  background:#eef2f7;
+  scrollbar-gutter:stable;
+  overscroll-behavior-x:contain;
+}
+.crm3890-top-scroll-inner{height:1px}
+.crm3890-top-scroll::-webkit-scrollbar{height:12px}
+.crm3890-top-scroll::-webkit-scrollbar-thumb{background:#64748b;border-radius:999px;border:3px solid #eef2f7}
+.crm3890-top-scroll::-webkit-scrollbar-track{background:#eef2f7;border-radius:999px}
+
+/* 긴 고객명이 옆 열을 밀지 않고 2~3줄 안에서 읽히도록 제한 */
+.customer-table td:has(.crm3857-customer-name),
+.customer-table th:nth-child(3){
+  width:240px;
+  min-width:240px;
+  max-width:240px;
+}
+.crm3857-customer-name{
+  display:inline-block;
+  width:100%;
+  max-width:220px;
+  white-space:normal !important;
+  word-break:keep-all;
+  overflow-wrap:anywhere;
+  line-height:1.45;
+  text-align:center;
+  vertical-align:middle;
+}
+@media(max-width:720px){
+  .crm3890-listing-scroll .listing-table{min-width:1450px}
+  .customer-table td:has(.crm3857-customer-name),
+  .customer-table th:nth-child(3){width:210px;min-width:210px;max-width:210px}
+  .crm3857-customer-name{max-width:190px}
+}
