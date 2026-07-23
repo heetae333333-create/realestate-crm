@@ -6667,3 +6667,62 @@ console.info('CRM v3.8.87 고객 엑셀 일괄등록 및 양식 적용 완료');
   Object.assign(window,{openCustomerModal,openFollowUpModal,openHistoryModal,openCustomerFuHub,crm3888SaveRecord,crm3888SaveSchedule,crm3888EditSchedule,crm3888ResetScheduleForm,crm3888CompleteSchedule,crm3888DeleteSchedule,renderCustomers,filterCustomers});
   console.info('CRM v3.8.88 고객 가로스크롤·예정 FU 분리·조건이력 적용 완료');
 })();
+
+/* ===== CRM v3.8.89 고객표 상단 즉시 가로스크롤 ===== */
+(()=>{
+  const crm3889BasePatch = typeof crm3888PatchCustomerScroll==='function' ? crm3888PatchCustomerScroll : null;
+
+  function crm3889PatchCustomerScroll(){
+    if(crm3889BasePatch) crm3889BasePatch();
+    const host=document.getElementById('customerTable');
+    if(!host)return;
+    const wrap=host.querySelector('.customer-table-scroll');
+    const table=host.querySelector('table.customer-table');
+    if(!wrap||!table)return;
+
+    let top=host.querySelector('.crm3889-top-scroll');
+    if(!top){
+      top=document.createElement('div');
+      top.className='crm3889-top-scroll';
+      top.setAttribute('aria-label','고객 목록 가로 스크롤');
+      top.innerHTML='<div class="crm3889-top-scroll-inner"></div>';
+      wrap.parentNode.insertBefore(top,wrap);
+    }
+    const inner=top.firstElementChild;
+    const syncWidth=()=>{inner.style.width=`${Math.max(table.scrollWidth,wrap.clientWidth)}px`};
+    syncWidth();
+
+    if(!top.dataset.crm3889Sync){
+      top.dataset.crm3889Sync='1';
+      let lock=false;
+      top.addEventListener('scroll',()=>{if(lock)return;lock=true;wrap.scrollLeft=top.scrollLeft;requestAnimationFrame(()=>lock=false)});
+      wrap.addEventListener('scroll',()=>{if(lock)return;lock=true;top.scrollLeft=wrap.scrollLeft;requestAnimationFrame(()=>lock=false)});
+    }
+
+    if(!wrap.dataset.crm3889Wheel){
+      wrap.dataset.crm3889Wheel='1';
+      wrap.addEventListener('wheel',e=>{
+        if(wrap.scrollWidth<=wrap.clientWidth)return;
+        const amount=Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:e.deltaY;
+        if(!amount)return;
+        const max=wrap.scrollWidth-wrap.clientWidth;
+        const next=Math.max(0,Math.min(max,wrap.scrollLeft+amount));
+        if(next!==wrap.scrollLeft){
+          e.preventDefault();
+          wrap.scrollLeft=next;
+        }
+      },{passive:false});
+    }
+
+    top.scrollLeft=wrap.scrollLeft;
+    requestAnimationFrame(syncWidth);
+  }
+
+  const baseRender=renderCustomers;
+  renderCustomers=async function(){const r=await baseRender();setTimeout(crm3889PatchCustomerScroll,0);return r};
+  const baseFilter=filterCustomers;
+  filterCustomers=function(){const r=baseFilter();setTimeout(crm3889PatchCustomerScroll,0);return r};
+  window.addEventListener('resize',()=>{if(state.view==='customers')setTimeout(crm3889PatchCustomerScroll,0)});
+  Object.assign(window,{renderCustomers,filterCustomers});
+  console.info('CRM v3.8.89 고객표 상단 즉시 가로스크롤 적용 완료');
+})();
