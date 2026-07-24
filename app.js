@@ -8187,3 +8187,88 @@ console.info('CRM v3.9.5 변경사항 확인 저장 버튼 및 null bypass 오�
   Object.assign(window,{crm3852NormalizeBuilding,crm3852NormalizeUnit,crm3863AlphaNumericKey,crm3863BuildingKey,crm3863UnitKey});
   console.info('CRM v3.10.3 영문 동·호 표준화 및 중복판정 통합 완료');
 })();
+
+/* ===== CRM v3.10.4 고객 목록 희망유형 5개 범주 표시 ===== */
+(function(){
+  const HOME_TYPES = new Set(['아파트','오피스텔','단독','다가구','다세대','빌라','원룸']);
+  const CATEGORY_ORDER = ['주택','상가','사무실','토지','기타'];
+
+  function parsePreferredTypes(customer){
+    const raw = customer?.preferred_property_types;
+    if(Array.isArray(raw)) return raw.map(v=>String(v||'').trim()).filter(Boolean);
+    if(typeof raw === 'string'){
+      const text = raw.trim();
+      if(!text) return [];
+      try{
+        const parsed = JSON.parse(text);
+        if(Array.isArray(parsed)) return parsed.map(v=>String(v||'').trim()).filter(Boolean);
+      }catch(_e){}
+      return text.split(/[,+;|]/).map(v=>v.trim()).filter(Boolean);
+    }
+    return [];
+  }
+
+  function preferredCategoryText(customer){
+    const types = parsePreferredTypes(customer);
+    if(!types.length) return '전체';
+    const categories = new Set();
+    for(const type of types){
+      if(HOME_TYPES.has(type)) categories.add('주택');
+      else if(type === '상가') categories.add('상가');
+      else if(type === '사무실') categories.add('사무실');
+      else if(type === '토지') categories.add('토지');
+      else categories.add('기타');
+    }
+    return CATEGORY_ORDER.filter(v=>categories.has(v)).join(' · ') || '전체';
+  }
+
+  function customerIdFromRow(row){
+    const btn = row.querySelector("button[onclick*='openCustomerModal']");
+    const code = btn?.getAttribute('onclick') || '';
+    const match = code.match(/openCustomerModal\(['\"]([^'\"]+)['\"]\)/);
+    return match?.[1] || '';
+  }
+
+  function applyCustomerPreferredCategories(){
+    const table = document.querySelector('#customerTable table');
+    if(!table) return;
+    const headers = Array.from(table.querySelectorAll('thead th'));
+    const index = headers.findIndex(th=>th.textContent.trim()==='구분' || th.dataset.crm3104Preferred==='1');
+    if(index < 0) return;
+    const header = headers[index];
+    header.textContent='희망';
+    header.dataset.crm3104Preferred='1';
+    header.title='희망 주택유형 범주';
+
+    table.querySelectorAll('tbody tr').forEach(row=>{
+      const id = customerIdFromRow(row);
+      const customer = state.customers?.find(x=>String(x.id)===String(id));
+      const cell = row.children[index];
+      if(!cell || !customer) return;
+      const text = preferredCategoryText(customer);
+      cell.innerHTML = `<span class="crm3104-preferred-category" title="${escapeHtml(text)}">${escapeHtml(text)}</span>`;
+    });
+  }
+
+  const baseFilterCustomers = window.filterCustomers;
+  if(typeof baseFilterCustomers === 'function'){
+    window.filterCustomers = function(...args){
+      const result = baseFilterCustomers.apply(this,args);
+      requestAnimationFrame(applyCustomerPreferredCategories);
+      return result;
+    };
+  }
+
+  const baseRenderCustomers = window.renderCustomers;
+  if(typeof baseRenderCustomers === 'function'){
+    window.renderCustomers = async function(...args){
+      const result = await baseRenderCustomers.apply(this,args);
+      requestAnimationFrame(applyCustomerPreferredCategories);
+      return result;
+    };
+  }
+
+  window.crm3104ApplyCustomerPreferredCategories = applyCustomerPreferredCategories;
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(applyCustomerPreferredCategories,300));
+  console.info('CRM v3.10.4 고객 목록 희망유형 5개 범주 표시 적용 완료');
+})();

@@ -1648,3 +1648,15 @@ button .crm3870-admin-tag{pointer-events:none}
   .crm3866-network-panel .listing-table{min-width:100%!important}
 }
 .crm310-draft-tag{margin-left:8px;font-size:12px;font-weight:700;color:#2563eb}
+
+/* CRM v3.10.4 고객 목록 희망유형 범주 */
+.crm3104-preferred-category{
+  display:inline-block;
+  max-width:120px;
+  white-space:normal;
+  line-height:1.35;
+  text-align:center;
+  word-break:keep-all;
+  color:#172033;
+  font-weight:600;
+}
