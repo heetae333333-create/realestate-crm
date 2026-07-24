@@ -1703,3 +1703,9 @@ button .crm3870-admin-tag{pointer-events:none}
 .crm3106-network-top-scroll::-webkit-scrollbar{height:12px}
 .crm3106-network-top-scroll::-webkit-scrollbar-track{background:#eef2f7;border-radius:8px}
 .crm3106-network-top-scroll::-webkit-scrollbar-thumb{background:#64748b;border-radius:8px;border:2px solid #eef2f7}
+
+/* ===== CRM v3.10.7 FU 카카오톡 소개문구 복사 ===== */
+#modal .modal-actions{display:flex;align-items:center;gap:10px}
+#modal .modal-actions .crm3107-kakao-copy{margin-right:auto;border-color:#86efac;background:#f0fdf4;color:#166534;font-weight:800}
+#modal .modal-actions .crm3107-kakao-copy:hover{background:#dcfce7;border-color:#4ade80}
+@media(max-width:620px){#modal .modal-actions{flex-wrap:wrap}.crm3107-kakao-copy{width:100%;order:-1}}
