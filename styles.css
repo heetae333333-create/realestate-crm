@@ -1797,3 +1797,25 @@ button .crm3870-admin-tag{pointer-events:none}
 .crm31019-listing-record{position:relative}
 .crm31019-record-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
 .crm31019-delete{padding:6px 10px;font-size:13px}
+
+/* ===== CRM v3.10.20 매물 관리 버튼 2줄 배치 ===== */
+.row-actions.crm31020-listing-actions{
+  display:flex !important;
+  flex-direction:column !important;
+  align-items:center !important;
+  justify-content:center !important;
+  gap:5px !important;
+  width:max-content;
+  min-width:178px;
+  margin:0 auto;
+}
+.crm31020-action-row{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  white-space:nowrap;
+}
+.crm31020-action-row > button{
+  margin:0 !important;
+}
