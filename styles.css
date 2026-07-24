@@ -1791,3 +1791,9 @@ button .crm3870-admin-tag{pointer-events:none}
 .crm31018-date,.crm31018-reason{display:flex;flex-direction:column;gap:7px;font-weight:700}.crm31018-date input,.crm31018-reason input{height:48px;border:1px solid #d8e0eb;border-radius:12px;padding:0 14px;background:#fff;font:inherit}
 .crm31018-reason{margin-top:14px}.crm31018-reason input{height:42px}.crm31018-clear{height:48px;white-space:nowrap}.crm31018-actions{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:14px}.crm31018-actions .primary{margin-left:auto}
 @media(max-width:760px){.crm31018-compact-row{grid-template-columns:1fr}.crm31018-clear{width:100%}.crm31018-actions{flex-wrap:wrap}.crm31018-actions>*{flex:1 1 auto}}
+
+/* CRM v3.10.19 매물 FU 기록 통합 */
+.crm31019-listing-fu-history{margin-top:16px}
+.crm31019-listing-record{position:relative}
+.crm31019-record-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.crm31019-delete{padding:6px 10px;font-size:13px}
