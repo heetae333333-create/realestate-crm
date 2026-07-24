@@ -1747,3 +1747,13 @@ button .crm3870-admin-tag{pointer-events:none}
 /* CRM v3.10.15 고객 FU 삭제 버튼 */
 .crm31015-fu-head-actions{display:flex;align-items:center;gap:8px;justify-content:flex-end}
 .crm31015-fu-delete{padding:5px 10px;font-size:12px;line-height:1.1;border-radius:8px}
+
+/* CRM v3.10.16 예정 FU 간소화 */
+.crm31016-simple-schedule{border:1px solid #dbe4f0;border-radius:16px;padding:18px;background:#f8fbff;margin-bottom:16px}
+.crm31016-simple-fields{display:grid;grid-template-columns:minmax(220px,1fr) minmax(260px,1.4fr);gap:14px;align-items:end}
+.crm31016-simple-fields label{display:flex;flex-direction:column;gap:7px;font-weight:700}
+.crm31016-simple-fields input{min-height:46px;border:1px solid #d7dfeb;border-radius:12px;padding:0 14px;background:#fff;font:inherit}
+.crm31016-simple-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:14px}
+.crm31016-schedule-reason{margin-top:6px;font-size:14px;line-height:1.35;color:#334155;max-width:520px;white-space:normal;word-break:break-word}
+.crm3888-schedule-item.completed{opacity:.72}
+@media(max-width:720px){.crm31016-simple-fields{grid-template-columns:1fr}.crm31016-simple-actions{justify-content:stretch}.crm31016-simple-actions button{flex:1}}
