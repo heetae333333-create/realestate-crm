@@ -8796,3 +8796,111 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   q('#crm393ChangeOverlay')?.remove();
   console.info('CRM v3.10.11 고객 카카오 버튼 제거·즉시 저장·층수연식 소개문구 보강 완료');
 })();
+
+/* ===== CRM v3.10.12 공동매물망 가로 스크롤바 단일화·렉 방지 ===== */
+(()=>{
+  const LEGACY='.crm3889-top-scroll,.crm3890-top-scroll,.crm396-top-scroll,.crm3106-network-top-scroll';
+  let frame=0;
+  let boundWrap=null;
+  let boundTop=null;
+  let syncing=false;
+
+  function isNetworkView(){
+    return state?.currentView==='network'||state?.view==='network'||document.querySelector('#networkTable table.listing-table');
+  }
+
+  function getParts(){
+    const host=document.querySelector('#networkTable');
+    const table=host?.querySelector('table.listing-table');
+    if(!host||!table)return {};
+    const wrap=table.closest('.table-wrap,.crm3890-listing-scroll,.crm3106-network-scroll')||table.parentElement;
+    return {host,table,wrap};
+  }
+
+  function removeLegacyBars(parent, keep){
+    if(!parent)return;
+    parent.querySelectorAll(LEGACY).forEach(el=>{if(el!==keep)el.remove();});
+    // 과거 코드가 wrapper 바로 앞에 만든 형제 스크롤바까지 정리
+    let node=parent.previousElementSibling;
+    while(node&&node.matches?.(LEGACY)){
+      const prev=node.previousElementSibling;
+      if(node!==keep)node.remove();
+      node=prev;
+    }
+  }
+
+  function bind(top,wrap){
+    if(boundWrap===wrap&&boundTop===top)return;
+    boundWrap=wrap;boundTop=top;syncing=false;
+    top.addEventListener('scroll',()=>{
+      if(syncing)return;syncing=true;wrap.scrollLeft=top.scrollLeft;
+      requestAnimationFrame(()=>syncing=false);
+    },{passive:true});
+    wrap.addEventListener('scroll',()=>{
+      if(syncing)return;syncing=true;top.scrollLeft=wrap.scrollLeft;
+      requestAnimationFrame(()=>syncing=false);
+    },{passive:true});
+    wrap.addEventListener('wheel',e=>{
+      if(!e.shiftKey)return;
+      const amount=Math.abs(e.deltaY)>=Math.abs(e.deltaX)?e.deltaY:e.deltaX;
+      if(!amount)return;
+      e.preventDefault();wrap.scrollLeft+=amount;top.scrollLeft=wrap.scrollLeft;
+    },{passive:false});
+  }
+
+  function ensureSingleNetworkScrollbar(){
+    frame=0;
+    if(!isNetworkView())return;
+    const {host,table,wrap}=getParts();if(!host||!table||!wrap)return;
+    wrap.classList.add('crm3112-network-scroll');
+    wrap.style.overflowX='auto';
+    wrap.style.overflowY='visible';
+
+    const parent=wrap.parentElement;
+    let top=parent?.querySelector(':scope > .crm3112-network-top-scroll');
+    if(!top){
+      top=document.createElement('div');
+      top.className='crm3112-network-top-scroll';
+      top.innerHTML='<div></div>';
+      parent.insertBefore(top,wrap);
+    }
+    removeLegacyBars(parent,top);
+    removeLegacyBars(host,top);
+    bind(top,wrap);
+
+    const inner=top.firstElementChild;
+    const width=Math.max(table.scrollWidth,wrap.clientWidth+1);
+    inner.style.width=`${width}px`;
+    top.style.display=table.scrollWidth>wrap.clientWidth?'block':'none';
+    top.scrollLeft=wrap.scrollLeft;
+  }
+
+  function schedule(){
+    if(frame)return;
+    frame=requestAnimationFrame(ensureSingleNetworkScrollbar);
+  }
+
+  const observer=new MutationObserver(records=>{
+    if(!isNetworkView())return;
+    for(const rec of records){
+      if(rec.type==='childList'&&(rec.addedNodes.length||rec.removedNodes.length)){schedule();break;}
+    }
+  });
+  observer.observe(document.getElementById('main')||document.body,{childList:true,subtree:true});
+  window.addEventListener('resize',schedule,{passive:true});
+
+  const base=window.renderNetwork||globalThis.renderNetwork;
+  if(typeof base==='function'&&!base.__crm3112){
+    const wrapped=async function(){
+      const result=await base.apply(this,arguments);
+      schedule();setTimeout(schedule,120);
+      return result;
+    };
+    wrapped.__crm3112=true;
+    window.renderNetwork=wrapped;
+    try{renderNetwork=wrapped}catch(_){ }
+  }
+
+  setTimeout(schedule,300);
+  console.info('CRM v3.10.12 공동매물망 스크롤바 단일화 적용 완료');
+})();

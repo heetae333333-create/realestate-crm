@@ -1720,3 +1720,12 @@ button .crm3870-admin-tag{pointer-events:none}
 .crm3109-year-field{display:flex;align-items:center;gap:8px}.crm3109-year-field input{min-width:0;flex:1}.crm3109-year-field span{font-weight:700;color:#475569}
 .crm3109-floor-age{margin-top:4px;font-size:11px;line-height:1.25;color:#64748b;white-space:nowrap}
 @media(max-width:720px){.crm3109-building-grid{grid-template-columns:1fr}.crm3109-building-title{align-items:flex-start;flex-direction:column;gap:3px}}
+
+/* CRM v3.10.12 공동매물망 스크롤바 단일화 */
+.crm3112-network-scroll{width:100%!important;max-width:100%!important;overflow-x:auto!important;overflow-y:visible!important;padding-bottom:8px;scrollbar-gutter:stable}
+.crm3112-network-top-scroll{width:100%;height:15px;overflow-x:auto;overflow-y:hidden;margin:0 0 7px;border-radius:8px;background:#eef2f7;scrollbar-color:#64748b #eef2f7;scrollbar-width:auto}
+.crm3112-network-top-scroll>div{height:1px}
+.crm3112-network-top-scroll::-webkit-scrollbar{height:12px}
+.crm3112-network-top-scroll::-webkit-scrollbar-track{background:#eef2f7;border-radius:8px}
+.crm3112-network-top-scroll::-webkit-scrollbar-thumb{background:#64748b;border-radius:8px;border:2px solid #eef2f7}
+#networkTable .crm3889-top-scroll,#networkTable .crm3890-top-scroll,#networkTable .crm396-top-scroll,#networkTable .crm3106-network-top-scroll{display:none!important}
