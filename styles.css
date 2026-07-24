@@ -1783,3 +1783,11 @@ button .crm3870-admin-tag{pointer-events:none}
  .crm31017-form-actions-right{width:100%;margin-left:0}
  .crm31017-form-actions-right>*{flex:1}
 }
+
+/* CRM v3.10.18 예정 FU UI 강제 통일 */
+.crm31018-compact-schedule{border:1px solid #dbe7f7;background:#f8fbff;border-radius:16px;padding:18px;margin-bottom:16px}
+.crm31018-compact-row{display:grid;grid-template-columns:minmax(180px,1fr) minmax(240px,310px) auto;gap:16px;align-items:end}
+.crm31018-copy{display:flex;flex-direction:column;gap:6px}.crm31018-copy strong{font-size:17px}.crm31018-copy span{font-size:13px;color:#718096;line-height:1.45}
+.crm31018-date,.crm31018-reason{display:flex;flex-direction:column;gap:7px;font-weight:700}.crm31018-date input,.crm31018-reason input{height:48px;border:1px solid #d8e0eb;border-radius:12px;padding:0 14px;background:#fff;font:inherit}
+.crm31018-reason{margin-top:14px}.crm31018-reason input{height:42px}.crm31018-clear{height:48px;white-space:nowrap}.crm31018-actions{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:14px}.crm31018-actions .primary{margin-left:auto}
+@media(max-width:760px){.crm31018-compact-row{grid-template-columns:1fr}.crm31018-clear{width:100%}.crm31018-actions{flex-wrap:wrap}.crm31018-actions>*{flex:1 1 auto}}
