@@ -1757,3 +1757,29 @@ button .crm3870-admin-tag{pointer-events:none}
 .crm31016-schedule-reason{margin-top:6px;font-size:14px;line-height:1.35;color:#334155;max-width:520px;white-space:normal;word-break:break-word}
 .crm3888-schedule-item.completed{opacity:.72}
 @media(max-width:720px){.crm31016-simple-fields{grid-template-columns:1fr}.crm31016-simple-actions{justify-content:stretch}.crm31016-simple-actions button{flex:1}}
+
+/* ===== CRM v3.10.17 예정 FU 통일 UI ===== */
+.crm31017-schedule-box{border:1px solid #dbe6f5;border-radius:16px;background:#f8fbff;padding:18px;margin-bottom:16px}
+.crm31017-schedule-main{display:grid;grid-template-columns:minmax(220px,1fr) minmax(230px,300px) auto;align-items:end;gap:14px}
+.crm31017-schedule-copy{display:flex;flex-direction:column;gap:7px;min-width:0}
+.crm31017-schedule-copy strong{font-size:17px;color:#172033}
+.crm31017-schedule-copy span{font-size:13px;line-height:1.55;color:#718096;max-width:360px}
+.crm31017-date-field,.crm31017-reason-field{display:flex;flex-direction:column;gap:7px;font-weight:700;color:#1f2937}
+.crm31017-date-field input,.crm31017-reason-field input{height:46px;border:1px solid #d8e0eb;border-radius:12px;background:#fff;padding:0 14px;font-size:15px;box-sizing:border-box;width:100%}
+.crm31017-clear{height:46px;white-space:nowrap}
+.crm31017-reason-field{margin-top:14px}
+.crm31017-reason-field span{font-size:14px}
+.crm31017-form-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px}
+.crm31017-form-actions-right{display:flex;align-items:center;gap:10px;margin-left:auto}
+.crm31017-card-copy{min-width:0;display:flex;flex-direction:column;gap:8px}
+.crm31016-schedule-reason{font-size:14px;line-height:1.45;white-space:normal;word-break:break-word}
+.crm3888-schedule-list{display:flex;flex-direction:column;gap:12px}
+.crm3888-schedule-item{border-radius:15px;padding:15px 16px}
+.crm3888-item-head{align-items:center;gap:14px}
+@media(max-width:720px){
+ .crm31017-schedule-main{grid-template-columns:1fr}
+ .crm31017-clear{width:100%}
+ .crm31017-form-actions{align-items:stretch;flex-direction:column}
+ .crm31017-form-actions-right{width:100%;margin-left:0}
+ .crm31017-form-actions-right>*{flex:1}
+}
