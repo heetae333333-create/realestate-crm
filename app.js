@@ -9812,3 +9812,115 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   window.crm31020ArrangeListingActions=arrangeListingActions;
   console.info('CRM v3.10.20 매물 관리 버튼 배치 적용 완료');
 })();
+
+/* ===== CRM v3.10.22 고객 목록 입주희망일 표시 확정 ===== */
+(function(){
+  function moveInText(customer){
+    const period=String(customer?.desired_move_in_period||'').trim();
+    if(period)return period;
+    const date=String(customer?.desired_move_in_date||'').trim();
+    return date?fmtDate(date):'-';
+  }
+
+  function customerIdFromRow(row){
+    const btn=row.querySelector("button[onclick*='openCustomerModal']");
+    const code=btn?.getAttribute('onclick')||'';
+    return code.match(/openCustomerModal\(['\"]([^'\"]+)['\"]\)/)?.[1]||'';
+  }
+
+  function patchCustomerMoveInColumn(){
+    const table=document.querySelector('#customerTable table');
+    if(!table)return;
+
+    // 이전 버전에서 잘못 삽입된 열이 있다면 한 번 정리한다.
+    const headers=[...table.querySelectorAll('thead th')];
+    const existingIndexes=[];
+    headers.forEach((th,i)=>{
+      if(th.dataset.crm31022MoveIn==='1'||th.classList.contains('crm3894-move-in-col')||th.textContent.trim()==='입주희망일')existingIndexes.push(i);
+    });
+    if(existingIndexes.length>1){
+      existingIndexes.slice(1).reverse().forEach(i=>{
+        table.querySelectorAll('tr').forEach(tr=>tr.children[i]?.remove());
+      });
+    }
+
+    let currentHeaders=[...table.querySelectorAll('thead th')];
+    let moveIndex=currentHeaders.findIndex(th=>th.dataset.crm31022MoveIn==='1'||th.classList.contains('crm3894-move-in-col')||th.textContent.trim()==='입주희망일');
+    const featureIndex=currentHeaders.findIndex(th=>th.textContent.trim()==='희망특징');
+    if(featureIndex<0)return;
+
+    if(moveIndex<0){
+      const th=document.createElement('th');
+      th.textContent='입주희망일';
+      th.className='crm3894-move-in-col crm31022-move-in-col';
+      th.dataset.crm31022MoveIn='1';
+      currentHeaders[featureIndex].before(th);
+      moveIndex=featureIndex;
+    }else{
+      const th=currentHeaders[moveIndex];
+      th.textContent='입주희망일';
+      th.dataset.crm31022MoveIn='1';
+      th.classList.add('crm3894-move-in-col','crm31022-move-in-col');
+      // 항상 희망특징 바로 왼쪽에 배치
+      currentHeaders=[...table.querySelectorAll('thead th')];
+      const newFeatureIndex=currentHeaders.findIndex(x=>x.textContent.trim()==='희망특징');
+      const newMoveIndex=currentHeaders.indexOf(th);
+      if(newFeatureIndex>=0&&newMoveIndex!==newFeatureIndex-1)currentHeaders[newFeatureIndex].before(th);
+    }
+
+    const rows=[...table.querySelectorAll('tbody tr')];
+    rows.forEach(row=>{
+      const id=customerIdFromRow(row);
+      const customer=(state.customers||[]).find(x=>String(x.id)===String(id));
+      if(!customer)return;
+
+      let cell=row.querySelector('td[data-crm31022-move-in="1"]');
+      if(!cell){
+        cell=document.createElement('td');
+        cell.dataset.crm31022MoveIn='1';
+        cell.className='crm3894-move-in-col crm31022-move-in-col';
+        const rowHeaders=[...table.querySelectorAll('thead th')];
+        const featurePos=rowHeaders.findIndex(th=>th.textContent.trim()==='희망특징');
+        if(featurePos>=0&&row.children[featurePos])row.children[featurePos].before(cell);
+        else row.appendChild(cell);
+      }
+      const text=moveInText(customer);
+      cell.innerHTML=`<span class="crm3894-move-in-text" title="${escapeHtml(text)}">${escapeHtml(text)}</span>`;
+    });
+  }
+
+  // 렌더링 완료 후 1회만 보정한다.
+  const baseRender=window.renderCustomers||globalThis.renderCustomers;
+  if(typeof baseRender==='function'&&!baseRender.__crm31022){
+    const wrapped=async function(){
+      const result=await baseRender.apply(this,arguments);
+      requestAnimationFrame(patchCustomerMoveInColumn);
+      return result;
+    };
+    wrapped.__crm31022=true;
+    window.renderCustomers=wrapped;
+    try{renderCustomers=wrapped}catch(_){ }
+  }
+
+  const baseFilter=window.filterCustomers||globalThis.filterCustomers;
+  if(typeof baseFilter==='function'&&!baseFilter.__crm31022){
+    const wrapped=function(){
+      const result=baseFilter.apply(this,arguments);
+      requestAnimationFrame(patchCustomerMoveInColumn);
+      return result;
+    };
+    wrapped.__crm31022=true;
+    window.filterCustomers=wrapped;
+    try{filterCustomers=wrapped}catch(_){ }
+  }
+
+  const observer=new MutationObserver(mutations=>{
+    if(mutations.some(m=>[...m.addedNodes].some(n=>n.nodeType===1&&(n.matches?.('#customerTable, #customerTable *')||n.querySelector?.('#customerTable'))))){
+      requestAnimationFrame(patchCustomerMoveInColumn);
+    }
+  });
+  observer.observe(document.body,{childList:true,subtree:true});
+  setTimeout(patchCustomerMoveInColumn,100);
+  window.crm31022PatchCustomerMoveInColumn=patchCustomerMoveInColumn;
+  console.info('CRM v3.10.22 고객 목록 입주희망일 표시 확정 적용');
+})();

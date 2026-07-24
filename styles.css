@@ -1819,3 +1819,18 @@ button .crm3870-admin-tag{pointer-events:none}
 .crm31020-action-row > button{
   margin:0 !important;
 }
+
+/* CRM v3.10.22 고객 입주희망일 목록 */
+#customerTable th.crm31022-move-in-col,
+#customerTable td.crm31022-move-in-col{
+  width:120px;
+  min-width:120px;
+  max-width:120px;
+  text-align:center;
+  white-space:normal;
+}
+#customerTable .crm3894-move-in-text{
+  display:block;
+  line-height:1.35;
+  overflow-wrap:anywhere;
+}
