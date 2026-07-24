@@ -1612,3 +1612,20 @@ button .crm3870-admin-tag{pointer-events:none}
 .photo-link.crm396-has-photos{background:#dcfce7 !important;border-color:#86efac !important;color:#15803d !important;font-weight:800;box-shadow:0 0 0 1px rgba(34,197,94,.06)}
 .photo-link.crm396-has-photos:hover{background:#bbf7d0 !important;border-color:#4ade80 !important;color:#166534 !important}
 @media(max-width:900px){.crm396-top-scroll{height:13px}.crm396-sort-icon{margin-left:3px}}
+
+/* CRM v3.9.7 자동매칭 고객 매물구분 */
+.crm397-property-group-field{display:flex;flex-direction:column;gap:7px;min-width:0}
+.crm397-property-group-field select{width:100%}
+
+/* ===== CRM v3.9.8 희망 매물유형 다중선택 ===== */
+.crm398-property-types-card{padding:18px 20px!important}
+.crm398-type-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:12px}
+.crm398-type-head h3{margin:0 0 4px}
+.crm398-type-head p{margin:0}
+.crm398-home-all{display:flex;align-items:center;gap:7px;padding:9px 12px;border:1px solid #bfdbfe;border-radius:10px;background:#eff6ff;font-weight:800;white-space:nowrap}
+.crm398-property-type-grid{display:grid;grid-template-columns:repeat(5,minmax(105px,1fr));gap:8px}
+.crm398-property-type-grid label{display:flex;align-items:center;gap:7px;min-height:42px;padding:9px 11px;border:1px solid #dbe3ef;border-radius:10px;background:#fff;font-weight:700;cursor:pointer}
+.crm398-property-type-grid label:has(input:checked){border-color:#3b82f6;background:#eff6ff;color:#1d4ed8}
+.crm398-property-type-grid input{width:17px;height:17px;flex:0 0 auto}
+@media(max-width:850px){.crm398-property-type-grid{grid-template-columns:repeat(3,minmax(90px,1fr))}.crm398-type-head{flex-direction:column}.crm398-home-all{align-self:flex-start}}
+@media(max-width:520px){.crm398-property-type-grid{grid-template-columns:repeat(2,minmax(90px,1fr))}}
