@@ -7961,3 +7961,147 @@ console.info('CRM v3.9.5 변경사항 확인 저장 버튼 및 null bypass 오�
   Object.assign(window,{crm398PropertyTypes,crm398SelectedPropertyTypes,crm398ReadPreferredTypes,crm398ToggleHomeAll,crm398SyncHomeAll,crm398TypeText,evaluateListingMatch:window.evaluateListingMatch,renderSmartMatch:window.renderSmartMatch});
   console.info('CRM v3.9.8 희망 매물유형 다중선택·자동매칭 적용 완료');
 })();
+
+/* ================= CRM v3.10.0 공동매물망 폭·임시저장 단일화 ================= */
+(()=>{
+  const q=(s,r=document)=>r.querySelector(s);
+  const qa=(s,r=document)=>[...r.querySelectorAll(s)];
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  const profileId=()=>state?.profile?.id||'anon';
+  const newKey=(type,id)=>`crm310:draft:${profileId()}:${type}:${id||'new'}`;
+  const oldKeys=(type,id)=>[
+    `crm390:draft:${profileId()}:${type}:${id||'new'}`,
+    `crm393:draft:${profileId()}:${type}:${id||'new'}`
+  ];
+  let activeSession=null;
+
+  function clearLegacy(type,id){ oldKeys(type,id).forEach(k=>localStorage.removeItem(k)); }
+  function controlKey(el,indexByName){
+    if(el.id)return `id:${el.id}`;
+    if(el.name){const n=indexByName[el.name]||0;indexByName[el.name]=n+1;return `name:${el.name}:${n}`;}
+    return '';
+  }
+  function serialize(form){
+    const data={},indexByName={};
+    qa('input,select,textarea',form).forEach(el=>{
+      if(el.type==='file'||el.disabled||el.dataset?.changeIgnore==='true')return;
+      const k=controlKey(el,indexByName);if(!k)return;
+      if(el.type==='checkbox'||el.type==='radio')data[k]={type:el.type,checked:!!el.checked,value:el.value};
+      else data[k]={type:el.type||el.tagName.toLowerCase(),value:el.value};
+    });
+    return data;
+  }
+  function same(a,b){return JSON.stringify(a||{})===JSON.stringify(b||{});}
+  function applyOnce(form,data){
+    const indexByName={};
+    qa('input,select,textarea',form).forEach(el=>{
+      if(el.type==='file')return;
+      const k=controlKey(el,indexByName),v=data?.[k];if(!k||v===undefined)return;
+      if(el.type==='checkbox'||el.type==='radio')el.checked=!!v.checked;
+      else el.value=v.value??'';
+      el.dispatchEvent(new Event('input',{bubbles:true}));
+      el.dispatchEvent(new Event('change',{bubbles:true}));
+    });
+  }
+  async function restore(form,data){
+    for(const ms of [0,80,180,350,650]){if(ms)await sleep(ms);applyOnce(form,data);}
+  }
+  function showTag(){
+    let tag=q('#crm310DraftTag');
+    if(!tag){tag=document.createElement('small');tag.id='crm310DraftTag';tag.className='crm310-draft-tag';q('#modalTitle')?.appendChild(tag)}
+    tag.textContent='임시저장됨';
+  }
+  async function waitForm(){
+    for(let i=0;i<35;i++){
+      const modal=q('#modal'),form=q('#modalForm'),btn=q('#modalSubmit');
+      if(modal?.open&&form&&btn)return {modal,form,btn};
+      await sleep(40);
+    }
+    return null;
+  }
+  async function install(type,id){
+    const found=await waitForm();if(!found)return;
+    const {modal,form,btn}=found;
+    if(activeSession?.cleanup)activeSession.cleanup();
+    clearLegacy(type,id);
+    const key=newKey(type,id);
+    await sleep(180);
+    let baseline=serialize(form),timer=null,saveWindow=false,closed=false;
+    const savedRaw=localStorage.getItem(key);
+    if(savedRaw){
+      try{
+        const saved=JSON.parse(savedRaw);
+        const data=saved?.data||saved;
+        if(data&&!same(data,baseline)){
+          const yes=window.confirm('작성 중이던 임시저장 내용이 있습니다. 이어서 작성할까요?');
+          if(yes){
+            await restore(form,data);
+            clearLegacy(type,id);
+            baseline=serialize(form);
+            if(typeof toast==='function')toast('임시저장 내용을 불러왔습니다.');
+          }else{
+            localStorage.removeItem(key);
+          }
+        }else localStorage.removeItem(key);
+      }catch(_){localStorage.removeItem(key)}
+    }
+    const onEdit=e=>{
+      if(!e.isTrusted)return;
+      clearTimeout(timer);
+      timer=setTimeout(()=>{
+        const current=serialize(form);
+        if(same(current,baseline)){localStorage.removeItem(key);return;}
+        localStorage.setItem(key,JSON.stringify({savedAt:new Date().toISOString(),data:current}));
+        showTag();
+      },500);
+    };
+    const onSubmitCapture=()=>{
+      saveWindow=true;
+      setTimeout(()=>{if(!closed)saveWindow=false;},6000);
+    };
+    const onClose=()=>{
+      closed=true;clearTimeout(timer);clearLegacy(type,id);
+      if(saveWindow)localStorage.removeItem(key);
+      cleanup();
+    };
+    const cleanup=()=>{
+      form.removeEventListener('input',onEdit,true);form.removeEventListener('change',onEdit,true);
+      btn.removeEventListener('click',onSubmitCapture,true);modal.removeEventListener('close',onClose);
+      if(activeSession?.form===form)activeSession=null;
+    };
+    form.addEventListener('input',onEdit,true);form.addEventListener('change',onEdit,true);
+    btn.addEventListener('click',onSubmitCapture,true);modal.addEventListener('close',onClose);
+    activeSession={form,cleanup};
+  }
+  function wrap(name,type){
+    const current=window[name]||globalThis[name];if(typeof current!=='function'||current.__crm310)return;
+    const wrapped=function(id){
+      clearLegacy(type,id);
+      const r=current.apply(this,arguments);
+      Promise.resolve(r).finally(()=>setTimeout(()=>install(type,id),80));
+      return r;
+    };
+    wrapped.__crm310=true;window[name]=wrapped;
+    try{if(name==='openCustomerModal')openCustomerModal=wrapped;else if(name==='openListingModal')openListingModal=wrapped;}catch(_){ }
+  }
+  wrap('openCustomerModal','customer');
+  wrap('openListingModal','listing');
+
+  // 공동매물망 표가 넓은 화면에서도 우측 여백 없이 차도록 보정
+  function stretchNetwork(){
+    if(!(state?.currentView==='network'||state?.view==='network'))return;
+    const host=q('.crm3866-network-panel #networkTable');if(!host)return;
+    const wrap=q('.crm3890-listing-scroll,.table-wrap',host)||host;
+    const table=q('table.listing-table',host);if(!table)return;
+    host.style.width='100%';wrap.style.width='100%';table.style.width='100%';
+    if(window.innerWidth>=1600)table.style.minWidth='100%';
+  }
+  const oldRenderNetwork=window.renderNetwork||globalThis.renderNetwork;
+  if(typeof oldRenderNetwork==='function'){
+    const wrapped=async function(){const r=await oldRenderNetwork.apply(this,arguments);requestAnimationFrame(stretchNetwork);setTimeout(stretchNetwork,180);return r};
+    window.renderNetwork=wrapped;try{renderNetwork=wrapped}catch(_){ }
+  }
+  window.addEventListener('resize',stretchNetwork,{passive:true});
+  setTimeout(stretchNetwork,500);
+  console.info('CRM v3.10.0 공동매물망 폭 채움·임시저장 단일화 적용 완료');
+})();

@@ -1629,3 +1629,22 @@ button .crm3870-admin-tag{pointer-events:none}
 .crm398-property-type-grid input{width:17px;height:17px;flex:0 0 auto}
 @media(max-width:850px){.crm398-property-type-grid{grid-template-columns:repeat(3,minmax(90px,1fr))}.crm398-type-head{flex-direction:column}.crm398-home-all{align-self:flex-start}}
 @media(max-width:520px){.crm398-property-type-grid{grid-template-columns:repeat(2,minmax(90px,1fr))}}
+
+/* ===== CRM v3.10.0 공동매물망 폭 채움 · 임시저장 안정화 ===== */
+.crm3866-network-panel,
+.crm3866-network-panel #networkTable,
+.crm3866-network-panel #networkTable > *,
+.crm3866-network-panel .crm3890-listing-scroll,
+.crm3866-network-panel .table-wrap{
+  width:100%!important;
+  max-width:none!important;
+  box-sizing:border-box;
+}
+.crm3866-network-panel .listing-table{
+  width:100%!important;
+  min-width:1450px!important;
+}
+@media (min-width:1600px){
+  .crm3866-network-panel .listing-table{min-width:100%!important}
+}
+.crm310-draft-tag{margin-left:8px;font-size:12px;font-weight:700;color:#2563eb}
