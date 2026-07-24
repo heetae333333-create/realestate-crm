@@ -7731,3 +7731,168 @@ console.info('CRM v3.8.91 고객명·연락처 줄바꿈 및 관리버튼 2단 �
 
 /* CRM v3.9.5 변경사항 저장 흐름 안정화 */
 console.info('CRM v3.9.5 변경사항 확인 저장 버튼 및 null bypass 오류 수정 완료');
+
+/* ================= CRM v3.9.6 전체 열 정렬·공동매물 스크롤·사진표시 ================= */
+(()=>{
+  const q=(s,r=document)=>r.querySelector(s);
+  const qa=(s,r=document)=>Array.from(r.querySelectorAll(s));
+  const collator=new Intl.Collator('ko-KR',{numeric:true,sensitivity:'base'});
+  const tableState=new WeakMap();
+  let photoIds=new Set();
+  let photoLoadPromise=null;
+
+  function parseSortable(text){
+    const raw=String(text||'').replace(/\s+/g,' ').trim();
+    if(!raw||raw==='-'||raw==='없음')return {empty:true,value:''};
+    const date=raw.match(/(20\d{2})[.\-/년\s]+(\d{1,2})[.\-/월\s]+(\d{1,2})/);
+    if(date){
+      const n=Date.UTC(Number(date[1]),Number(date[2])-1,Number(date[3]));
+      return {empty:false,type:'number',value:n};
+    }
+    const normalized=raw.replace(/,/g,'');
+    const amount=normalized.match(/(-?\d+(?:\.\d+)?)\s*억(?:\s*(\d+(?:\.\d+)?)\s*만?)?/);
+    if(amount)return {empty:false,type:'number',value:Number(amount[1])*10000+Number(amount[2]||0)};
+    const numOnly=normalized.match(/^-?\d+(?:\.\d+)?(?:만원|만|㎡|평|개|장)?$/);
+    if(numOnly)return {empty:false,type:'number',value:Number(normalized.match(/-?\d+(?:\.\d+)?/)[0])};
+    return {empty:false,type:'text',value:raw};
+  }
+
+  function compareValues(a,b,dir){
+    const av=parseSortable(a),bv=parseSortable(b);
+    if(av.empty&&bv.empty)return 0;
+    if(av.empty)return 1;
+    if(bv.empty)return -1;
+    let result;
+    if(av.type==='number'&&bv.type==='number')result=av.value-bv.value;
+    else result=collator.compare(String(av.value),String(bv.value));
+    return dir==='asc'?result:-result;
+  }
+
+  function logicalGroups(table){
+    const rows=qa('tbody > tr',table);
+    const groups=[];
+    for(let i=0;i<rows.length;i++){
+      const row=rows[i];
+      if(row.classList.contains('crm3813-address-row')&&rows[i+1]){
+        groups.push({nodes:[row,rows[i+1]],dataRow:rows[i+1],index:groups.length});
+        i++;
+      }else groups.push({nodes:[row],dataRow:row,index:groups.length});
+    }
+    return groups;
+  }
+
+  function restoreOriginal(table,state){
+    const body=q('tbody',table);if(!body)return;
+    state.groups.slice().sort((a,b)=>a.index-b.index).forEach(g=>g.nodes.forEach(n=>body.appendChild(n)));
+  }
+
+  function sortTable(table,col,mode){
+    const state=tableState.get(table);if(!state)return;
+    qa('thead th',table).forEach((th,i)=>{
+      const icon=q('.crm396-sort-icon',th);
+      if(icon)icon.textContent=i===col?(mode==='asc'?'↑':mode==='desc'?'↓':'↕'):'↕';
+      th.classList.toggle('crm396-sort-active',i===col&&mode!=='none');
+    });
+    if(mode==='none'){restoreOriginal(table,state);return;}
+    const body=q('tbody',table);if(!body)return;
+    const sorted=state.groups.slice().sort((ga,gb)=>{
+      const ac=ga.dataRow.children[col],bc=gb.dataRow.children[col];
+      const result=compareValues(ac?.innerText,bc?.innerText,mode);
+      return result||ga.index-gb.index;
+    });
+    sorted.forEach(g=>g.nodes.forEach(n=>body.appendChild(n)));
+  }
+
+  function installTableSorting(table){
+    if(table.dataset.crm396Sort==='1')return;
+    const headers=qa('thead th',table);if(!headers.length)return;
+    table.dataset.crm396Sort='1';
+    const state={groups:logicalGroups(table),column:-1,mode:'none'};
+    tableState.set(table,state);
+    headers.forEach((th,col)=>{
+      const label=th.textContent.trim();
+      if(!label||/선택|관리/.test(label))return;
+      th.classList.add('crm396-sortable-th');
+      const icon=document.createElement('span');icon.className='crm396-sort-icon';icon.textContent='↕';icon.setAttribute('aria-hidden','true');th.appendChild(icon);
+      th.title=`${label} 정렬: 오름차순 → 내림차순 → 등록순`;
+      th.addEventListener('click',e=>{
+        if(e.target.closest('input,button,a,select'))return;
+        if(state.column!==col){state.column=col;state.mode='asc';}
+        else state.mode=state.mode==='none'?'asc':state.mode==='asc'?'desc':'none';
+        sortTable(table,col,state.mode);
+      });
+    });
+  }
+
+  function addTopScrollbar(wrapper,table){
+    if(wrapper.previousElementSibling?.classList.contains('crm396-top-scroll'))return;
+    const top=document.createElement('div');top.className='crm396-top-scroll';top.innerHTML='<div></div>';
+    wrapper.parentNode.insertBefore(top,wrapper);
+    const inner=top.firstElementChild;
+    const syncWidth=()=>{inner.style.width=`${Math.max(table.scrollWidth,wrapper.clientWidth)}px`;top.style.display=table.scrollWidth>wrapper.clientWidth?'block':'none';};
+    let syncing=false;
+    top.addEventListener('scroll',()=>{if(syncing)return;syncing=true;wrapper.scrollLeft=top.scrollLeft;requestAnimationFrame(()=>syncing=false)});
+    wrapper.addEventListener('scroll',()=>{if(syncing)return;syncing=true;top.scrollLeft=wrapper.scrollLeft;requestAnimationFrame(()=>syncing=false)});
+    wrapper.addEventListener('wheel',e=>{
+      if(!e.shiftKey)return;
+      const amount=Math.abs(e.deltaY)>=Math.abs(e.deltaX)?e.deltaY:e.deltaX;
+      if(!amount)return;
+      e.preventDefault();wrapper.scrollLeft+=amount;top.scrollLeft=wrapper.scrollLeft;
+    },{passive:false});
+    new ResizeObserver(syncWidth).observe(wrapper);new ResizeObserver(syncWidth).observe(table);setTimeout(syncWidth,0);
+  }
+
+  function installScroll(table){
+    let wrapper=table.closest('.customer-table-scroll,.crm3890-listing-scroll,.table-wrap');
+    if(!wrapper)return;
+    wrapper.classList.add('crm396-unified-scroll');
+    addTopScrollbar(wrapper,table);
+  }
+
+  async function loadPhotoIds(force=false){
+    if(photoLoadPromise&&!force)return photoLoadPromise;
+    photoLoadPromise=(async()=>{
+      try{
+        if(!state?.client)return;
+        const {data,error}=await state.client.from('listing_photos').select('listing_id').limit(20000);
+        if(error)throw error;
+        photoIds=new Set((data||[]).map(x=>String(x.listing_id)));
+        applyPhotoStyles();
+      }catch(e){console.warn('[crm396] 사진 존재여부 조회 실패',e)}
+      finally{photoLoadPromise=null;}
+    })();
+    return photoLoadPromise;
+  }
+
+  function applyPhotoStyles(){
+    qa('button.photo-link').forEach(btn=>{
+      const m=(btn.getAttribute('onclick')||'').match(/openListingPhotos\(['\"]([^'\"]+)/);
+      if(!m)return;
+      const has=photoIds.has(String(m[1]));
+      btn.classList.toggle('crm396-has-photos',has);
+      btn.title=has?'등록된 내부사진이 있습니다.':'등록된 내부사진이 없습니다.';
+    });
+  }
+
+  function installAll(){
+    qa('table.customer-table, table.listing-table').forEach(table=>{installTableSorting(table);installScroll(table)});
+    applyPhotoStyles();
+  }
+
+  const observer=new MutationObserver(()=>requestAnimationFrame(installAll));
+  observer.observe(document.body,{childList:true,subtree:true});
+  setInterval(()=>{installAll();loadPhotoIds(false)},12000);
+  setTimeout(()=>{installAll();loadPhotoIds(true)},700);
+
+  const originalAdd=window.addListingPhotos;
+  if(typeof originalAdd==='function'){
+    window.addListingPhotos=async function(){const r=await originalAdd.apply(this,arguments);setTimeout(()=>loadPhotoIds(true),500);return r};
+    try{addListingPhotos=window.addListingPhotos}catch(_){ }
+  }
+  const originalDelete=window.deleteListingPhoto;
+  if(typeof originalDelete==='function'){
+    window.deleteListingPhoto=async function(){const r=await originalDelete.apply(this,arguments);setTimeout(()=>loadPhotoIds(true),500);return r};
+    try{deleteListingPhoto=window.deleteListingPhoto}catch(_){ }
+  }
+  console.info('CRM v3.9.6 전체 열 정렬·공동매물 스크롤·사진표시 적용 완료');
+})();

@@ -1590,3 +1590,25 @@ button .crm3870-admin-tag{pointer-events:none}
 
 /* CRM v3.9.4 필수정보 누락 점검 */
 .crm394-audit-section{margin-top:16px}.crm394-audit-section h3{margin:0 0 8px;font-size:16px}.crm394-audit-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 4px;border-bottom:1px solid var(--line,#e5e7eb)}.crm394-audit-row>div{min-width:0}.crm394-audit-row strong{display:inline-block;max-width:440px;white-space:normal;word-break:break-word}.crm394-audit-row small{display:block;margin-top:4px}
+
+/* ===== CRM v3.9.6 전체 열 정렬·공동매물 스크롤·사진표시 ===== */
+.crm396-unified-scroll{
+  width:100%;overflow-x:auto !important;overflow-y:visible;
+  scrollbar-gutter:stable;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;
+}
+.crm396-unified-scroll::-webkit-scrollbar{height:12px}
+.crm396-unified-scroll::-webkit-scrollbar-thumb{background:#64748b;border-radius:999px;border:3px solid #eef2f7}
+.crm396-unified-scroll::-webkit-scrollbar-track{background:#eef2f7;border-radius:999px}
+.crm396-top-scroll{width:100%;height:15px;overflow-x:auto;overflow-y:hidden;margin:0 0 7px;background:#eef2f7;border-radius:999px;scrollbar-gutter:stable}
+.crm396-top-scroll>div{height:1px}
+.crm396-top-scroll::-webkit-scrollbar{height:12px}
+.crm396-top-scroll::-webkit-scrollbar-thumb{background:#64748b;border-radius:999px;border:3px solid #eef2f7}
+.crm396-top-scroll::-webkit-scrollbar-track{background:#eef2f7;border-radius:999px}
+.crm396-sortable-th{cursor:pointer;user-select:none;white-space:nowrap;transition:background .15s ease,color .15s ease}
+.crm396-sortable-th:hover{background:#eef4ff;color:#1d4ed8}
+.crm396-sortable-th.crm396-sort-active{background:#e8f0ff;color:#1d4ed8}
+.crm396-sort-icon{display:inline-flex;align-items:center;justify-content:center;margin-left:5px;min-width:13px;font-size:11px;color:#64748b;vertical-align:1px}
+.crm396-sort-active .crm396-sort-icon{color:#2563eb;font-weight:800}
+.photo-link.crm396-has-photos{background:#dcfce7 !important;border-color:#86efac !important;color:#15803d !important;font-weight:800;box-shadow:0 0 0 1px rgba(34,197,94,.06)}
+.photo-link.crm396-has-photos:hover{background:#bbf7d0 !important;border-color:#4ade80 !important;color:#166534 !important}
+@media(max-width:900px){.crm396-top-scroll{height:13px}.crm396-sort-icon{margin-left:3px}}
