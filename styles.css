@@ -1712,3 +1712,11 @@ button .crm3870-admin-tag{pointer-events:none}
 
 /* CRM v3.10.8 */
 .crm3108-install-note{padding:14px 16px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:12px;color:#1e3a5f}.crm3108-install-note p{margin:6px 0 0;color:#64748b;line-height:1.5}.crm3108-legacy-fu{align-items:end}
+
+/* CRM v3.10.9 층수·연식 */
+.crm3109-building-card{border:1px solid #dbe4f0;border-radius:16px;padding:16px;background:#f8fbff}
+.crm3109-building-title{display:flex;align-items:baseline;gap:10px;margin-bottom:12px}.crm3109-building-title strong{font-size:16px}.crm3109-building-title span{font-size:12px;color:#64748b}
+.crm3109-building-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.crm3109-building-grid label{display:flex;flex-direction:column;gap:7px;font-weight:700}.crm3109-building-grid small{font-size:11px;color:#94a3b8;font-weight:500}
+.crm3109-year-field{display:flex;align-items:center;gap:8px}.crm3109-year-field input{min-width:0;flex:1}.crm3109-year-field span{font-weight:700;color:#475569}
+.crm3109-floor-age{margin-top:4px;font-size:11px;line-height:1.25;color:#64748b;white-space:nowrap}
+@media(max-width:720px){.crm3109-building-grid{grid-template-columns:1fr}.crm3109-building-title{align-items:flex-start;flex-direction:column;gap:3px}}

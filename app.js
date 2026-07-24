@@ -8567,3 +8567,147 @@ async function crm3108SaveLegacyFu(customerId, clear=false){
   openCustomerFuHub(customerId,'schedule');
 }
 console.info('CRM v3.10.8 고객 예정 FU fallback 적용 완료');
+
+/* ===== CRM v3.10.9 매물 층수·연식 + 카카오 소개문구 반영 ===== */
+(function(){
+  const q=(s,r=document)=>r.querySelector(s);
+  const qa=(s,r=document)=>[...r.querySelectorAll(s)];
+  const cleanInt=v=>{const n=parseInt(String(v??'').replace(/[^0-9-]/g,''),10);return Number.isFinite(n)?n:null};
+
+  function floorAgeText(x){
+    const parts=[];
+    const current=cleanInt(x?.current_floor), total=cleanInt(x?.total_floors), year=cleanInt(x?.built_year);
+    if(current!==null||total!==null){
+      if(current!==null&&total!==null)parts.push(`${current}/${total}층`);
+      else if(current!==null)parts.push(`${current}층`);
+      else parts.push(`총 ${total}층`);
+    }
+    if(year!==null)parts.push(`${year}년`);
+    return parts.join(' · ');
+  }
+
+  function injectFields(id){
+    const form=q('#modalForm'), grid=q('#modalBody .form-grid');
+    if(!form||!grid||q('#crm3109BuildingInfo',form))return;
+    const x=(state.listings||[]).find(v=>String(v.id)===String(id))||{};
+    const anchor=q('[name="bathroom_count"]',grid)?.closest('label') || q('[name="area_m2"]',grid)?.closest('label');
+    const section=document.createElement('section');
+    section.id='crm3109BuildingInfo';
+    section.className='span-2 crm3109-building-card';
+    section.innerHTML=`
+      <div class="crm3109-building-title"><strong>층수·연식</strong><span>목록과 카카오톡 소개 문구에 표시됩니다.</span></div>
+      <div class="crm3109-building-grid">
+        <label>현재 층수<input name="current_floor" type="number" min="-10" max="200" step="1" value="${x.current_floor??''}" placeholder="예: 3"><small>지하는 -1처럼 입력</small></label>
+        <label>총층수<input name="total_floors" type="number" min="1" max="300" step="1" value="${x.total_floors??''}" placeholder="예: 10"></label>
+        <label>연식(준공연도)<div class="crm3109-year-field"><input name="built_year" type="number" min="1800" max="2100" step="1" value="${x.built_year??''}" placeholder="예: 2022"><span>년</span></div></label>
+      </div>`;
+    if(anchor)anchor.insertAdjacentElement('afterend',section);else grid.appendChild(section);
+
+    const submit=q('#modalSubmit');
+    if(!submit||submit.__crm3109)return;
+    const original=submit.onclick;
+    submit.__crm3109=true;
+    submit.onclick=async function(e){
+      const title=String(q('[name="title"]',form)?.value||'').trim();
+      const values={
+        current_floor:cleanInt(q('[name="current_floor"]',form)?.value),
+        total_floors:cleanInt(q('[name="total_floors"]',form)?.value),
+        built_year:cleanInt(q('[name="built_year"]',form)?.value)
+      };
+      if(values.current_floor!==null&&values.total_floors!==null&&values.current_floor>values.total_floors){
+        e?.preventDefault?.();return toast('현재 층수는 총층수보다 높을 수 없습니다.');
+      }
+      const y=new Date().getFullYear()+2;
+      if(values.built_year!==null&&(values.built_year<1800||values.built_year>y)){
+        e?.preventDefault?.();return toast(`연식은 1800년부터 ${y}년 사이로 입력하세요.`);
+      }
+      const result=typeof original==='function'?await original.call(this,e):undefined;
+      try{
+        let listingId=id;
+        if(!listingId){
+          const {data}=await state.client.from('listings').select('id').eq('owner_id',state.profile.id).eq('title',title).order('created_at',{ascending:false}).limit(1).maybeSingle();
+          listingId=data?.id;
+        }
+        if(listingId){
+          const {error}=await state.client.from('listings').update(values).eq('id',listingId);
+          if(error)throw error;
+          const local=(state.listings||[]).find(v=>String(v.id)===String(listingId));if(local)Object.assign(local,values);
+        }
+      }catch(err){toast(`층수·연식 저장 실패: ${err.message||err}`)}
+      setTimeout(()=>{paintListInfo();},120);
+      return result;
+    };
+  }
+
+  const baseOpen=window.openListingModal||globalThis.openListingModal;
+  if(typeof baseOpen==='function'&&!baseOpen.__crm3109){
+    const wrapped=function(id){
+      const r=baseOpen.apply(this,arguments);
+      requestAnimationFrame(()=>injectFields(id));
+      setTimeout(()=>injectFields(id),100);
+      setTimeout(()=>injectFields(id),350);
+      return r;
+    };
+    wrapped.__crm3109=true;
+    window.openListingModal=wrapped;
+    try{openListingModal=wrapped}catch(_){ }
+  }
+
+  function findListingForRow(row){
+    const titleBtn=q('.crm3814-listing-title-link',row);
+    if(!titleBtn)return null;
+    const onclick=titleBtn.getAttribute('onclick')||'';
+    const id=onclick.match(/\('([^']+)'\)/)?.[1];
+    return (state.listings||[]).find(x=>String(x.id)===String(id));
+  }
+  function paintListInfo(){
+    qa('table.listing-table tbody tr').forEach(row=>{
+      if(row.classList.contains('crm3813-address-row'))return;
+      const x=findListingForRow(row);if(!x)return;
+      const text=floorAgeText(x);
+      let target=q('.crm3109-floor-age',row);
+      if(!text){target?.remove();return;}
+      if(!target){
+        const cells=qa('td',row);
+        const head=qa('th',row.closest('table')?.tHead||document).map(h=>h.textContent.trim());
+        const idx=head.findIndex(v=>v==='방/욕실');
+        const cell=idx>=0?cells[idx]:null;
+        if(!cell)return;
+        target=document.createElement('div');target.className='crm3109-floor-age';cell.appendChild(target);
+      }
+      target.textContent=text;
+    });
+  }
+
+  const observer=new MutationObserver(records=>{
+    if(records.some(r=>[...r.addedNodes].some(n=>n.nodeType===1&&(n.matches?.('table.listing-table')||n.querySelector?.('table.listing-table')))))requestAnimationFrame(paintListInfo);
+  });
+  observer.observe(q('#main')||document.body,{childList:true,subtree:true});
+  setTimeout(paintListInfo,500);
+
+  // v3.10.7 소개 문구 함수를 덮지 않고, 복사 직전에 층수·연식을 추가하는 전용 복사 함수로 교체
+  window.crm3107CopyListingIntro=async function(id){
+    const item=(state.listings||[]).find(x=>String(x.id)===String(id));
+    if(!item)return toast('매물 정보를 찾지 못했습니다.');
+    const deals=(typeof crm38DealOptions==='function'?crm38DealOptions(item):[]);
+    const dealLines=deals.length?deals.map(o=>o.deal_type==='월세'?`월세 ${Number(o.price||0).toLocaleString()}만원 / ${Number(o.monthly_rent||0).toLocaleString()}만원`:`${o.deal_type} ${Number(o.price||0).toLocaleString()}만원`):[];
+    const room=typeof listingRoomText==='function'?listingRoomText(item):(item.room_count??'-');
+    const move=typeof moveInText==='function'?String(moveInText(item)).replace(/<br\s*\/?>/gi,' / ').replace(/<[^>]+>/g,''):(item.move_in_date||'협의 가능');
+    const features=Array.isArray(item.feature_tags)?item.feature_tags:[];
+    const area=item.area_m2?`${item.area_m2}㎡${Number(item.area_m2)?` (약 ${(Number(item.area_m2)/3.3058).toFixed(2)}평)`:''}`:'-';
+    const location=[item.district,item.address].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(' · ');
+    const building=floorAgeText(item);
+    const lines=[
+      `🏠 ${item.title||'매물 안내'}`,location?`📍 ${location}`:'',item.property_type?`유형: ${item.property_type}`:'',dealLines.length?`조건: ${dealLines.join(' / ')}`:'',
+      `전용면적: ${area}`,`방/욕실: ${room} / ${item.bathroom_count??'-'}`,building?`층수·연식: ${building}`:'',`입주: ${move}`,features.length?`특징: ${features.join(' · ')}`:'','',
+      '※ 매물은 실시간으로 계약되거나 조건이 변경될 수 있어 방문 전 다시 확인해드리겠습니다.',state?.profile?.full_name?`담당 중개사: ${state.profile.full_name}`:'',state?.profile?.office_name?`소속: ${state.profile.office_name}`:'',state?.profile?.phone?`연락처: ${typeof crm381FormatPhone==='function'?crm381FormatPhone(state.profile.phone):state.profile.phone}`:''
+    ].filter(Boolean);
+    const text=lines.join('\n');let copied=false;
+    try{if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(text);copied=true;}}catch(_){ }
+    if(!copied){const ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();try{copied=document.execCommand('copy')}catch(_){ }ta.remove();}
+    toast(copied?'카카오톡 소개 문구를 클립보드에 복사했습니다.':'복사가 차단되었습니다. 브라우저의 클립보드 권한을 확인하세요.');
+  };
+  try{crm3107CopyListingIntro=window.crm3107CopyListingIntro}catch(_){ }
+  Object.assign(window,{crm3109FloorAgeText:floorAgeText});
+  console.info('CRM v3.10.9 층수·연식·카카오 소개문구 적용 완료');
+})();
