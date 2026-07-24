@@ -1743,3 +1743,7 @@ button .crm3870-admin-tag{pointer-events:none}
 .crm3106-network-scroll,
 .crm3112-network-scroll,
 .table-wrap{overflow-x:auto!important;scrollbar-gutter:stable;padding-bottom:8px}
+
+/* CRM v3.10.15 고객 FU 삭제 버튼 */
+.crm31015-fu-head-actions{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+.crm31015-fu-delete{padding:5px 10px;font-size:12px;line-height:1.1;border-radius:8px}
