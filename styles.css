@@ -1681,3 +1681,25 @@ button .crm3870-admin-tag{pointer-events:none}
 #customerTable table td:has(.crm3105-preferred-wrap){
   width:120px;min-width:120px;max-width:120px;
 }
+
+/* ===== CRM v3.10.6 희망유형 간결표시 · 사진표시 · 공동매물 드래그바 ===== */
+.crm3106-preferred{width:112px;max-width:112px;margin:0 auto;text-align:center;line-height:1.22;word-break:keep-all}
+.crm3106-pref-main{font-weight:750;color:#172033;white-space:nowrap}
+.crm3106-pref-detail{margin-top:3px;font-size:12px;font-weight:650;color:#64748b}
+.crm3106-pref-detail>div{white-space:nowrap;min-height:15px}
+#customerTable table th[data-crm3106-preferred="1"],
+#customerTable table td:has(.crm3106-preferred){width:116px!important;min-width:116px!important;max-width:116px!important}
+
+.photo-link.crm3106-has-photos,
+.photo-link[data-has-photos="1"]{background:#dcfce7!important;border-color:#4ade80!important;color:#15803d!important;font-weight:800!important;box-shadow:0 0 0 1px rgba(34,197,94,.08)!important}
+.photo-link.crm3106-has-photos:hover,
+.photo-link[data-has-photos="1"]:hover{background:#bbf7d0!important;border-color:#22c55e!important;color:#166534!important}
+
+.crm3866-network-panel .listing-table,
+#networkTable .listing-table{min-width:1650px!important;width:max-content!important}
+.crm3106-network-scroll{width:100%!important;max-width:100%!important;overflow-x:auto!important;overflow-y:visible!important;padding-bottom:8px;scrollbar-gutter:stable}
+.crm3106-network-top-scroll{display:block;width:100%;height:15px;overflow-x:auto;overflow-y:hidden;margin:0 0 7px;border-radius:8px;background:#eef2f7;scrollbar-color:#64748b #eef2f7;scrollbar-width:auto}
+.crm3106-network-top-scroll>div{height:1px;min-width:1650px}
+.crm3106-network-top-scroll::-webkit-scrollbar{height:12px}
+.crm3106-network-top-scroll::-webkit-scrollbar-track{background:#eef2f7;border-radius:8px}
+.crm3106-network-top-scroll::-webkit-scrollbar-thumb{background:#64748b;border-radius:8px;border:2px solid #eef2f7}
