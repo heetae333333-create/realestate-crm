@@ -1729,3 +1729,17 @@ button .crm3870-admin-tag{pointer-events:none}
 .crm3112-network-top-scroll::-webkit-scrollbar-track{background:#eef2f7;border-radius:8px}
 .crm3112-network-top-scroll::-webkit-scrollbar-thumb{background:#64748b;border-radius:8px;border:2px solid #eef2f7}
 #networkTable .crm3889-top-scroll,#networkTable .crm3890-top-scroll,#networkTable .crm396-top-scroll,#networkTable .crm3106-network-top-scroll{display:none!important}
+
+/* ===== CRM v3.10.13 모든 시트 상단 가로 드래그바 제거 ===== */
+.crm3889-top-scroll,
+.crm3890-top-scroll,
+.crm396-top-scroll,
+.crm3106-network-top-scroll,
+.crm3112-network-top-scroll{display:none!important;height:0!important;margin:0!important;padding:0!important;overflow:hidden!important}
+/* 표 자체의 하단 기본 스크롤바만 유지 */
+.customer-table-scroll,
+.crm3890-listing-scroll,
+.crm396-unified-scroll,
+.crm3106-network-scroll,
+.crm3112-network-scroll,
+.table-wrap{overflow-x:auto!important;scrollbar-gutter:stable;padding-bottom:8px}
