@@ -2041,3 +2041,14 @@ table.listing-table tbody tr.crm-r311-listing-complete .muted {
   min-width: 92px;
   font-weight: 800;
 }
+
+/* ===== CRM v3.10.24R3.12 FU 히스토리 수정 ===== */
+.crm31015-fu-head-actions,.crm31019-record-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.crm-r312-fu-edit{padding:6px 11px!important;font-size:13px!important;min-height:32px}
+.crm-r312-editor{width:100%}
+.crm-r312-edit-grid{display:grid;grid-template-columns:minmax(150px,.7fr) minmax(180px,1fr);gap:12px}
+.crm-r312-edit-grid label{display:flex;flex-direction:column;gap:6px;font-weight:700}
+.crm-r312-edit-grid input,.crm-r312-edit-grid textarea{width:100%;box-sizing:border-box}
+.crm-r312-content-label{grid-column:1/-1}
+.crm-r312-edit-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+@media(max-width:640px){.crm-r312-edit-grid{grid-template-columns:1fr}}

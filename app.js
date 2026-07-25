@@ -10943,3 +10943,148 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   });
   console.info(`CRM v${VERSION} 매물 거래완료·재개 기능 적용`);
 })();
+
+/* =========================================================
+   CRM v3.10.24R3.12 · 고객/매물 FU 히스토리 개별 수정
+   ========================================================= */
+(() => {
+  const VERSION = '3.10.24R3.12';
+  const q = (s, r = document) => r.querySelector(s);
+  const qa = (s, r = document) => Array.from(r.querySelectorAll(s));
+  const esc = (v) => typeof escapeHtml === 'function' ? escapeHtml(String(v ?? '')) : String(v ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+
+  function parseHistoryTarget(article) {
+    const customerDelete = q('.crm31015-fu-delete[onclick]', article);
+    if (customerDelete) {
+      const m = (customerDelete.getAttribute('onclick') || '').match(/crm31015DeleteCustomerFu\(['"]([^'"]+)['"],['"]([^'"]+)['"]\)/);
+      if (m) return { historyId: m[1], parentId: m[2], type: 'customer' };
+    }
+    const listingDelete = q('.crm31019-delete[onclick]', article);
+    if (listingDelete) {
+      const m = (listingDelete.getAttribute('onclick') || '').match(/crm31019DeleteListingFu\(['"]([^'"]+)['"],['"]([^'"]+)['"]\)/);
+      if (m) return { historyId: m[1], parentId: m[2], type: 'listing' };
+    }
+    return null;
+  }
+
+  function addEditButtons(root = document) {
+    qa('.crm3888-record-item', root).forEach(article => {
+      if (article.dataset.crmR312EditReady === '1') return;
+      const target = parseHistoryTarget(article);
+      if (!target) return; // 삭제 권한이 있는 담당 중개사/관리자에게만 수정도 노출
+      const actionHost = q('.crm31015-fu-head-actions, .crm31019-record-actions', article);
+      if (!actionHost) return;
+      const deleteBtn = q('.crm31015-fu-delete, .crm31019-delete', actionHost);
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.className = 'ghost crm-r312-fu-edit';
+      edit.textContent = '수정';
+      edit.addEventListener('click', () => crmR312EditHistory(target.historyId, target.parentId, target.type, article));
+      if (deleteBtn) actionHost.insertBefore(edit, deleteBtn); else actionHost.appendChild(edit);
+      article.dataset.crmR312EditReady = '1';
+    });
+  }
+
+  async function crmR312EditHistory(historyId, parentId, type, articleEl = null) {
+    const article = articleEl || qa('.crm3888-record-item').find(el => parseHistoryTarget(el)?.historyId === String(historyId));
+    if (!article) return toast('수정할 FU 기록을 찾지 못했습니다.');
+    if (q('.crm-r312-editor', article)) return;
+
+    const { data, error } = await state.client.from('interaction_history')
+      .select('id,follow_up_date,contact_method,content')
+      .eq('id', historyId)
+      .maybeSingle();
+    if (error) return toast(`FU 기록 조회 실패: ${error.message}`);
+    if (!data) return toast('FU 기록을 찾지 못했습니다.');
+
+    const original = article.innerHTML;
+    article.dataset.crmR312Original = encodeURIComponent(original);
+    article.innerHTML = `
+      <div class="crm-r312-editor">
+        <div class="crm-r312-edit-grid">
+          <label>기록 일자
+            <input class="crm-r312-date" type="date" value="${esc(String(data.follow_up_date || '').slice(0,10))}">
+          </label>
+          <label>상담 종류
+            <input class="crm-r312-method" type="text" value="${esc(data.contact_method || 'FU')}" placeholder="예: 전화, 부재, 매물추천">
+          </label>
+          <label class="crm-r312-content-label">상담·진행 내용
+            <textarea class="crm-r312-content" rows="5">${esc(data.content || '')}</textarea>
+          </label>
+        </div>
+        <div class="crm-r312-edit-actions">
+          <button type="button" class="ghost" onclick="crmR312CancelHistoryEdit('${historyId}')">취소</button>
+          <button type="button" class="primary" onclick="crmR312SaveHistoryEdit('${historyId}','${parentId}','${type}')">수정 저장</button>
+        </div>
+      </div>`;
+    article.dataset.crmR312Editing = String(historyId);
+  }
+
+  function crmR312CancelHistoryEdit(historyId) {
+    const article = qa('.crm3888-record-item').find(el => el.dataset.crmR312Editing === String(historyId));
+    if (!article) return;
+    const encoded = article.dataset.crmR312Original || '';
+    if (encoded) article.innerHTML = decodeURIComponent(encoded);
+    delete article.dataset.crmR312Editing;
+    delete article.dataset.crmR312Original;
+    delete article.dataset.crmR312EditReady;
+    addEditButtons(article.parentElement || document);
+  }
+
+  async function crmR312SaveHistoryEdit(historyId, parentId, type) {
+    const article = qa('.crm3888-record-item').find(el => el.dataset.crmR312Editing === String(historyId));
+    if (!article) return toast('수정 중인 FU 기록을 찾지 못했습니다.');
+    const followUpDate = q('.crm-r312-date', article)?.value || '';
+    const method = (q('.crm-r312-method', article)?.value || '').trim();
+    const content = (q('.crm-r312-content', article)?.value || '').trim();
+    if (!followUpDate) return toast('기록 일자를 입력해 주세요.');
+    if (!method) return toast('상담 종류를 입력해 주세요.');
+    if (!content) return toast('상담·진행 내용을 입력해 주세요.');
+
+    const { error } = await state.client.from('interaction_history')
+      .update({ follow_up_date: followUpDate, contact_method: method, content })
+      .eq('id', historyId);
+    if (error) return toast(`FU 수정 실패: ${error.message}`);
+
+    toast('FU 기록을 수정했습니다.');
+    if (type === 'customer') {
+      if (typeof window.openCustomerFuHub === 'function') await window.openCustomerFuHub(parentId, 'records');
+      if (typeof renderCustomers === 'function') renderCustomers();
+    } else {
+      if (typeof window.crm361OpenListingFu === 'function') await window.crm361OpenListingFu(parentId);
+      if (typeof loadListings === 'function') { try { await loadListings(); } catch (_) {} }
+    }
+    setTimeout(() => addEditButtons(), 60);
+  }
+
+  function wrapOpenFunction(name, after) {
+    const base = window[name] || globalThis[name];
+    if (typeof base !== 'function' || base.__crmR312Wrapped) return;
+    const wrapped = async function(...args) {
+      const result = await base.apply(this, args);
+      [0, 50, 130, 280].forEach(ms => setTimeout(() => { try { after(...args); addEditButtons(); } catch (_) {} }, ms));
+      return result;
+    };
+    wrapped.__crmR312Wrapped = true;
+    window[name] = wrapped;
+    try { globalThis[name] = wrapped; } catch (_) {}
+  }
+
+  wrapOpenFunction('openCustomerFuHub', () => {});
+  wrapOpenFunction('crm361OpenListingFu', () => {});
+
+  const observer = new MutationObserver((mutations) => {
+    let relevant = false;
+    for (const m of mutations) {
+      if ([...m.addedNodes].some(n => n.nodeType === 1 && (n.matches?.('.crm3888-record-item,.crm3888-record-list') || n.querySelector?.('.crm3888-record-item')))) {
+        relevant = true; break;
+      }
+    }
+    if (relevant) addEditButtons();
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+
+  Object.assign(window, { crmR312EditHistory, crmR312CancelHistoryEdit, crmR312SaveHistoryEdit });
+  addEditButtons();
+  console.info(`CRM v${VERSION} 고객/매물 FU 히스토리 수정 기능 적용`);
+})();
