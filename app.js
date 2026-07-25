@@ -10328,3 +10328,102 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   window.crm31024r32Apply=applyR32;
   console.info('CRM v3.10.24R3.2 R3 직접 수정 적용');
 })();
+
+/* ===== CRM v3.10.24R3.3 · 연락처/상세조건 밀도형 레이아웃 ===== */
+(()=>{
+  const q=(s,r=document)=>r.querySelector(s);
+  function directChild(node,root){
+    if(!node||!root)return null;
+    let cur=node;
+    while(cur&&cur.parentElement!==root)cur=cur.parentElement;
+    return cur&&cur.parentElement===root?cur:null;
+  }
+  function fieldBlock(root,name){
+    const input=q(`[name="${name}"]`,root);
+    return input?directChild(input,root):null;
+  }
+  function ensureRow(grid,className){
+    let row=q(`:scope > .${className}`,grid);
+    if(!row){row=document.createElement('div');row.className=`${className} span-2`;}
+    return row;
+  }
+  function appendIf(row,node){if(node&&node.parentElement!==row)row.appendChild(node);}
+
+  function applyR33(){
+    const modal=q('#modal'), body=q('#modalBody');
+    const root=q('#modalBody .crm31024r-listing-form');
+    const title=q('#modalTitle')?.textContent||'';
+    if(!modal?.open||!body||!root||!/^매물 (등록|수정)/.test(title))return false;
+    if(typeof window.crm31024rArrangeListingForm==='function')window.crm31024rArrangeListingForm();
+
+    // 상단: 매물명 + 연락처 추가 버튼, 연락처 입력행은 바로 아래 전체 폭.
+    const top=q('.crm31024r-top-row',root);
+    const titleSlot=q('.crm31024r-title-slot',top||root);
+    const contactSlot=q('.crm31024r-contact-slot',top||root);
+    const toolbar=q('.crm386-contact-toolbar',body);
+    const contacts=q('#crm38ExtraContacts',body);
+    if(top&&titleSlot&&contactSlot){
+      top.classList.add('crm31024r33-top');
+      contactSlot.classList.add('crm31024r33-contact-button-slot');
+      if(toolbar&&toolbar.parentElement!==contactSlot)contactSlot.appendChild(toolbar);
+      let contactRows=q(':scope > .crm31024r33-contact-rows',top);
+      if(!contactRows){
+        contactRows=document.createElement('div');
+        contactRows.className='crm31024r33-contact-rows';
+        top.appendChild(contactRows);
+      }
+      if(contacts&&contacts.parentElement!==contactRows)contactRows.appendChild(contacts);
+    }
+
+    const detailGrid=q('.crm31024r-detail-card .crm31024r-card-grid',root);
+    if(detailGrid){
+      // 방/화장실/관리비를 한 줄에 정렬. 1.5룸은 방 개수 필드 내부 기능 그대로 유지.
+      const roomRow=ensureRow(detailGrid,'crm31024r33-room-row');
+      appendIf(roomRow,fieldBlock(detailGrid,'room_count'));
+      appendIf(roomRow,fieldBlock(detailGrid,'bathroom_count'));
+      appendIf(roomRow,fieldBlock(detailGrid,'management_fee'));
+      if(!roomRow.isConnected)detailGrid.prepend(roomRow);
+
+      // 입주조건 별도 테두리 박스를 해제하고, 필드만 평면형 한 줄로 유지.
+      const moveRow=ensureRow(detailGrid,'crm31024r33-move-row');
+      appendIf(moveRow,fieldBlock(detailGrid,'move_in_date'));
+      appendIf(moveRow,fieldBlock(detailGrid,'move_in_immediate'));
+      appendIf(moveRow,fieldBlock(detailGrid,'move_in_negotiable'));
+      if(!moveRow.isConnected)detailGrid.appendChild(moveRow);
+
+      // 옵션 / 대출 가능 여부 / 최종 확인일을 같은 줄 3칸으로 정렬.
+      const compactRow=ensureRow(detailGrid,'crm31024r33-option-loan-confirm-row');
+      appendIf(compactRow,fieldBlock(detailGrid,'options'));
+      appendIf(compactRow,fieldBlock(detailGrid,'loan_available'));
+      appendIf(compactRow,fieldBlock(detailGrid,'last_confirmed_at'));
+      if(!compactRow.isConnected)detailGrid.appendChild(compactRow);
+
+      // 기존 보정 행이 비었으면 제거하여 여백 방지.
+      detailGrid.querySelectorAll('.crm31024r32-loan-confirm-row,.crm31024r3-loan-confirm-row').forEach(row=>{
+        if(!row.children.length)row.remove();
+      });
+
+      // 사진과 비밀메모는 항상 맨 아래 유지.
+      const photo=fieldBlock(detailGrid,'listing_photo_files')||q('#listingPhotoFiles',detailGrid)?.closest('label');
+      const description=fieldBlock(detailGrid,'description');
+      if(photo)detailGrid.appendChild(photo);
+      if(description)detailGrid.appendChild(description);
+    }
+    root.dataset.crm31024r33='1';
+    return true;
+  }
+
+  const prior=window.openListingModal||openListingModal;
+  window.openListingModal=function(){
+    const result=prior.apply(this,arguments);
+    [0,40,100,200,400,750,1200].forEach(ms=>setTimeout(applyR33,ms));
+    return result;
+  };
+  openListingModal=window.openListingModal;
+  const observer=new MutationObserver(()=>{
+    if(q('#modal')?.open&&/^매물 (등록|수정)/.test(q('#modalTitle')?.textContent||''))requestAnimationFrame(applyR33);
+  });
+  observer.observe(document.body,{childList:true,subtree:true});
+  window.crm31024r33Apply=applyR33;
+  console.info('CRM v3.10.24R3.3 밀도형 매물 입력 레이아웃 적용');
+})();
