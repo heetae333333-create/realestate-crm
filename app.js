@@ -10948,7 +10948,7 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
    CRM v3.10.24R3.12 · 고객/매물 FU 히스토리 개별 수정
    ========================================================= */
 (() => {
-  const VERSION = '3.10.24R3.12';
+  const VERSION = '3.10.24R3.13';
   const q = (s, r = document) => r.querySelector(s);
   const qa = (s, r = document) => Array.from(r.querySelectorAll(s));
   const esc = (v) => typeof escapeHtml === 'function' ? escapeHtml(String(v ?? '')) : String(v ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
@@ -11057,22 +11057,12 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
     setTimeout(() => addEditButtons(), 60);
   }
 
-  function wrapOpenFunction(name, after) {
-    const base = window[name] || globalThis[name];
-    if (typeof base !== 'function' || base.__crmR312Wrapped) return;
-    const wrapped = async function(...args) {
-      const result = await base.apply(this, args);
-      [0, 50, 130, 280].forEach(ms => setTimeout(() => { try { after(...args); addEditButtons(); } catch (_) {} }, ms));
-      return result;
-    };
-    wrapped.__crmR312Wrapped = true;
-    window[name] = wrapped;
-    try { globalThis[name] = wrapped; } catch (_) {}
-  }
+  // R3.13: FU 창 열기 함수는 다시 감싸지 않습니다.
+  // 기존 버전에서 openCustomerFuHub / crm361OpenListingFu를 여러 번 래핑하면서
+  // 같은 모달이 연속 렌더링되는 듯한 버벅임이 생길 수 있었습니다.
+  // 수정 버튼은 아래 MutationObserver가 기록 카드가 실제 DOM에 추가된 뒤 한 번만 붙입니다.
 
-  wrapOpenFunction('openCustomerFuHub', () => {});
-  wrapOpenFunction('crm361OpenListingFu', () => {});
-
+  let crmR313EditPatchQueued = false;
   const observer = new MutationObserver((mutations) => {
     let relevant = false;
     for (const m of mutations) {
@@ -11080,11 +11070,18 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
         relevant = true; break;
       }
     }
-    if (relevant) addEditButtons();
+    if (!relevant || crmR313EditPatchQueued) return;
+    crmR313EditPatchQueued = true;
+    requestAnimationFrame(() => {
+      crmR313EditPatchQueued = false;
+      const modalBody = q('#modalBody');
+      if (modalBody) addEditButtons(modalBody);
+    });
   });
-  observer.observe(document.body, { childList: true, subtree: true });
+  const crmR313ModalBody = q('#modalBody');
+  if (crmR313ModalBody) observer.observe(crmR313ModalBody, { childList: true, subtree: true });
 
   Object.assign(window, { crmR312EditHistory, crmR312CancelHistoryEdit, crmR312SaveHistoryEdit });
   addEditButtons();
-  console.info(`CRM v${VERSION} 고객/매물 FU 히스토리 수정 기능 적용`);
+  console.info(`CRM v${VERSION} FU 단일 오픈 + 히스토리 수정 안정화 적용`);
 })();
