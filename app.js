@@ -10460,3 +10460,131 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   Object.assign(window,{openListingModal,crmR35InstallMoveInUI:installMoveInUI});
   console.info(`CRM v${VERSION} 매물 입주가능일 UI 적용`);
 })();
+
+/* CRM v3.10.24R3.9 고객 상태 2단계 통합 */
+(() => {
+  const VERSION = '3.10.24R3.9';
+  const ACTIVE = '영업중';
+  const CLOSED = '영업종료';
+  const normalizeStatus = value => String(value || '').trim() === CLOSED ? CLOSED : ACTIVE;
+
+  function patchCustomerStatusFilter() {
+    const select = document.querySelector('#customerStatus');
+    if (!select) return;
+    const current = select.dataset.crmR39Value || select.value || '';
+    select.innerHTML = `
+      <option value="">전체 상태</option>
+      <option value="${ACTIVE}">${ACTIVE}</option>
+      <option value="${CLOSED}">${CLOSED}</option>
+    `;
+    select.value = [ACTIVE, CLOSED].includes(current) ? current : '';
+  }
+
+  function getCustomerIdFromRow(row) {
+    const clickable = row.querySelector('[onclick*="openCustomerModal"]');
+    const code = clickable?.getAttribute('onclick') || '';
+    const match = code.match(/openCustomerModal\(['\"]([^'\"]+)['\"]\)/);
+    return match?.[1] || '';
+  }
+
+  function patchCustomerRows() {
+    const table = document.querySelector('#customerTable table');
+    if (!table) return;
+    const headers = [...table.querySelectorAll('thead th')];
+    const statusIndex = headers.findIndex(th => th.textContent.trim().replace(/[↕↑↓]/g, '') === '상태');
+    table.querySelectorAll('tbody tr').forEach(row => {
+      const id = getCustomerIdFromRow(row);
+      if (!id) return;
+      const customer = (state.customers || []).find(x => String(x.id) === String(id));
+      if (!customer) return;
+      const normalized = normalizeStatus(customer.status);
+      row.classList.toggle('crm-r39-customer-closed', normalized === CLOSED);
+      row.classList.toggle('crm-r39-customer-active', normalized === ACTIVE);
+      if (statusIndex >= 0 && row.children[statusIndex]) {
+        row.children[statusIndex].innerHTML = `<span class="crm-r39-status-badge ${normalized === CLOSED ? 'closed' : 'active'}">${normalized}</span>`;
+      }
+    });
+  }
+
+  function patchCustomerModalStatus(id) {
+    const select = document.querySelector('#modalBody [name="status"]');
+    if (!select) return false;
+    const customer = (state.customers || []).find(x => String(x.id) === String(id));
+    const selected = normalizeStatus(customer?.status || select.value);
+    select.innerHTML = `
+      <option value="${ACTIVE}">${ACTIVE}</option>
+      <option value="${CLOSED}">${CLOSED}</option>
+    `;
+    select.value = selected;
+    return true;
+  }
+
+  const baseRender = window.renderCustomers || globalThis.renderCustomers;
+  if (typeof baseRender === 'function' && !baseRender.__crmR39Wrapped) {
+    const wrappedRender = async function(...args) {
+      const result = await baseRender.apply(this, args);
+      patchCustomerStatusFilter();
+      patchCustomerRows();
+      return result;
+    };
+    wrappedRender.__crmR39Wrapped = true;
+    window.renderCustomers = wrappedRender;
+    try { renderCustomers = wrappedRender; } catch (_) {}
+  }
+
+  const baseFilter = window.filterCustomers || globalThis.filterCustomers;
+  if (typeof baseFilter === 'function' && !baseFilter.__crmR39Wrapped) {
+    const wrappedFilter = function(...args) {
+      const select = document.querySelector('#customerStatus');
+      const wanted = select?.value || '';
+      if (select && [ACTIVE, CLOSED].includes(wanted)) {
+        select.dataset.crmR39Value = wanted;
+        select.value = '';
+      }
+      const result = baseFilter.apply(this, args);
+      if (select) {
+        patchCustomerStatusFilter();
+        select.value = wanted;
+        select.dataset.crmR39Value = wanted;
+      }
+      if (wanted) {
+        const table = document.querySelector('#customerTable table');
+        table?.querySelectorAll('tbody tr').forEach(row => {
+          const id = getCustomerIdFromRow(row);
+          if (!id) return;
+          const customer = (state.customers || []).find(x => String(x.id) === String(id));
+          if (normalizeStatus(customer?.status) !== wanted) row.remove();
+        });
+      }
+      patchCustomerRows();
+      return result;
+    };
+    wrappedFilter.__crmR39Wrapped = true;
+    window.filterCustomers = wrappedFilter;
+    try { filterCustomers = wrappedFilter; } catch (_) {}
+  }
+
+  const baseOpen = window.openCustomerModal || globalThis.openCustomerModal;
+  if (typeof baseOpen === 'function' && !baseOpen.__crmR39Wrapped) {
+    const wrappedOpen = function(id = null, ...args) {
+      const result = baseOpen.call(this, id, ...args);
+      [0, 30, 80, 160, 320].forEach(ms => setTimeout(() => patchCustomerModalStatus(id), ms));
+      return result;
+    };
+    wrappedOpen.__crmR39Wrapped = true;
+    window.openCustomerModal = wrappedOpen;
+    try { openCustomerModal = wrappedOpen; } catch (_) {}
+  }
+
+  // 페이지 진입 직후에도 기존 화면을 보정합니다.
+  setTimeout(() => {
+    patchCustomerStatusFilter();
+    patchCustomerRows();
+  }, 200);
+
+  Object.assign(window, {
+    crmR39NormalizeCustomerStatus: normalizeStatus,
+    crmR39PatchCustomerRows: patchCustomerRows
+  });
+  console.info(`CRM v${VERSION} 고객 상태 2단계 적용`);
+})();

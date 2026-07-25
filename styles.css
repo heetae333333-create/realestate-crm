@@ -1965,3 +1965,40 @@ th.crm31023-sort-active{color:#1d4ed8;background:#eff6ff}
 .crm38-photo-card.crm31024r37-selected::after{content:'선택됨';position:absolute;right:10px;top:10px;z-index:2;padding:5px 8px;border-radius:999px;background:#ef4444;color:#fff;font-size:12px;font-weight:800}
 .photo-manage-on .crm38-photo-meta{display:none!important}
 @media(max-width:640px){.crm31024r37-photo-toolbar{align-items:flex-start}.crm31024r37-photo-actions{width:100%;justify-content:flex-start}.crm31024r37-delete-bar{align-items:stretch;flex-wrap:wrap}.crm31024r37-delete-bar #crm31024r37SelectedCount{margin-left:0}.crm31024r37-delete-bar button{margin-left:auto}}
+
+/* CRM v3.10.24R3.9 고객 상태 2단계 */
+.crm-r39-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.crm-r39-status-badge.active {
+  color: #14532d;
+  background: #dcfce7;
+  border: 1px solid #bbf7d0;
+}
+.crm-r39-status-badge.closed {
+  color: #374151;
+  background: #e5e7eb;
+  border: 1px solid #d1d5db;
+}
+#customerTable tbody tr.crm-r39-customer-closed > td {
+  background: #eef0f3 !important;
+  color: #4b5563;
+}
+#customerTable tbody tr.crm-r39-customer-closed:hover > td {
+  background: #e5e7eb !important;
+}
+#customerTable tbody tr.crm-r39-customer-closed .crm3857-customer-name,
+#customerTable tbody tr.crm-r39-customer-closed button:not(.danger):not(.success) {
+  color: #374151;
+}
+#customerTable tbody tr.crm-r39-customer-closed .muted {
+  color: #6b7280 !important;
+}
