@@ -11085,3 +11085,75 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   addEditButtons();
   console.info(`CRM v${VERSION} FU 단일 오픈 + 히스토리 수정 안정화 적용`);
 })();
+
+/* =========================================================
+   CRM v3.10.24R3.14 · FU 모달 실제 1회 표시 안정화
+   - 누적 래퍼가 showModal()을 여러 번 호출해도 실제 표시 자체는 마지막 1회만 수행
+   - 고객/매물 FU 및 고객 FU 탭 이동 모두 동일 처리
+   ========================================================= */
+(() => {
+  const VERSION = '3.10.24R3.14';
+  const modal = document.getElementById('modal');
+  if (!modal) return;
+
+  async function openWithSinglePaint(opener, thisArg, args) {
+    // 이미 열린 FU 안에서 탭을 바꾸는 경우에는 dialog를 닫았다 다시 열지 않고
+    // 내용만 갱신한다.
+    const wasOpen = modal.open;
+    const originalShowModal = modal.showModal;
+    let requested = false;
+
+    // 누적된 과거 코드의 showModal() 호출은 이 실행 동안 모두 흡수한다.
+    modal.showModal = function () {
+      requested = true;
+    };
+
+    try {
+      const result = await opener.apply(thisArg, args);
+      return result;
+    } finally {
+      modal.showModal = originalShowModal;
+      // 처음 FU를 여는 경우에만 최종 DOM이 완성된 뒤 딱 한 번 표시한다.
+      if (!wasOpen && (requested || !modal.open)) {
+        try {
+          originalShowModal.call(modal);
+        } catch (err) {
+          // 다른 코드가 이미 열어 둔 경우 InvalidStateError는 무시한다.
+          if (!modal.open) console.warn('FU 모달 표시 실패', err);
+        }
+      }
+    }
+  }
+
+  const customerBase = window.openCustomerFuHub || globalThis.openCustomerFuHub;
+  if (typeof customerBase === 'function' && !customerBase.__crmR314SinglePaint) {
+    const wrappedCustomer = async function (...args) {
+      return openWithSinglePaint(customerBase, this, args);
+    };
+    wrappedCustomer.__crmR314SinglePaint = true;
+    window.openCustomerFuHub = wrappedCustomer;
+    try { openCustomerFuHub = wrappedCustomer; } catch (_) {}
+  }
+
+  const listingBase = window.crm361OpenListingFu || globalThis.crm361OpenListingFu;
+  if (typeof listingBase === 'function' && !listingBase.__crmR314SinglePaint) {
+    const wrappedListing = async function (...args) {
+      return openWithSinglePaint(listingBase, this, args);
+    };
+    wrappedListing.__crmR314SinglePaint = true;
+    window.crm361OpenListingFu = wrappedListing;
+    try { crm361OpenListingFu = wrappedListing; } catch (_) {}
+  }
+
+  // 인라인 onclick은 이 최종 함수만 통하도록 통일한다.
+  const singleFollowUpOpen = function (entityType, id) {
+    return entityType === 'listing'
+      ? window.crm361OpenListingFu(id)
+      : window.openCustomerFuHub(id, 'records');
+  };
+  singleFollowUpOpen.__crmR314SinglePaint = true;
+  window.openFollowUpModal = singleFollowUpOpen;
+  try { openFollowUpModal = singleFollowUpOpen; } catch (_) {}
+
+  console.info(`CRM v${VERSION} FU 모달 단일 표시 적용`);
+})();
