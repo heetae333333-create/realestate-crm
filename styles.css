@@ -1968,75 +1968,113 @@ th.crm31023-sort-active{color:#1d4ed8;background:#eff6ff}
 #modalBody .crm31024r-contact-slot .crm386-contact-toolbar{display:flex!important;align-items:center;justify-content:space-between;gap:12px}
 #modalBody .crm31024r-contact-slot .crm386-contact-toolbar + #crm38ExtraContacts{margin-top:8px!important}
 
-/* ===== CRM v3.10.24R3.1 · R3 기반 연락처 평면 배치 ===== */
-#modalBody .crm31024r3flat-top-row{
+/* ===== CRM v3.10.24R3.2 · R3 직접 수정: 상단 연락처 완전 평면화 ===== */
+#modalBody .crm31024r-top-row{
   display:grid!important;
-  grid-template-columns:minmax(0,1fr) minmax(0,1.2fr)!important;
+  grid-template-columns:minmax(0,1fr) minmax(0,1.15fr)!important;
   gap:14px!important;
   align-items:start!important;
 }
-#modalBody .crm31024r3flat-title,
-#modalBody .crm31024r3flat-contact{
+#modalBody .crm31024r-top-row > .crm31024r-title-slot,
+#modalBody .crm31024r-top-row > .crm31024r-contact-slot{
   border:0!important;
   border-radius:0!important;
   background:transparent!important;
-  padding:0!important;
   box-shadow:none!important;
+  padding:0!important;
   min-height:0!important;
+  height:auto!important;
 }
-#modalBody .crm31024r3flat-title > label{margin:0!important}
-#modalBody .crm31024r3flat-contact{
+#modalBody .crm31024r-top-row > .crm31024r-title-slot{
   display:block!important;
 }
-#modalBody .crm31024r3flat-toolbar{
+#modalBody .crm31024r-top-row > .crm31024r-contact-slot{
+  display:block!important;
+}
+#modalBody .crm31024r-contact-slot .crm386-contact-toolbar{
   display:flex!important;
   align-items:center!important;
   justify-content:space-between!important;
   gap:10px!important;
+  width:100%!important;
+  min-height:0!important;
   margin:0 0 8px!important;
   padding:0!important;
   border:0!important;
+  border-radius:0!important;
   background:transparent!important;
-  min-height:44px!important;
+  box-shadow:none!important;
 }
-#modalBody .crm31024r3flat-toolbar button{
+#modalBody .crm31024r-contact-slot .crm386-contact-toolbar::before{
+  content:'연락처';
+  font-size:15px;
+  font-weight:800;
+  color:#111827;
+}
+#modalBody .crm31024r-contact-slot .crm386-contact-toolbar > :not(button){display:none!important}
+#modalBody .crm31024r-contact-slot .crm386-contact-toolbar button{
   flex:0 0 auto!important;
+  width:auto!important;
+  min-width:92px!important;
+  height:44px!important;
+  margin:0!important;
+  padding:0 14px!important;
   white-space:nowrap!important;
 }
-#modalBody .crm31024r3flat-contact-list{
+#modalBody .crm31024r-contact-slot #crm38ExtraContacts{
   display:flex!important;
   flex-direction:column!important;
   gap:7px!important;
+  width:100%!important;
   margin:0!important;
   padding:0!important;
   border:0!important;
+  border-radius:0!important;
   background:transparent!important;
+  box-shadow:none!important;
 }
-#modalBody .crm31024r3flat-contact-list:empty{display:none!important}
-#modalBody .crm31024r3flat-contact-list .crm38-contact-row{
+#modalBody .crm31024r-contact-slot #crm38ExtraContacts:empty{display:none!important}
+#modalBody .crm31024r-contact-slot .crm38-contact-row{
   display:grid!important;
-  grid-template-columns:minmax(88px,.7fr) minmax(90px,.8fr) minmax(150px,1.25fr) auto!important;
+  grid-template-columns:minmax(92px,.72fr) minmax(90px,.78fr) minmax(170px,1.35fr) auto!important;
   gap:7px!important;
   align-items:center!important;
-  padding:0!important;
+  width:100%!important;
   margin:0!important;
+  padding:0!important;
   border:0!important;
-  background:transparent!important;
   border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
 }
-#modalBody .crm31024r3flat-contact-list .crm38-contact-row > *{min-width:0!important;margin:0!important}
-#modalBody .crm31024r3-loan-confirm-row{
+#modalBody .crm31024r-contact-slot .crm38-contact-row > *{
+  min-width:0!important;
+  width:100%!important;
+  margin:0!important;
+}
+#modalBody .crm31024r-contact-slot .crm38-contact-row button{
+  width:auto!important;
+  min-width:42px!important;
+}
+/* 상세조건에 남은 연락처 껍데기는 완전 제거 */
+#modalBody .crm31024r-detail-card .crm386-contact-toolbar,
+#modalBody .crm31024r-detail-card #crm38ExtraContacts,
+#modalBody .crm31024r-detail-card .crm386-contact-card{display:none!important}
+
+/* 대출 가능 여부와 최종 확인일 같은 줄 고정 */
+#modalBody .crm31024r-detail-card .crm31024r3-loan-confirm-row,
+#modalBody .crm31024r-detail-card .crm31024r32-loan-confirm-row{
+  grid-column:1/-1!important;
   display:grid!important;
   grid-template-columns:repeat(2,minmax(0,1fr))!important;
   gap:14px!important;
   align-items:start!important;
   margin:0!important;
 }
-#modalBody .crm31024r3-loan-confirm-row > label{margin:0!important;min-width:0!important}
 @media(max-width:820px){
-  #modalBody .crm31024r3flat-top-row{grid-template-columns:1fr!important}
-  #modalBody .crm31024r3flat-contact-list .crm38-contact-row{grid-template-columns:1fr 1fr!important}
-  #modalBody .crm31024r3flat-contact-list .crm38-contact-row input[type="tel"],
-  #modalBody .crm31024r3flat-contact-list .crm38-contact-row input[name*="phone"]{grid-column:1/-1}
-  #modalBody .crm31024r3-loan-confirm-row{grid-template-columns:1fr!important}
+  #modalBody .crm31024r-top-row{grid-template-columns:1fr!important}
+  #modalBody .crm31024r-contact-slot .crm38-contact-row{grid-template-columns:1fr 1fr!important}
+  #modalBody .crm31024r-contact-slot .crm38-contact-row input[type='tel']{grid-column:1/-1!important}
+  #modalBody .crm31024r-detail-card .crm31024r3-loan-confirm-row,
+  #modalBody .crm31024r-detail-card .crm31024r32-loan-confirm-row{grid-template-columns:1fr!important}
 }

@@ -10271,93 +10271,60 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   console.info(`CRM v${VERSION} 매물 입력 UI 재배치 적용`);
 })();
 
-/* ===== CRM v3.10.24R3.1 · R3 기반 연락처 평면화 / 상세행 정리 / v3.10.23 항목 점검 ===== */
+/* ===== CRM v3.10.24R3.2 · R3 직접 수정 보정 ===== */
 (()=>{
-  const VERSION='3.10.24R3.1';
   const q=(s,r=document)=>r.querySelector(s);
-
   function directChild(node,root){
     if(!node||!root)return null;
-    let current=node;
-    while(current&&current.parentElement!==root)current=current.parentElement;
-    return current&&current.parentElement===root?current:null;
+    let cur=node;
+    while(cur&&cur.parentElement!==root)cur=cur.parentElement;
+    return cur&&cur.parentElement===root?cur:null;
   }
   function fieldBlock(root,name){
     const input=q(`[name="${name}"]`,root);
     return input?directChild(input,root):null;
   }
-  function moveInto(row,node){
-    if(node&&node.parentElement!==row)row.appendChild(node);
-  }
-  function auditListingFields(body){
-    const expected=[
-      'title','address','building_no','unit_no','district','status','is_public',
-      'property_type','area_m2','management_fee','room_count','bathroom_count',
-      'options','loan_available','official_price','move_in_date','last_confirmed_at',
-      'next_confirm_at','description'
-    ];
-    const missing=expected.filter(name=>!q(`[name="${name}"]`,body));
-    if(!q('#listingPhotoFiles',body))missing.push('listing_photo_files');
-    if(!q('.crm38-deal-section',body))missing.push('거래유형 및 금액');
-    if(!q('.crm361-feature-grid',body))missing.push('매물특징');
-    if(missing.length)console.warn('CRM v3.10.23 매물등록 항목 누락 확인:',missing);
-    else console.info('CRM v3.10.23 매물등록 항목 전체 유지 확인 완료');
-  }
-  function refine(){
-    const modal=q('#modal');
-    const body=q('#modalBody');
-    const root=q('#modalBody .crm31024r-listing-form');
+  function applyR32(){
+    const modal=q('#modal'),body=q('#modalBody'),root=q('#modalBody .crm31024r-listing-form');
     const title=q('#modalTitle')?.textContent||'';
     if(!modal?.open||!body||!root||!/^매물 (등록|수정)/.test(title))return false;
-
-    // R3 배치를 먼저 완성한 뒤 그 위에서만 정리합니다.
     if(typeof window.crm31024rArrangeListingForm==='function')window.crm31024rArrangeListingForm();
 
-    const topRow=q('.crm31024r-top-row',root);
-    const titleSlot=q('.crm31024r-title-slot',topRow);
-    const contactSlot=q('.crm31024r-contact-slot',topRow);
-    const toolbar=q('.crm386-contact-toolbar',contactSlot||body);
-    const contacts=q('#crm38ExtraContacts',contactSlot||body);
-    if(topRow)topRow.classList.add('crm31024r3flat-top-row');
-    if(titleSlot)titleSlot.classList.add('crm31024r3flat-title');
-    if(contactSlot)contactSlot.classList.add('crm31024r3flat-contact');
-    if(toolbar)toolbar.classList.add('crm31024r3flat-toolbar');
-    if(contacts)contacts.classList.add('crm31024r3flat-contact-list');
+    const top=q('.crm31024r-top-row',root);
+    const contactSlot=q('.crm31024r-contact-slot',top||root);
+    const toolbar=q('.crm386-contact-toolbar',body);
+    const contacts=q('#crm38ExtraContacts',body);
+    if(contactSlot){
+      if(toolbar&&toolbar.parentElement!==contactSlot)contactSlot.appendChild(toolbar);
+      if(contacts&&contacts.parentElement!==contactSlot)contactSlot.appendChild(contacts);
+    }
 
-    // 대출 가능 여부와 최종 확인일을 같은 줄에 배치합니다.
     const detailGrid=q('.crm31024r-detail-card .crm31024r-card-grid',root);
     if(detailGrid){
-      let compact=q(':scope > .crm31024r3-loan-confirm-row',detailGrid);
-      if(!compact){
-        compact=document.createElement('div');
-        compact.className='crm31024r3-loan-confirm-row span-2';
-      }
+      let row=q(':scope > .crm31024r32-loan-confirm-row',detailGrid);
       const loan=fieldBlock(detailGrid,'loan_available');
       const last=fieldBlock(detailGrid,'last_confirmed_at');
       if(loan||last){
-        moveInto(compact,loan);
-        moveInto(compact,last);
-        if(!compact.isConnected)detailGrid.appendChild(compact);
+        if(!row){row=document.createElement('div');row.className='crm31024r32-loan-confirm-row span-2';}
+        if(loan&&loan.parentElement!==row)row.appendChild(loan);
+        if(last&&last.parentElement!==row)row.appendChild(last);
+        if(!row.isConnected)detailGrid.appendChild(row);
       }
     }
-
-    auditListingFields(body);
-    root.dataset.crm31024r3flat='1';
+    root.dataset.crm31024r32='1';
     return true;
   }
-
   const prior=window.openListingModal||openListingModal;
   window.openListingModal=function(){
     const result=prior.apply(this,arguments);
-    [20,80,180,400,850,1400].forEach(ms=>setTimeout(refine,ms));
+    [0,30,80,160,320,650,1100].forEach(ms=>setTimeout(applyR32,ms));
     return result;
   };
   openListingModal=window.openListingModal;
-
   const observer=new MutationObserver(()=>{
-    if(q('#modal')?.open&&/^매물 (등록|수정)/.test(q('#modalTitle')?.textContent||''))requestAnimationFrame(refine);
+    if(q('#modal')?.open&&/^매물 (등록|수정)/.test(q('#modalTitle')?.textContent||''))requestAnimationFrame(applyR32);
   });
   observer.observe(document.body,{childList:true,subtree:true});
-  Object.assign(window,{openListingModal,crm31024r3RefineListingForm:refine});
-  console.info(`CRM v${VERSION} R3 기반 연락처 평면화·최종확인일 정렬·항목점검 적용`);
+  window.crm31024r32Apply=applyR32;
+  console.info('CRM v3.10.24R3.2 R3 직접 수정 적용');
 })();
