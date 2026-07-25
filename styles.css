@@ -2080,3 +2080,50 @@ table.listing-table tbody tr.crm-r311-listing-complete .muted {
 #modal.crm-r316-fu-stable .modal-actions {
   flex: 0 0 auto;
 }
+
+/* ===== CRM v3.10.24R3.17 · 매물 FU 하단 버튼 정리 ===== */
+#modal.crm-r316-fu-stable .modal-actions.crm-r317-listing-fu-actions{
+  display:grid;
+  grid-template-columns:auto minmax(190px,1fr) auto auto;
+  align-items:stretch;
+  gap:10px;
+  width:100%;
+  margin-top:18px;
+}
+#modal .modal-actions.crm-r317-listing-fu-actions > button{
+  min-height:46px;
+  height:46px;
+  padding:0 16px;
+  border-radius:11px;
+  margin:0;
+  white-space:nowrap;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  line-height:1.2;
+}
+#modal .modal-actions.crm-r317-listing-fu-actions .crm-r317-deal-toggle{
+  min-width:104px;
+  font-weight:800;
+}
+#modal .modal-actions.crm-r317-listing-fu-actions .crm-r317-kakao{
+  width:100%;
+  min-width:190px;
+  margin-right:0;
+  font-weight:800;
+}
+#modal .modal-actions.crm-r317-listing-fu-actions .crm-r317-cancel{
+  min-width:74px;
+}
+#modal .modal-actions.crm-r317-listing-fu-actions .crm-r317-save{
+  min-width:74px;
+}
+#modal .crm-r311-listing-toggle-wrap:empty{display:none!important}
+@media(max-width:680px){
+  #modal.crm-r316-fu-stable .modal-actions.crm-r317-listing-fu-actions{
+    grid-template-columns:1fr 1fr;
+  }
+  #modal .modal-actions.crm-r317-listing-fu-actions .crm-r317-kakao{
+    min-width:0;
+  }
+}

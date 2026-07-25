@@ -11208,3 +11208,100 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   modal.addEventListener('cancel', clearFuModal);
   console.info(`CRM v${VERSION} FU 모달 상단 고정 안정화 적용`);
 })();
+
+/* =========================================================
+   CRM v3.10.24R3.17 · 매물 FU 하단 액션 정리
+   - 카카오톡 소개문구 복사 중복 제거(기존 좌측 버튼 1개 유지)
+   - FU 화면의 계약 취소 버튼 제거(진행상황에서만 사용)
+   - 거래완료/거래재개 + 카카오톡 복사 + 취소 + 저장을 한 행으로 정렬
+   ========================================================= */
+(() => {
+  const VERSION = '3.10.24R3.17';
+  const q = (s, r = document) => r.querySelector(s);
+  const qa = (s, r = document) => Array.from(r.querySelectorAll(s));
+
+  function isListingFuOpen() {
+    const modal = q('#modal');
+    const title = (q('#modalTitle')?.textContent || '').trim();
+    return !!modal?.open && /FU 관리/.test(title) && !/고객 FU 관리/.test(title);
+  }
+
+  function cleanListingFuActions() {
+    if (!isListingFuOpen()) return;
+    const modal = q('#modal');
+    const body = q('#modalBody');
+    const actions = q('#modalForm .modal-actions');
+    if (!modal || !body || !actions) return;
+
+    actions.classList.add('crm-r317-listing-fu-actions');
+
+    // 계약 취소는 진행상황 모달에서만 사용한다.
+    qa('button', actions).forEach(btn => {
+      const text = (btn.textContent || '').replace(/\s+/g, ' ').trim();
+      if (/계약\s*취소/.test(text) || btn.id === 'contractCancelBtn' || btn.classList.contains('crm3828-contract-cancel')) {
+        btn.remove();
+      }
+    });
+
+    // 중복 카카오톡 소개문구 복사 버튼은 1개만 남긴다.
+    const kakaoButtons = qa('button', actions).filter(btn => {
+      const text = (btn.textContent || '').replace(/\s+/g, ' ').trim();
+      return /카카오톡/.test(text) && /(소개|매물)/.test(text) && /복사/.test(text);
+    });
+    const preferredKakao = kakaoButtons.find(btn => btn.classList.contains('crm3107-kakao-copy')) || kakaoButtons[0] || null;
+    kakaoButtons.forEach(btn => { if (btn !== preferredKakao) btn.remove(); });
+    if (preferredKakao) {
+      preferredKakao.classList.add('crm-r317-kakao');
+      // 기존 좌측 녹색 버튼을 그대로 유지한다.
+      preferredKakao.innerHTML = '💬 카카오톡 소개 문구 복사';
+    }
+
+    // 거래완료/거래재개 버튼을 별도 행에서 하단 액션 행으로 이동.
+    const toggleWrap = q('.crm-r311-listing-toggle-wrap', body);
+    const toggle = q('.crm-r311-listing-toggle', body) || q('.crm-r311-listing-toggle', actions);
+    if (toggle) {
+      toggle.classList.add('crm-r317-deal-toggle');
+      actions.insertBefore(toggle, actions.firstChild);
+    }
+    if (toggleWrap) toggleWrap.remove();
+
+    // 취소/저장 버튼 클래스 지정. 위치는 우측 유지.
+    const submit = q('#modalSubmit', actions);
+    const cancel = qa('button', actions).find(btn => btn !== submit && (btn.getAttribute('value') === 'cancel' || (btn.textContent || '').trim() === '취소'));
+    if (cancel) cancel.classList.add('crm-r317-cancel');
+    if (submit) submit.classList.add('crm-r317-save');
+
+    // 원하는 순서: 거래완료 | 카카오톡 복사 | (여백) | 취소 | 저장
+    if (toggle) actions.appendChild(toggle);
+    if (preferredKakao) actions.appendChild(preferredKakao);
+    if (cancel) actions.appendChild(cancel);
+    if (submit) actions.appendChild(submit);
+  }
+
+  const base = window.crm361OpenListingFu || globalThis.crm361OpenListingFu;
+  if (typeof base === 'function' && !base.__crmR317Actions) {
+    const wrapped = async function(...args) {
+      const result = await base.apply(this, args);
+      cleanListingFuActions();
+      return result;
+    };
+    wrapped.__crmR317Actions = true;
+    window.crm361OpenListingFu = wrapped;
+    try { crm361OpenListingFu = wrapped; } catch (_) {}
+  }
+
+  // 최종 진입점도 R3.17의 매물 FU 함수를 사용하도록 맞춘다.
+  const currentFollow = window.openFollowUpModal || globalThis.openFollowUpModal;
+  if (typeof currentFollow === 'function' && !currentFollow.__crmR317Actions) {
+    const wrappedFollow = function(entityType, id, ...args) {
+      if (entityType === 'listing') return window.crm361OpenListingFu(id, ...args);
+      return currentFollow.call(this, entityType, id, ...args);
+    };
+    wrappedFollow.__crmR317Actions = true;
+    window.openFollowUpModal = wrappedFollow;
+    try { openFollowUpModal = wrappedFollow; } catch (_) {}
+  }
+
+  window.crmR317CleanListingFuActions = cleanListingFuActions;
+  console.info(`CRM v${VERSION} 매물 FU 액션 정리 적용`);
+})();
