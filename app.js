@@ -10671,7 +10671,7 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   if (typeof baseHub === 'function' && !baseHub.__crmR310Wrapped) {
     const wrappedHub = async function(customerId, tab = 'records', ...args) {
       const result = await baseHub.call(this, customerId, tab, ...args);
-      [0, 40, 100, 220].forEach(ms => setTimeout(() => patchFuStatusButton(customerId, tab), ms));
+      await patchFuStatusButton(customerId, tab);
       return result;
     };
     wrappedHub.__crmR310Wrapped = true;
@@ -10865,7 +10865,7 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   if (typeof baseListingFu === 'function' && !baseListingFu.__crmR311Wrapped) {
     const wrappedFu = async function(listingId, ...args) {
       const result = await baseListingFu.call(this, listingId, ...args);
-      [0, 50, 120, 250].forEach(ms => setTimeout(() => patchListingFuDealButton(listingId), ms));
+      await patchListingFuDealButton(listingId);
       return result;
     };
     wrappedFu.__crmR311Wrapped = true;
@@ -11087,73 +11087,59 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
 })();
 
 /* =========================================================
-   CRM v3.10.24R3.14 · FU 모달 실제 1회 표시 안정화
-   - 누적 래퍼가 showModal()을 여러 번 호출해도 실제 표시 자체는 마지막 1회만 수행
-   - 고객/매물 FU 및 고객 FU 탭 이동 모두 동일 처리
+   CRM v3.10.24R3.15 · FU 모달 흔들림 제거
+   - 영업종료/거래완료 버튼 패치는 지연 타이머 없이 opener 내부에서 완료
+   - FU DOM이 완성된 뒤 브라우저 레이아웃 1회 확정 후 dialog 표시
    ========================================================= */
 (() => {
-  const VERSION = '3.10.24R3.14';
+  const VERSION = '3.10.24R3.15';
   const modal = document.getElementById('modal');
   if (!modal) return;
 
-  async function openWithSinglePaint(opener, thisArg, args) {
-    // 이미 열린 FU 안에서 탭을 바꾸는 경우에는 dialog를 닫았다 다시 열지 않고
-    // 내용만 갱신한다.
+  const nextPaint = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+  async function openStable(opener, thisArg, args) {
     const wasOpen = modal.open;
     const originalShowModal = modal.showModal;
     let requested = false;
 
-    // 누적된 과거 코드의 showModal() 호출은 이 실행 동안 모두 흡수한다.
-    modal.showModal = function () {
-      requested = true;
-    };
-
+    modal.showModal = function () { requested = true; };
     try {
-      const result = await opener.apply(thisArg, args);
-      return result;
+      return await opener.apply(thisArg, args);
     } finally {
       modal.showModal = originalShowModal;
-      // 처음 FU를 여는 경우에만 최종 DOM이 완성된 뒤 딱 한 번 표시한다.
-      if (!wasOpen && (requested || !modal.open)) {
-        try {
-          originalShowModal.call(modal);
-        } catch (err) {
-          // 다른 코드가 이미 열어 둔 경우 InvalidStateError는 무시한다.
-          if (!modal.open) console.warn('FU 모달 표시 실패', err);
+      if (!wasOpen) {
+        // MutationObserver/동기 DOM 패치까지 끝난 뒤 크기를 한 번 확정하고 표시한다.
+        await nextPaint();
+        if (!modal.open && requested) {
+          try { originalShowModal.call(modal); }
+          catch (err) { if (!modal.open) console.warn('FU 모달 표시 실패', err); }
         }
       }
     }
   }
 
   const customerBase = window.openCustomerFuHub || globalThis.openCustomerFuHub;
-  if (typeof customerBase === 'function' && !customerBase.__crmR314SinglePaint) {
-    const wrappedCustomer = async function (...args) {
-      return openWithSinglePaint(customerBase, this, args);
-    };
-    wrappedCustomer.__crmR314SinglePaint = true;
+  if (typeof customerBase === 'function' && !customerBase.__crmR315Stable) {
+    const wrappedCustomer = async function (...args) { return openStable(customerBase, this, args); };
+    wrappedCustomer.__crmR315Stable = true;
     window.openCustomerFuHub = wrappedCustomer;
     try { openCustomerFuHub = wrappedCustomer; } catch (_) {}
   }
 
   const listingBase = window.crm361OpenListingFu || globalThis.crm361OpenListingFu;
-  if (typeof listingBase === 'function' && !listingBase.__crmR314SinglePaint) {
-    const wrappedListing = async function (...args) {
-      return openWithSinglePaint(listingBase, this, args);
-    };
-    wrappedListing.__crmR314SinglePaint = true;
+  if (typeof listingBase === 'function' && !listingBase.__crmR315Stable) {
+    const wrappedListing = async function (...args) { return openStable(listingBase, this, args); };
+    wrappedListing.__crmR315Stable = true;
     window.crm361OpenListingFu = wrappedListing;
     try { crm361OpenListingFu = wrappedListing; } catch (_) {}
   }
 
-  // 인라인 onclick은 이 최종 함수만 통하도록 통일한다.
-  const singleFollowUpOpen = function (entityType, id) {
+  window.openFollowUpModal = function (entityType, id) {
     return entityType === 'listing'
       ? window.crm361OpenListingFu(id)
       : window.openCustomerFuHub(id, 'records');
   };
-  singleFollowUpOpen.__crmR314SinglePaint = true;
-  window.openFollowUpModal = singleFollowUpOpen;
-  try { openFollowUpModal = singleFollowUpOpen; } catch (_) {}
 
-  console.info(`CRM v${VERSION} FU 모달 단일 표시 적용`);
+  console.info(`CRM v${VERSION} FU 흔들림 제거 적용`);
 })();
