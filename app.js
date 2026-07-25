@@ -11471,3 +11471,152 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   window.crmR318SyncListingFuFooter = syncFooter;
   console.info(`CRM v${VERSION} 매물 FU 탭별 하단 액션 완전 분리 적용`);
 })();
+
+/* =========================================================
+   CRM v3.10.24R3.19 · 관리자 전체 고객 관리 + 내 고객 완전 분리
+   ========================================================= */
+(() => {
+  const VERSION = '3.10.24R3.19';
+  const q = (s, r=document) => r.querySelector(s);
+  const sameId = (a,b) => String(a ?? '') === String(b ?? '');
+
+  // 중요: 관리자라도 일반 "내 고객" 화면에서 다른 중개사 고객이 섞이지 않게
+  // 기존 로더가 끝난 마지막 단계에서 담당자 기준으로 한 번 더 강제 분리한다.
+  const baseLoadCustomers = loadCustomers;
+  loadCustomers = async function(...args){
+    const result = await baseLoadCustomers.apply(this,args);
+    const me = state?.profile?.id;
+    if (me && Array.isArray(state.customers)) {
+      state.customers = state.customers.filter(c => sameId(c.owner_id, me));
+      const ids = new Set(state.customers.map(c => String(c.id)));
+      if (Array.isArray(state.customerDealOptions)) state.customerDealOptions = state.customerDealOptions.filter(x => ids.has(String(x.customer_id)));
+      if (Array.isArray(state.customerContacts)) state.customerContacts = state.customerContacts.filter(x => ids.has(String(x.customer_id)));
+    }
+    return result;
+  };
+  try { window.loadCustomers = loadCustomers; } catch (_) {}
+
+  function ownerName(customer){
+    const m=(state.members||[]).find(x=>sameId(x.id,customer.owner_id));
+    if(!m) return '-';
+    return `${m.full_name||'-'}${m.office_name?` · ${m.office_name}`:''}`;
+  }
+  function statusNorm(v){ return String(v||'').trim()==='영업종료'?'영업종료':'영업중'; }
+
+  async function loadAdminCustomers(){
+    if(state.profile?.role!=='admin') return [];
+    await loadMembers();
+    const {data,error}=await state.client.from('customers').select('*').order('created_at',{ascending:false});
+    if(error) throw error;
+    const rows=data||[];
+    const ids=rows.map(x=>x.id);
+    let deals=[], contacts=[];
+    if(ids.length){
+      const [dr,cr]=await Promise.all([
+        state.client.from('customer_deal_options').select('*').in('customer_id',ids).order('sort_order'),
+        state.client.from('customer_contacts').select('*').in('customer_id',ids).order('sort_order')
+      ]);
+      if(!dr.error) deals=dr.data||[];
+      if(!cr.error) contacts=cr.data||[];
+    }
+    rows.forEach(c=>{
+      c.deal_options=deals.filter(x=>sameId(x.customer_id,c.id));
+      c.additional_contacts=contacts.filter(x=>sameId(x.customer_id,c.id));
+    });
+    state.adminCustomers=rows;
+    // 관리자 전체 고객 화면에서 기존 FU/히스토리/진행상황 함수가 해당 고객을 찾을 수 있도록만 사용.
+    state.customers=rows.slice();
+    return rows;
+  }
+
+  function renderAdminCustomerRows(rows){
+    const el=q('#adminCustomerTable'); if(!el) return;
+    el.innerHTML=rows.length?`<div class="table-wrap"><table class="customer-table crm-r319-admin-customer-table"><thead><tr>
+      <th>상태</th><th>고객명</th><th>연락처</th><th>구분</th><th>거래유형</th><th>등급</th><th>희망지역</th><th>희망금액/월세</th><th>담당 중개사</th><th>최종 FU</th><th>예정 FU</th><th>관리</th>
+    </tr></thead><tbody>${rows.map(c=>`<tr class="${statusNorm(c.status)==='영업종료'?'crm-r319-customer-closed':''}">
+      <td>${badge(statusNorm(c.status),statusNorm(c.status)==='영업종료'?'gray':'green')}</td>
+      <td><strong>${escapeHtml(c.name||'-')}</strong></td>
+      <td>${escapeHtml(c.phone||c.additional_contacts?.[0]?.phone||'-')}</td>
+      <td>${escapeHtml(c.customer_type||'-')}</td>
+      <td>${escapeHtml(typeof crm3857DealText==='function'?crm3857DealText(c):(c.deal_type||'-'))}</td>
+      <td>${gradeBadge(c.customer_grade)}</td>
+      <td>${escapeHtml(c.preferred_area||'-')}</td>
+      <td>${typeof crm3857BudgetText==='function'?crm3857BudgetText(c):customerBudgetText(c)}</td>
+      <td><strong>${escapeHtml(ownerName(c))}</strong></td>
+      <td>${fmtDate(c.last_follow_up_at)}</td>
+      <td>${dueBadge(c.next_follow_up_at)}</td>
+      <td><div class="row-actions crm-r319-admin-actions">
+        <button class="success" onclick="openCustomerFuHub('${c.id}','records')">FU</button>
+        <button class="ghost" onclick="openContractModal('customer','${c.id}')">진행상황</button>
+        <button class="ghost" onclick="crmR319TransferCustomer('${c.id}')">담당 이관</button>
+        <button class="danger" onclick="crmR319DeleteCustomer('${c.id}')">삭제</button>
+      </div></td>
+    </tr>`).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 고객이 없습니다.</div>';
+  }
+
+  window.crmR319FilterAdminCustomers=function(){
+    const text=(q('#adminCustomerSearch')?.value||'').trim().toLowerCase();
+    const owner=q('#adminCustomerOwner')?.value||'';
+    const status=q('#adminCustomerStatus')?.value||'';
+    const type=q('#adminCustomerType')?.value||'';
+    const grade=q('#adminCustomerGrade')?.value||'';
+    const rows=(state.adminCustomers||[]).filter(c=>{
+      const member=(state.members||[]).find(m=>sameId(m.id,c.owner_id));
+      const hay=`${c.name||''} ${c.phone||''} ${c.preferred_area||''} ${member?.full_name||''} ${member?.office_name||''}`.toLowerCase();
+      return (!text||hay.includes(text))&&(!owner||sameId(c.owner_id,owner))&&(!status||statusNorm(c.status)===status)&&(!type||c.customer_type===type)&&(!grade||c.customer_grade===grade);
+    });
+    renderAdminCustomerRows(rows);
+  };
+
+  window.renderAdminCustomers=async function(){
+    if(state.profile?.role!=='admin') return renderView('dashboard');
+    try{await loadAdminCustomers();}catch(e){toast(e.message||'전체 고객을 불러오지 못했습니다.');return;}
+    q('#topActions').innerHTML='';
+    q('#content').innerHTML=`
+      <div class="notice" style="margin-bottom:14px">관리자 전용 화면입니다. 모든 중개사의 고객을 여기에서만 통합 열람하고 담당자를 이관할 수 있습니다. 일반 <strong>내 고객</strong> 시트에는 로그인한 중개사 본인의 고객만 표시됩니다.</div>
+      <div class="panel">
+        <div class="filters admin-listing-filters crm-r319-admin-customer-filters">
+          <input id="adminCustomerSearch" placeholder="고객명·연락처·희망지역·담당자 검색" oninput="crmR319FilterAdminCustomers()">
+          <select id="adminCustomerOwner" onchange="crmR319FilterAdminCustomers()"><option value="">전체 담당자</option>${(state.members||[]).filter(x=>x.status==='approved').map(x=>`<option value="${x.id}">${escapeHtml(x.full_name||'')} · ${escapeHtml(x.office_name||'')}</option>`).join('')}</select>
+          <select id="adminCustomerStatus" onchange="crmR319FilterAdminCustomers()"><option value="">전체 상태</option><option>영업중</option><option>영업종료</option></select>
+          <select id="adminCustomerType" onchange="crmR319FilterAdminCustomers()"><option value="">전체 구분</option><option>매수</option><option>매도</option><option>임차</option><option>임대</option></select>
+          <select id="adminCustomerGrade" onchange="crmR319FilterAdminCustomers()"><option value="">전체 등급</option><option>A</option><option>B</option><option>C</option><option>D</option></select>
+        </div>
+        <div id="adminCustomerTable"></div>
+      </div>`;
+    crmR319FilterAdminCustomers();
+  };
+
+  window.crmR319TransferCustomer=async function(id){
+    const c=(state.adminCustomers||[]).find(x=>sameId(x.id,id)); if(!c)return toast('고객을 찾을 수 없습니다.');
+    q('#modalTitle').textContent=`${c.name||'고객'} · 담당 이관`;
+    q('#modalBody').innerHTML=`<div class="form-grid"><label class="span-2">현재 담당<input value="${escapeHtml(ownerName(c))}" disabled></label><label class="span-2">새 담당자<select id="crmR319CustomerOwner"><option value="">선택</option>${(state.members||[]).filter(x=>x.status==='approved'&&!sameId(x.id,c.owner_id)).map(x=>`<option value="${x.id}">${escapeHtml(x.full_name||'')} · ${escapeHtml(x.office_name||'')}</option>`).join('')}</select></label><label class="span-2">이관 사유<input id="crmR319TransferReason" value="관리자 고객 담당 이관"></label></div>`;
+    q('#modalSubmit').style.display='';q('#modalSubmit').textContent='이관';
+    q('#modalSubmit').onclick=async e=>{e.preventDefault();const to=q('#crmR319CustomerOwner').value;if(!to)return toast('새 담당자를 선택하세요.');const {error}=await state.client.from('customers').update({owner_id:to}).eq('id',id);if(error)return toast(error.message);try{await state.client.from('transfer_history').insert({entity_type:'customer',entity_id:id,from_owner:c.owner_id,to_owner:to,reason:q('#crmR319TransferReason').value||'관리자 고객 담당 이관',transferred_by:state.profile.id});}catch(_){ }q('#modal').close();toast('고객 담당자를 이관했습니다.');await renderAdminCustomers();};
+    q('#modal').showModal();
+  };
+
+  window.crmR319DeleteCustomer=async function(id){
+    const c=(state.adminCustomers||[]).find(x=>sameId(x.id,id));
+    if(!confirm(`${c?.name||'이 고객'}을 삭제할까요?`))return;
+    const {error}=await state.client.from('customers').delete().eq('id',id);if(error)return toast(error.message);
+    toast('삭제했습니다.');await renderAdminCustomers();
+  };
+
+  const baseRenderView = window.renderView || renderView;
+  const wrappedRenderView = async function(view,...args){
+    if(view==='adminCustomers'){
+      state.view=view;
+      document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
+      q('#pageTitle').textContent='전체 고객 관리';
+      q('#pageSubtitle').textContent='모든 중개사의 고객을 관리자 화면에서만 통합 관리합니다';
+      q('#topActions').innerHTML='';
+      return renderAdminCustomers();
+    }
+    return baseRenderView.call(this,view,...args);
+  };
+  window.renderView=wrappedRenderView;
+  try{renderView=wrappedRenderView;}catch(_){ }
+
+  console.info(`CRM v${VERSION} 전체 고객 관리/고객 시트 분리 적용`);
+})();

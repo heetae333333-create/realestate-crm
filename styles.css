@@ -2166,3 +2166,11 @@ table.listing-table tbody tr.crm-r311-listing-complete .muted {
     width:100%;
   }
 }
+
+/* CRM v3.10.24R3.19 · 관리자 전체 고객 관리 */
+.crm-r319-admin-customer-filters{grid-template-columns:minmax(240px,1.4fr) repeat(4,minmax(135px,.75fr));}
+.crm-r319-admin-customer-table .crm-r319-customer-closed td{background:#f1f3f5;}
+.crm-r319-admin-customer-table .crm-r319-customer-closed:hover td{background:#e9ecef;}
+.crm-r319-admin-actions{min-width:310px;flex-wrap:wrap;gap:6px;}
+@media(max-width:1100px){.crm-r319-admin-customer-filters{grid-template-columns:1fr 1fr;}}
+@media(max-width:700px){.crm-r319-admin-customer-filters{grid-template-columns:1fr;}}
