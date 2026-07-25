@@ -1908,3 +1908,48 @@ th.crm31023-sort-active{color:#1d4ed8;background:#eff6ff}
   #modalBody .crm31024r-card-head{display:block}
   #modalBody .crm31024r-card-head span{display:block;margin-top:4px}
 }
+
+
+/* ===== CRM v3.10.24R2 · 상단 연락처/섹션 순서 보정 ===== */
+#modalBody .crm31024r-top-row{
+  grid-column:1/-1;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:14px;
+  align-items:stretch;
+}
+#modalBody .crm31024r-title-slot,
+#modalBody .crm31024r-contact-slot{
+  border:1px solid #d9e3f1;
+  border-radius:16px;
+  background:#fff;
+  padding:16px;
+  min-width:0;
+}
+#modalBody .crm31024r-title-slot > label{margin:0;display:block}
+#modalBody .crm31024r-contact-slot{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+#modalBody .crm31024r-contact-slot .crm386-contact-toolbar{
+  margin:0;
+  min-height:44px;
+}
+#modalBody .crm31024r-contact-slot #crm38ExtraContacts{
+  margin:0;
+  min-width:0;
+}
+#modalBody .crm31024r-contact-slot .crm38-contact-row{
+  grid-template-columns:minmax(100px,.75fr) minmax(110px,.9fr) minmax(150px,1.2fr) auto;
+}
+#modalBody .crm31024r-address-card{grid-column:1/-1}
+#modalBody .crm31024r-deal-card{grid-column:1/-1}
+#modalBody .crm31024r-property-card{grid-column:1/-1}
+#modalBody .crm31024r-detail-card{grid-column:1/-1}
+@media(max-width:820px){
+  #modalBody .crm31024r-top-row{grid-template-columns:1fr}
+  #modalBody .crm31024r-title-slot,
+  #modalBody .crm31024r-contact-slot{padding:13px}
+  #modalBody .crm31024r-contact-slot .crm38-contact-row{grid-template-columns:1fr}
+}

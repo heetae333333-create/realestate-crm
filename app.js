@@ -10111,7 +10111,7 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
 
 /* ===== CRM v3.10.24R · v3.10.23 기반 매물 입력 UI 재배치 ===== */
 (()=>{
-  const VERSION='3.10.24R';
+  const VERSION='3.10.24R2';
   const q=(s,r=document)=>r.querySelector(s);
 
   function directChild(node,root){
@@ -10190,24 +10190,38 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
     if(!body||!root||!/^매물 (등록|수정)/.test(title))return false;
 
     root.classList.add('crm31024r-listing-form');
+    let topRow=q(':scope > .crm31024r-top-row',root);
     let addressCard=q(':scope > .crm31024r-address-card',root);
     let propertyCard=q(':scope > .crm31024r-property-card',root);
     let detailCard=q(':scope > .crm31024r-detail-card',root);
+    if(!topRow){
+      topRow=document.createElement('section');
+      topRow.className='crm31024r-top-row span-2';
+      topRow.innerHTML='<div class="crm31024r-title-slot"></div><div class="crm31024r-contact-slot"></div>';
+    }
     if(!addressCard){addressCard=makeCard('crm31024r-address-card','주소 및 공개 설정','지역은 지번 주소에서 구·동을 자동 추출합니다.');}
     if(!propertyCard){propertyCard=makeCard('crm31024r-property-card','매물 기본 정보','매물 유형과 전용면적을 입력하세요.');}
     if(!detailCard){detailCard=makeCard('crm31024r-detail-card','상세 조건 및 사진','기존 입력 기능은 그대로 유지됩니다.');}
 
-    const extra=q('#crm38ExtraContacts',root);
-    const insertAfter=extra||fieldBlock(root,'contact_phone')||fieldBlock(root,'title');
-    if(!addressCard.isConnected){insertAfter?.after(addressCard);}
-    if(!propertyCard.isConnected){addressCard.after(propertyCard);}
+    const titleBlock=fieldBlock(root,'title');
+    const extra=q('#crm38ExtraContacts',root)||q('#crm38ExtraContacts',topRow);
+    const toolbar=q('.crm386-contact-toolbar',root)||q('.crm386-contact-toolbar',topRow);
+    const titleSlot=q('.crm31024r-title-slot',topRow);
+    const contactSlot=q('.crm31024r-contact-slot',topRow);
+    if(titleBlock&&titleBlock.parentElement!==titleSlot)titleSlot.appendChild(titleBlock);
+    if(toolbar&&toolbar.parentElement!==contactSlot)contactSlot.appendChild(toolbar);
+    if(extra&&extra.parentElement!==contactSlot)contactSlot.appendChild(extra);
+    if(!topRow.isConnected)root.prepend(topRow);
+
+    if(!addressCard.isConnected){topRow.after(addressCard);}
 
     const deal=q(':scope > .crm38-deal-section',root)||q('.crm38-deal-section',root);
     if(deal){
       deal.classList.add('crm31024r-deal-card');
-      propertyCard.after(deal);
+      addressCard.after(deal);
     }
-    if(!detailCard.isConnected){(deal||propertyCard).after(detailCard);}
+    if(!propertyCard.isConnected){(deal||addressCard).after(propertyCard);}
+    if(!detailCard.isConnected){propertyCard.after(detailCard);}
 
     const addressGrid=q('.crm31024r-card-grid',addressCard);
     const propertyGrid=q('.crm31024r-card-grid',propertyCard);
@@ -10220,7 +10234,7 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
     ['property_type','area_m2'].forEach(n=>moveUnique(propertyGrid,fieldBlock(root,n)));
 
     const protectedNodes=new Set([
-      fieldBlock(root,'title'),fieldBlock(root,'contact_phone'),extra,addressCard,propertyCard,detailCard,deal
+      topRow,addressCard,propertyCard,detailCard,deal
     ].filter(Boolean));
     [...root.children].forEach(node=>{
       if(protectedNodes.has(node))return;
