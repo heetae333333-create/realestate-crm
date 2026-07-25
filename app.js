@@ -11620,3 +11620,194 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
 
   console.info(`CRM v${VERSION} 전체 고객 관리/고객 시트 분리 적용`);
 })();
+
+/* =========================================================
+   CRM v3.10.24R3.20 · 고객 목록 열 정리
+   - 희망특징 독립 열 제거
+   - 입주희망일을 해당 자리로 고정
+   - 희망금액 아래 희망특징 소형 요약
+   - 희망 -> 희망유형
+   ========================================================= */
+(() => {
+  const VERSION = '3.10.24R3.20';
+  let patching = false;
+  let queued = false;
+
+  const text = v => String(v ?? '').trim();
+  const esc = v => typeof escapeHtml === 'function' ? escapeHtml(String(v ?? '')) : String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  function customerIdFromRow(row){
+    const el = row.querySelector("[onclick*='openCustomerModal'],[onclick*='openCustomerDetail'],[onclick*='openCustomerFuHub']");
+    const code = el?.getAttribute('onclick') || '';
+    return code.match(/(?:openCustomerModal|openCustomerDetail|openCustomerFuHub)\(['\"]([^'\"]+)['\"]/)?.[1] || '';
+  }
+
+  function featureList(customer){
+    const raw = customer?.desired_feature_tags;
+    if(Array.isArray(raw)) return raw.map(text).filter(Boolean);
+    if(typeof raw === 'string'){
+      const s = raw.trim();
+      if(!s) return [];
+      try{
+        const parsed = JSON.parse(s);
+        if(Array.isArray(parsed)) return parsed.map(text).filter(Boolean);
+      }catch(_){ }
+      return s.split(/[;,|]/).map(text).filter(Boolean);
+    }
+    return [];
+  }
+
+  function moveInText(customer){
+    const period = text(customer?.desired_move_in_period);
+    if(period) return period;
+    const date = text(customer?.desired_move_in_date);
+    return date ? (typeof fmtDate === 'function' ? fmtDate(date) : date) : '-';
+  }
+
+  function featureSummaryHtml(customer){
+    const items = featureList(customer);
+    if(!items.length) return '';
+    const shown = items.slice(0, 2);
+    const more = items.length > 2;
+    const title = items.join(', ');
+    return `<div class="crm-r320-budget-features" title="${esc(title)}">${shown.map(v=>`<span class="crm-r320-feature-chip">${esc(v)}</span>`).join('')}${more?'<span class="crm-r320-feature-more">…</span>':''}</div>`;
+  }
+
+  function findCustomer(id){
+    return (state?.customers || []).find(x => String(x.id) === String(id));
+  }
+
+  function patchCustomerTable(){
+    if(patching) return;
+    const table = document.querySelector('#customerTable table.customer-table, #customerTable table');
+    if(!table) return;
+    patching = true;
+    try{
+      let headers = [...table.querySelectorAll('thead th')];
+      if(!headers.length) return;
+
+      // 희망 매물 유형 제목을 명확하게 표시
+      const preferredHeader = headers.find(th =>
+        th.dataset.crm3106Preferred === '1' ||
+        th.dataset.crm3105Preferred === '1' ||
+        ['희망','희망유형'].includes(text(th.textContent))
+      );
+      if(preferredHeader) preferredHeader.textContent = '희망유형';
+
+      headers = [...table.querySelectorAll('thead th')];
+      const featureIndex = headers.findIndex(th => ['희망특징','매물특징','희망 매물 특징'].includes(text(th.textContent)));
+      const moveIndexes = headers.map((th,i) => ({th,i})).filter(({th}) =>
+        text(th.textContent) === '입주희망일' ||
+        th.dataset.crm31022MoveIn === '1' ||
+        th.classList.contains('crm3894-move-in-col') ||
+        th.classList.contains('crm31022-move-in-col')
+      ).map(x=>x.i);
+
+      // 기존 희망특징 열의 위치를 입주희망일의 최종 위치로 사용한다.
+      let targetIndex = featureIndex;
+      if(targetIndex >= 0){
+        const featureHeader = headers[targetIndex];
+        featureHeader.textContent = '입주희망일';
+        featureHeader.dataset.crmR320MoveIn = '1';
+        featureHeader.classList.remove('crm3894-move-in-col','crm31022-move-in-col');
+        featureHeader.classList.add('crm-r320-move-in-col');
+
+        // 이 열을 제외한 과거 입주희망일 열은 제거해서 열 밀림을 없앤다.
+        const removeIndexes = moveIndexes.filter(i => i !== targetIndex).sort((a,b)=>b-a);
+        removeIndexes.forEach(i => {
+          table.querySelectorAll('tr').forEach(tr => tr.children[i]?.remove());
+          if(i < targetIndex) targetIndex--;
+        });
+      }else if(moveIndexes.length){
+        // 희망특징 열이 이미 제거된 상태라면 입주희망일은 하나만 유지한다.
+        targetIndex = moveIndexes[0];
+        moveIndexes.slice(1).sort((a,b)=>b-a).forEach(i => {
+          table.querySelectorAll('tr').forEach(tr => tr.children[i]?.remove());
+          if(i < targetIndex) targetIndex--;
+        });
+        const th = table.querySelectorAll('thead th')[targetIndex];
+        if(th){
+          th.textContent = '입주희망일';
+          th.dataset.crmR320MoveIn = '1';
+          th.classList.add('crm-r320-move-in-col');
+        }
+      }
+
+      headers = [...table.querySelectorAll('thead th')];
+      // 과거 패치가 희망유형을 다시 '희망'으로 바꿨을 수 있어 마지막으로 다시 고정
+      headers.forEach(th => {
+        if(th.dataset.crm3106Preferred === '1' || th.dataset.crm3105Preferred === '1' || text(th.textContent) === '희망') th.textContent = '희망유형';
+      });
+
+      const finalMoveIndex = headers.findIndex(th => th.dataset.crmR320MoveIn === '1' || text(th.textContent) === '입주희망일');
+      const budgetIndex = headers.findIndex(th => text(th.textContent) === '희망금액');
+
+      table.querySelectorAll('tbody tr').forEach(row => {
+        const id = customerIdFromRow(row);
+        const customer = findCustomer(id);
+        if(!customer) return;
+
+        if(finalMoveIndex >= 0 && row.children[finalMoveIndex]){
+          const value = moveInText(customer);
+          row.children[finalMoveIndex].innerHTML = `<span class="crm-r320-move-in-text" title="${esc(value)}">${esc(value)}</span>`;
+        }
+
+        if(budgetIndex >= 0 && row.children[budgetIndex]){
+          const cell = row.children[budgetIndex];
+          cell.querySelectorAll('.crm-r320-budget-features').forEach(el=>el.remove());
+          const html = featureSummaryHtml(customer);
+          if(html) cell.insertAdjacentHTML('beforeend', html);
+          cell.classList.add('crm-r320-budget-cell');
+        }
+      });
+    } finally {
+      patching = false;
+    }
+  }
+
+  function schedulePatch(){
+    if(queued) return;
+    queued = true;
+    requestAnimationFrame(() => {
+      queued = false;
+      patchCustomerTable();
+    });
+  }
+
+  const baseRender = window.renderCustomers || globalThis.renderCustomers;
+  if(typeof baseRender === 'function' && !baseRender.__crmR320){
+    const wrapped = async function(...args){
+      const result = await baseRender.apply(this,args);
+      schedulePatch();
+      return result;
+    };
+    wrapped.__crmR320 = true;
+    window.renderCustomers = wrapped;
+    try { renderCustomers = wrapped; } catch(_){ }
+  }
+
+  const baseFilter = window.filterCustomers || globalThis.filterCustomers;
+  if(typeof baseFilter === 'function' && !baseFilter.__crmR320){
+    const wrapped = function(...args){
+      const result = baseFilter.apply(this,args);
+      schedulePatch();
+      return result;
+    };
+    wrapped.__crmR320 = true;
+    window.filterCustomers = wrapped;
+    try { filterCustomers = wrapped; } catch(_){ }
+  }
+
+  const observer = new MutationObserver(records => {
+    if(patching) return;
+    const relevant = records.some(r => [...r.addedNodes].some(n => n.nodeType === 1 && (
+      n.id === 'customerTable' || n.matches?.('#customerTable table, table.customer-table') || n.querySelector?.('#customerTable table, table.customer-table')
+    )));
+    if(relevant) schedulePatch();
+  });
+  observer.observe(document.getElementById('main') || document.body,{childList:true,subtree:true});
+
+  setTimeout(schedulePatch,120);
+  window.crmR320PatchCustomerTable = patchCustomerTable;
+  console.info(`CRM v${VERSION} 고객 목록 열/특징 배치 정리 적용`);
+})();
