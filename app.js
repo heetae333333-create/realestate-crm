@@ -10728,3 +10728,218 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   Object.assign(window, { crmR310ToggleCustomerSales });
   console.info(`CRM v${VERSION} 고객 영업종료·재개 기능 적용`);
 })();
+
+/* =========================================================
+   CRM v3.10.24R3.11 · 매물 거래완료/재개 FU 버튼 + 자동 이력 + 완료행 음영
+   ========================================================= */
+(() => {
+  const VERSION = '3.10.24R3.11';
+  const AVAILABLE = 'available';
+  const COMPLETE = 'complete';
+  const q = (s, r = document) => r.querySelector(s);
+  const qa = (s, r = document) => Array.from(r.querySelectorAll(s));
+  const sameId = (a,b) => String(a ?? '') === String(b ?? '');
+  const normalizeStatus = value => {
+    const v = String(value || '').trim();
+    return (v === COMPLETE || v === '거래완료' || v === '거래 완료') ? COMPLETE : AVAILABLE;
+  };
+
+  function dateTimeText(date = new Date()) {
+    return date.toLocaleString('ko-KR', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: false
+    });
+  }
+
+  async function loadListingFresh(listingId) {
+    const cached = (state.listings || []).find(x => sameId(x.id, listingId));
+    const { data, error } = await state.client.from('listings').select('*').eq('id', listingId).maybeSingle();
+    if (error) throw error;
+    return data || cached;
+  }
+
+  async function writeListingStatusHistory(listingId, nextStatus, source = '매물 상세 수정') {
+    const complete = normalizeStatus(nextStatus) === COMPLETE;
+    const action = complete ? '거래 완료' : '거래 재개';
+    const content = `${dateTimeText()}에 ${action}되었습니다.\n처리 위치: ${source}`;
+    const { error } = await state.client.from('interaction_history').insert({
+      customer_id: null,
+      listing_id: listingId,
+      created_by: state.profile.id,
+      follow_up_date: typeof today === 'function' ? today() : new Date().toISOString().slice(0, 10),
+      contact_method: action,
+      content,
+      next_follow_up_at: null
+    });
+    if (error) throw error;
+  }
+
+  function listingIdFromRow(row) {
+    const buttons = qa('button[onclick]', row);
+    const patterns = [
+      /openListingModal\(['"]([^'"]+)['"]\)/,
+      /crm361OpenListingFu\(['"]([^'"]+)['"]\)/,
+      /openListingDetail\(['"]([^'"]+)['"]\)/,
+      /deleteListing\(['"]([^'"]+)['"]\)/,
+      /openContractModal\(['"]listing['"],\s*['"]([^'"]+)['"]\)/
+    ];
+    for (const btn of buttons) {
+      const code = btn.getAttribute('onclick') || '';
+      for (const re of patterns) {
+        const m = code.match(re);
+        if (m) return m[1];
+      }
+    }
+    return '';
+  }
+
+  function patchListingRows(root = document) {
+    qa('table.listing-table tbody tr', root).forEach(row => {
+      const id = listingIdFromRow(row);
+      let listing = id ? (state.listings || []).find(x => sameId(x.id, id)) : null;
+      const isComplete = listing
+        ? normalizeStatus(listing.status) === COMPLETE
+        : /거래\s*완료/.test(row.textContent || '');
+      row.classList.toggle('crm-r311-listing-complete', isComplete);
+    });
+  }
+
+  async function refreshListingScreens() {
+    try {
+      if (typeof loadListings === 'function') await loadListings();
+    } catch (_) {}
+    patchListingRows();
+    // 현재 화면이 내 매물/공동매물/전체매물이라면 가능한 경우 즉시 다시 그립니다.
+    try {
+      const view = state?.currentView || state?.view || '';
+      if (view === 'myListings' && typeof renderMyListings === 'function') await renderMyListings();
+      else if (view === 'network' && typeof renderNetwork === 'function') await renderNetwork();
+      else if (view === 'adminListings' && typeof renderAdminListings === 'function') await renderAdminListings();
+    } catch (_) {
+      patchListingRows();
+    }
+    setTimeout(() => patchListingRows(), 80);
+  }
+
+  async function crmR311ToggleListingDeal(listingId) {
+    try {
+      const listing = await loadListingFresh(listingId);
+      if (!listing) return toast('매물 정보를 찾을 수 없습니다.');
+      const current = normalizeStatus(listing.status);
+      const next = current === COMPLETE ? AVAILABLE : COMPLETE;
+      const actionText = next === COMPLETE ? '거래완료 처리' : '거래를 재개';
+      if (!confirm(`${listing.title || '매물'}을(를) ${actionText}할까요?`)) return;
+
+      const { error } = await state.client.from('listings').update({ status: next }).eq('id', listingId);
+      if (error) return toast(error.message);
+      await writeListingStatusHistory(listingId, next, '매물 FU');
+
+      const cached = (state.listings || []).find(x => sameId(x.id, listingId));
+      if (cached) cached.status = next;
+      const mine = (state.myListings || []).find(x => sameId(x.id, listingId));
+      if (mine) mine.status = next;
+
+      await refreshListingScreens();
+      toast(next === COMPLETE ? '매물 상태를 거래완료로 변경했습니다.' : '매물 상태를 거래가능으로 변경했습니다.');
+      if (typeof window.crm361OpenListingFu === 'function') await window.crm361OpenListingFu(listingId);
+    } catch (err) {
+      toast(err?.message || '매물 상태 변경 중 오류가 발생했습니다.');
+    }
+  }
+
+  async function patchListingFuDealButton(listingId) {
+    const body = q('#modalBody');
+    const title = q('#modalTitle')?.textContent || '';
+    if (!body || !/FU 관리/.test(title) || /고객 FU 관리/.test(title)) return;
+    body.querySelectorAll('.crm-r311-listing-toggle-wrap').forEach(el => el.remove());
+    let listing;
+    try { listing = await loadListingFresh(listingId); } catch (_) { return; }
+    const complete = normalizeStatus(listing?.status) === COMPLETE;
+    const wrap = document.createElement('div');
+    wrap.className = 'crm-r311-listing-toggle-wrap';
+    wrap.innerHTML = `<button type="button" class="${complete ? 'success' : 'danger'} crm-r311-listing-toggle" onclick="crmR311ToggleListingDeal('${listingId}')">${complete ? '거래재개' : '거래완료'}</button>`;
+    body.appendChild(wrap);
+  }
+
+  const baseListingFu = window.crm361OpenListingFu || globalThis.crm361OpenListingFu;
+  if (typeof baseListingFu === 'function' && !baseListingFu.__crmR311Wrapped) {
+    const wrappedFu = async function(listingId, ...args) {
+      const result = await baseListingFu.call(this, listingId, ...args);
+      [0, 50, 120, 250].forEach(ms => setTimeout(() => patchListingFuDealButton(listingId), ms));
+      return result;
+    };
+    wrappedFu.__crmR311Wrapped = true;
+    window.crm361OpenListingFu = wrappedFu;
+    try { crm361OpenListingFu = wrappedFu; } catch (_) {}
+  }
+
+  function installListingModalStatusAudit(listingId, originalStatus) {
+    const modal = q('#modal');
+    const submit = q('#modalSubmit');
+    if (!listingId || !modal || !submit || !/매물 (등록|수정)/.test(q('#modalTitle')?.textContent || '')) return false;
+    if (submit.dataset.crmR311Audit === String(listingId)) return true;
+    const oldClick = submit.onclick;
+    if (typeof oldClick !== 'function') return false;
+    submit.dataset.crmR311Audit = String(listingId);
+    submit.onclick = async function(event) {
+      const selected = normalizeStatus(q('#modalBody [name="status"]')?.value);
+      const before = normalizeStatus(originalStatus);
+      const wasOpen = modal.open;
+      const result = await oldClick.call(this, event);
+      if (selected === before) return result;
+      // 저장 실패 시 모달이 열린 채로 유지되므로 이력 기록을 하지 않습니다.
+      if (wasOpen && modal.open) return result;
+      try {
+        const fresh = await loadListingFresh(listingId);
+        if (normalizeStatus(fresh?.status) === selected) {
+          await writeListingStatusHistory(listingId, selected, '매물 상세 수정');
+          const cached = (state.listings || []).find(x => sameId(x.id, listingId));
+          if (cached) cached.status = selected;
+          const mine = (state.myListings || []).find(x => sameId(x.id, listingId));
+          if (mine) mine.status = selected;
+          await refreshListingScreens();
+        }
+      } catch (err) {
+        toast(err?.message || '거래 상태 이력 기록에 실패했습니다.');
+      }
+      return result;
+    };
+    return true;
+  }
+
+  const baseOpenListing = window.openListingModal || globalThis.openListingModal;
+  if (typeof baseOpenListing === 'function' && !baseOpenListing.__crmR311Wrapped) {
+    const wrappedOpen = function(listingId = null, ...args) {
+      const listing = (state.listings || []).find(x => sameId(x.id, listingId));
+      const originalStatus = normalizeStatus(listing?.status);
+      const result = baseOpenListing.call(this, listingId, ...args);
+      if (listingId) [30, 80, 160, 320, 600].forEach(ms => setTimeout(() => installListingModalStatusAudit(listingId, originalStatus), ms));
+      return result;
+    };
+    wrappedOpen.__crmR311Wrapped = true;
+    window.openListingModal = wrappedOpen;
+    try { openListingModal = wrappedOpen; } catch (_) {}
+  }
+
+  const baseRenderListingTable = window.renderListingTable || globalThis.renderListingTable;
+  if (typeof baseRenderListingTable === 'function' && !baseRenderListingTable.__crmR311Wrapped) {
+    const wrappedRender = function(...args) {
+      const result = baseRenderListingTable.apply(this, args);
+      const target = args[1] ? document.getElementById(args[1]) : document;
+      patchListingRows(target || document);
+      return result;
+    };
+    wrappedRender.__crmR311Wrapped = true;
+    window.renderListingTable = wrappedRender;
+    try { renderListingTable = wrappedRender; } catch (_) {}
+  }
+
+  // 현재 열려 있는 표도 즉시 반영.
+  setTimeout(() => patchListingRows(), 120);
+
+  Object.assign(window, {
+    crmR311ToggleListingDeal,
+    crmR311PatchListingRows: patchListingRows
+  });
+  console.info(`CRM v${VERSION} 매물 거래완료·재개 기능 적용`);
+})();

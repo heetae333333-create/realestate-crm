@@ -2016,3 +2016,28 @@ th.crm31023-sort-active{color:#1d4ed8;background:#eff6ff}
   min-width:104px;
   font-weight:800;
 }
+
+/* CRM v3.10.24R3.11 · 거래완료 매물 표시 및 FU 토글 */
+table.listing-table tbody tr.crm-r311-listing-complete > td {
+  background: #f0f1f3 !important;
+  color: #4b5563;
+}
+table.listing-table tbody tr.crm-r311-listing-complete:hover > td {
+  background: #e8eaed !important;
+}
+table.listing-table tbody tr.crm-r311-listing-complete strong,
+table.listing-table tbody tr.crm-r311-listing-complete .listing-title-cell,
+table.listing-table tbody tr.crm-r311-listing-complete .muted {
+  color: #5f6670 !important;
+}
+.crm-r311-listing-toggle-wrap {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  margin-top: 16px;
+  padding-top: 4px;
+}
+.crm-r311-listing-toggle {
+  min-width: 92px;
+  font-weight: 800;
+}
