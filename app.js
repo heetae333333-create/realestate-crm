@@ -9924,3 +9924,187 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   window.crm31022PatchCustomerMoveInColumn=patchCustomerMoveInColumn;
   console.info('CRM v3.10.22 고객 목록 입주희망일 표시 확정 적용');
 })();
+
+/* ===== CRM v3.10.23 최신 등록순 · 전 열 정렬 · 고객 등록일 · 최초 FU 자동기입 ===== */
+(function(){
+  const VERSION='3.10.23';
+  const tableStates=new WeakMap();
+  let scheduled=false;
+
+  const same=(a,b)=>String(a??'')===String(b??'');
+  const cleanHeader=s=>String(s||'').replace(/[↕↑↓]/g,'').trim();
+  const dateValue=v=>{
+    const s=String(v||'').trim();
+    if(!s||s==='-')return NaN;
+    const normalized=s.replace(/\./g,'-').replace(/\s+/g,' ').replace(/-(\s|$)/g,'$1');
+    const m=normalized.match(/(20\d{2})[-\s](\d{1,2})[-\s](\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?/);
+    if(m)return new Date(+m[1],+m[2]-1,+m[3],+(m[4]||0),+(m[5]||0)).getTime();
+    const t=Date.parse(s);return Number.isFinite(t)?t:NaN;
+  };
+  const numberValue=v=>{
+    const s=String(v||'').replace(/,/g,'');
+    const m=s.match(/-?\d+(?:\.\d+)?/);return m?Number(m[0]):NaN;
+  };
+  function compareVisible(a,b){
+    const av=(a||'').trim(), bv=(b||'').trim();
+    const ad=dateValue(av),bd=dateValue(bv);
+    if(Number.isFinite(ad)&&Number.isFinite(bd))return ad-bd;
+    const an=numberValue(av),bn=numberValue(bv);
+    if(Number.isFinite(an)&&Number.isFinite(bn)&&(/\d/.test(av)&&/\d/.test(bv)))return an-bn;
+    return av.localeCompare(bv,'ko',{numeric:true,sensitivity:'base'});
+  }
+  function entityIdFromRow(row,type){
+    const code=[...row.querySelectorAll('[onclick]')].map(el=>el.getAttribute('onclick')||'').join(' ');
+    const patterns=type==='customer'
+      ?[/openCustomerModal\(['"]([^'"]+)['"]\)/,/openFollowUpModal\(['"]customer['"],['"]([^'"]+)['"]\)/,/openCustomerFuHub\(['"]([^'"]+)['"]/]
+      :[/openListingModal\(['"]([^'"]+)['"]\)/,/openListingPhotos\(['"]([^'"]+)['"]\)/,/openFollowUpModal\(['"]listing['"],['"]([^'"]+)['"]\)/,/crm361OpenListingFu\(['"]([^'"]+)['"]\)/];
+    for(const re of patterns){const m=code.match(re);if(m)return m[1];}
+    return '';
+  }
+  function tableType(table){
+    if(table.closest('#customerTable'))return 'customer';
+    if(table.classList.contains('customer-table'))return 'customer';
+    if(table.classList.contains('listing-table')||table.closest('#myListingTable,#networkTable,#adminListingTable'))return 'listing';
+    return '';
+  }
+  function buildGroups(table,type){
+    const rows=[...table.tBodies[0]?.rows||[]];
+    if(type!=='listing')return rows.map((r,i)=>({rows:[r],main:r,original:i,id:entityIdFromRow(r,type)}));
+    const groups=[];let pending=[];
+    rows.forEach(r=>{
+      const isAddress=r.cells.length===1||[...r.cells].some(c=>Number(c.colSpan)>1);
+      if(isAddress){
+        if(pending.length)groups.push({rows:pending,main:pending[pending.length-1],original:groups.length,id:entityIdFromRow(pending[pending.length-1],type)});
+        pending=[r];
+      }else{
+        pending.push(r);
+        groups.push({rows:pending,main:r,original:groups.length,id:entityIdFromRow(r,type)});
+        pending=[];
+      }
+    });
+    if(pending.length)groups.push({rows:pending,main:pending[pending.length-1],original:groups.length,id:entityIdFromRow(pending[pending.length-1],type)});
+    return groups;
+  }
+  function createdAtFor(group,type){
+    const list=type==='customer'?(state.customers||[]):(state.listings||[]);
+    const row=list.find(x=>same(x.id,group.id));
+    return row?.created_at?new Date(row.created_at).getTime():0;
+  }
+  function updateSequence(groups,type){
+    groups.forEach((g,i)=>{
+      const row=g.main;
+      const headers=[...row.closest('table').querySelectorAll('thead th')].map(th=>cleanHeader(th.textContent));
+      const idx=headers.indexOf('순번');
+      if(idx>=0&&row.cells[idx])row.cells[idx].textContent=String(i+1);
+    });
+  }
+  function applyGroups(table,groups,type){
+    const frag=document.createDocumentFragment();
+    groups.forEach(g=>g.rows.forEach(r=>frag.appendChild(r)));
+    table.tBodies[0].appendChild(frag);updateSequence(groups,type);
+  }
+  function ensureNewestFirst(table,type){
+    if(type!=='listing')return;
+    const groups=buildGroups(table,type);
+    groups.sort((a,b)=>createdAtFor(b,type)-createdAtFor(a,type));
+    groups.forEach((g,i)=>g.original=i);
+    applyGroups(table,groups,type);
+    tableStates.set(table,{key:'__newest__',dir:'desc',groups:[...groups]});
+  }
+  function installSort(table,type){
+    const headers=[...table.querySelectorAll('thead th')];
+    if(!headers.length||!table.tBodies.length)return;
+    headers.forEach((th,index)=>{
+      const label=cleanHeader(th.textContent);
+      if(!label||label==='관리'||label==='선택')return;
+      th.classList.add('crm31023-sortable');
+      th.dataset.crm31023Label=label;
+      if(!th.querySelector('.crm31023-sort-icon'))th.insertAdjacentHTML('beforeend','<span class="crm31023-sort-icon">↕</span>');
+      if(th.dataset.crm31023Bound==='1')return;
+      th.dataset.crm31023Bound='1';
+      th.addEventListener('click',()=>{
+        const stateNow=tableStates.get(table)||{key:'',dir:'',groups:buildGroups(table,type)};
+        let dir='asc';
+        if(stateNow.key===label&&stateNow.dir==='asc')dir='desc';
+        else if(stateNow.key===label&&stateNow.dir==='desc')dir='original';
+        let groups=buildGroups(table,type);
+        groups.forEach((g,i)=>{if(g.original==null)g.original=i;});
+        if(dir==='original')groups.sort((a,b)=>{
+          if(type==='listing')return createdAtFor(b,type)-createdAtFor(a,type);
+          return a.original-b.original;
+        });
+        else groups.sort((a,b)=>{
+          const av=a.main.cells[index]?.innerText||'';
+          const bv=b.main.cells[index]?.innerText||'';
+          const c=compareVisible(av,bv);return dir==='asc'?c:-c;
+        });
+        applyGroups(table,groups,type);
+        headers.forEach(h=>{const icon=h.querySelector('.crm31023-sort-icon');if(icon)icon.textContent='↕';h.classList.remove('crm31023-sort-active');});
+        const icon=th.querySelector('.crm31023-sort-icon');if(icon)icon.textContent=dir==='asc'?'↑':dir==='desc'?'↓':'↕';
+        if(dir!=='original')th.classList.add('crm31023-sort-active');
+        tableStates.set(table,{key:label,dir,groups});
+      });
+    });
+  }
+  function addCustomerRegisteredAt(table){
+    if(tableType(table)!=='customer')return;
+    [...table.tBodies[0]?.rows||[]].forEach(row=>{
+      const id=entityIdFromRow(row,'customer');if(!id)return;
+      const c=(state.customers||[]).find(x=>same(x.id,id));if(!c?.created_at)return;
+      const actions=row.querySelector('.row-actions');if(!actions)return;
+      let stamp=actions.parentElement.querySelector('.crm31023-created-at');
+      if(!stamp){stamp=document.createElement('div');stamp.className='crm31023-created-at';actions.before(stamp);}
+      const d=new Date(c.created_at);
+      stamp.textContent=`등록 ${String(d.getFullYear()).slice(2)}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    });
+  }
+  function processTables(){
+    scheduled=false;
+    document.querySelectorAll('table').forEach(table=>{
+      const type=tableType(table);if(!type)return;
+      if(table.dataset.crm31023Init!=='1'){
+        table.dataset.crm31023Init='1';
+        ensureNewestFirst(table,type);
+      }
+      installSort(table,type);
+      addCustomerRegisteredAt(table);
+    });
+  }
+  function schedule(){if(scheduled)return;scheduled=true;requestAnimationFrame(processTables);}
+
+  // 신규 고객·매물 등록 시 최종 FU를 오늘 날짜로 자동 입력한다.
+  function installInsertPatch(){
+    if(!state?.client||state.client.__crm31023InsertPatch)return false;
+    const client=state.client;
+    const originalFrom=client.from.bind(client);
+    client.from=function(table){
+      const builder=originalFrom(table);
+      if((table==='customers'||table==='listings')&&builder&&typeof builder.insert==='function'&&!builder.__crm31023Insert){
+        const originalInsert=builder.insert.bind(builder);
+        builder.insert=function(values,options){
+          const todayValue=new Date().toISOString().slice(0,10);
+          const patch=row=>{
+            if(!row||typeof row!=='object')return row;
+            return row.last_follow_up_at?row:{...row,last_follow_up_at:todayValue};
+          };
+          return originalInsert(Array.isArray(values)?values.map(patch):patch(values),options);
+        };
+        builder.__crm31023Insert=true;
+      }
+      return builder;
+    };
+    client.__crm31023InsertPatch=true;return true;
+  }
+  if(!installInsertPatch()){
+    const timer=setInterval(()=>{if(installInsertPatch())clearInterval(timer)},100);
+    setTimeout(()=>clearInterval(timer),10000);
+  }
+
+  const observer=new MutationObserver(mutations=>{
+    if(mutations.some(m=>[...m.addedNodes].some(n=>n.nodeType===1&&(n.matches?.('table,tbody,tr')||n.querySelector?.('table')))))schedule();
+  });
+  observer.observe(document.body,{childList:true,subtree:true});
+  schedule();
+  window.crm31023ProcessTables=processTables;
+  console.info(`CRM v${VERSION} 최신 등록순·전 열 정렬·고객 등록일·최초 FU 자동기입 적용`);
+})();
