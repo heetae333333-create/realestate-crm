@@ -2228,3 +2228,11 @@ table.listing-table tbody tr.crm-r311-listing-complete .muted {
   justify-content:center;
   width:100%;
 }
+
+/* CRM v3.10.24R3.22 */
+#modal .modal-actions.crm-r318-listing-fu-actions{grid-template-columns:104px 170px 150px 74px 74px}
+#modal .modal-actions.crm-r318-listing-fu-actions .crm-r318-kakao,#modal .modal-actions.crm-r318-listing-fu-actions .crm-r322-image-brochure{width:100%;min-width:0;font-weight:800}
+#modal .modal-actions.crm-r318-listing-fu-actions .crm-r318-kakao{border-color:#86efac;background:#f0fdf4;color:#166534}
+#modal .modal-actions.crm-r318-listing-fu-actions .crm-r322-image-brochure{border-color:#bfdbfe;background:#eff6ff;color:#1d4ed8}
+.crm-r322-preview-dialog{width:min(920px,96vw);max-height:94vh;border:0;border-radius:18px;padding:0}.crm-r322-preview-dialog::backdrop{background:rgba(15,23,42,.62)}.crm-r322-preview-card{background:#fff;padding:18px}.crm-r322-preview-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px}.crm-r322-preview-head>div{display:grid;gap:3px}.crm-r322-preview-head strong{font-size:20px}.crm-r322-preview-head span{color:#64748b;font-size:13px}.crm-r322-preview-image{background:#eef2f6;border-radius:14px;padding:10px;max-height:72vh;overflow:auto;text-align:center}.crm-r322-preview-image canvas{display:block;width:min(100%,720px);height:auto;margin:0 auto;border-radius:10px;box-shadow:0 10px 34px rgba(15,23,42,.12)}.crm-r322-preview-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+@media(max-width:760px){#modal .modal-actions.crm-r318-listing-fu-actions{grid-template-columns:1fr 1fr}}

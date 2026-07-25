@@ -11389,18 +11389,25 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
     const kakao = document.createElement('button');
     kakao.type = 'button';
     kakao.className = 'ghost crm-r318-fu-only crm-r318-kakao';
-    kakao.innerHTML = '💬 카카오톡 소개 문구 복사';
+    kakao.innerHTML = '💬 카카오톡 소개문구';
     kakao.onclick = () => {
       const fn = window.crm3114CopyListingIntro || window.crm3107CopyListingIntro;
       if (typeof fn === 'function') fn(id);
     };
 
-    // footer를 실제로 4개 버튼만 남긴다.
+    const brochure = document.createElement('button');
+    brochure.type = 'button';
+    brochure.className = 'ghost crm-r318-fu-only crm-r322-image-brochure';
+    brochure.innerHTML = '🖼 이미지 소개서';
+    brochure.onclick = () => window.crmR322OpenImageBrochure?.(id);
+
+    // FU 기록 footer는 딱 5개 버튼만 유지한다.
     qa(':scope > button', actions).forEach(btn => {
       if (btn !== cancel && btn !== submit) btn.remove();
     });
     actions.insertBefore(toggle, cancel);
     actions.insertBefore(kakao, cancel);
+    actions.insertBefore(brochure, cancel);
   }
 
   function syncFooter(tab = activeTab()) {
@@ -11810,4 +11817,89 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   setTimeout(schedulePatch,120);
   window.crmR320PatchCustomerTable = patchCustomerTable;
   console.info(`CRM v${VERSION} 고객 목록 열/특징 배치 정리 적용`);
+})();
+
+/* =========================================================
+   CRM v3.10.24R3.22 · 전문 매물 소개서
+   ========================================================= */
+(() => {
+  const VERSION = '3.10.24R3.22';
+  const esc = v => escapeHtml(String(v ?? ''));
+  const clean = v => String(v ?? '').replace(/<br\s*\/?>/gi,' · ').replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim();
+
+  function brochureMoveIn(x){
+    const out=[];
+    if(x?.move_in_immediate) out.push('즉시입주');
+    else if(x?.move_in_period){
+      const m=String(x.move_in_period).match(/^(\d{4})-(\d{2})\s*(초순|중순|말)$/);
+      out.push(m?`${m[1]}년 ${Number(m[2])}월 ${m[3]}`:String(x.move_in_period));
+    } else if(x?.move_in_date) out.push(fmtDate(x.move_in_date));
+    if(x?.move_in_negotiable) out.push('협의 가능');
+    return out.length?out.join(' · '):'확인 필요';
+  }
+  function brochureAddress(x){
+    const base=String(x?.address||'').trim(), district=String(x?.district||'').trim();
+    let s=base||district||'-';
+    if(district&&base&&!base.includes(district)) s=`${district} ${base}`;
+    const extra=[];
+    if(x?.building_no && !s.includes(String(x.building_no))) extra.push(`${x.building_no}동`);
+    if(x?.unit_no && !s.includes(String(x.unit_no))) extra.push(`${x.unit_no}호`);
+    return [s,...extra].filter(Boolean).join(' ');
+  }
+  function brochureArea(x){
+    const n=Number(x?.area_m2||0);
+    return n?`${n.toLocaleString('ko-KR',{maximumFractionDigits:2})}㎡ · 약 ${(n/3.3058).toFixed(2)}평`:'-';
+  }
+  function brochurePrice(x){ return clean(listingPriceText(x))||'-'; }
+  async function brochurePhotos(x, limit=5){
+    try{
+      const {data,error}=await state.client.from('listing_photos').select('*').eq('listing_id',x.id).eq('is_customer_visible',true).order('sort_order').order('created_at');
+      if(error) throw error;
+      const arr=[...(data||[])];
+      const ci=arr.findIndex(p=>p.id===x.cover_photo_id);
+      if(ci>0) arr.unshift(arr.splice(ci,1)[0]);
+      const urls=[];
+      for(const p of arr.slice(0,limit)){ const u=await signedPhotoUrl(p.storage_path); if(u) urls.push(u); }
+      return urls;
+    }catch(e){ console.warn('brochure photo load failed',e); return []; }
+  }
+  const printCss=`*{box-sizing:border-box}body{margin:0;background:#eef2f6;color:#111827;font-family:Pretendard,'Noto Sans KR',Arial,sans-serif}.toolbar{position:sticky;top:0;z-index:5;display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;background:#fff;border-bottom:1px solid #dbe2ea}.toolbar button{border:1px solid #d5dce5;background:#fff;border-radius:10px;padding:10px 16px;font-weight:800;cursor:pointer}.toolbar .primary{background:#1d4ed8;color:#fff;border-color:#1d4ed8}.wrap{width:min(1040px,calc(100% - 32px));margin:24px auto 48px}.sheet{background:#fff;border-radius:22px;padding:34px;box-shadow:0 20px 60px rgba(15,23,42,.1);margin-bottom:24px;page-break-after:always}.sheet:last-child{page-break-after:auto}.topline{display:flex;justify-content:space-between;border-bottom:2px solid #111827;padding-bottom:10px;font-size:11px;font-weight:900;letter-spacing:.16em;color:#64748b}.head{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:end;padding:26px 0 22px}.ptype{display:inline-flex;background:#eaf1ff;color:#1d4ed8;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:900;margin-bottom:10px}.head h1{font-size:34px;line-height:1.15;margin:0 0 10px;letter-spacing:-.04em}.addr{margin:0;color:#475569;font-size:15px}.price{text-align:right;min-width:210px}.price small{display:block;color:#64748b;font-weight:800;margin-bottom:6px}.price strong{display:block;font-size:24px}.photos{display:grid;grid-template-columns:2fr 1fr 1fr;grid-template-rows:210px 210px;gap:8px;border-radius:16px;overflow:hidden;background:#e5e7eb}.photos img{width:100%;height:100%;object-fit:cover;display:block}.photos img:first-child{grid-row:1/3}.photos.count-1{grid-template-columns:1fr;grid-template-rows:430px}.photos.count-1 img:first-child{grid-row:auto}.photos.count-2{grid-template-columns:1fr 1fr;grid-template-rows:360px}.photos.count-2 img:first-child{grid-row:auto}.photos.count-3{grid-template-columns:2fr 1fr;grid-template-rows:210px 210px}.photos.count-3 img:nth-child(2),.photos.count-3 img:nth-child(3){grid-column:2}.no-photo{height:300px;border:1px dashed #cbd5e1;border-radius:16px;display:grid;place-items:center;background:#f8fafc;color:#94a3b8;font-weight:800}.facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:18px}.fact{border:1px solid #e2e8f0;border-radius:13px;padding:14px 15px}.fact span{display:block;color:#64748b;font-size:12px;font-weight:800;margin-bottom:6px}.fact strong{font-size:15px;line-height:1.35}.foot{display:flex;justify-content:space-between;gap:20px;margin-top:22px;padding-top:14px;border-top:1px solid #e2e8f0;color:#64748b;font-size:11px}.foot b{color:#334155;white-space:nowrap}@media(max-width:760px){.sheet{padding:22px}.head{grid-template-columns:1fr}.price{text-align:left}.facts{grid-template-columns:1fr 1fr}.photos{grid-template-columns:1fr 1fr;grid-template-rows:220px 160px}.photos img:first-child{grid-column:1/3;grid-row:auto}}@page{size:A4;margin:8mm}@media print{body{background:#fff}.toolbar{display:none!important}.wrap{width:100%;margin:0}.sheet{box-shadow:none;border-radius:0;margin:0;padding:8mm;min-height:277mm}.photos{grid-template-rows:62mm 62mm}.photos.count-1{grid-template-rows:126mm}.photos.count-2{grid-template-rows:105mm}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}`;
+  function card(x,urls,i){
+    const facts=[['매물유형',x.property_type||'-'],['방 / 욕실',`${listingRoomText(x)||'-'}개 / ${x.bathroom_count??'-'}개`],['전용면적',brochureArea(x)],['입주가능일',brochureMoveIn(x)]];
+    const photos=urls.length?`<div class="photos count-${urls.length}">${urls.map((u,j)=>`<img src="${u}" alt="${esc(x.title)} 사진 ${j+1}">`).join('')}</div>`:`<div class="no-photo">등록된 고객 공개 사진이 없습니다</div>`;
+    return `<section class="sheet"><div class="topline"><span>PROPERTY BRIEF</span><span>${String(i+1).padStart(2,'0')}</span></div><div class="head"><div><div class="ptype">${esc(x.property_type||'-')}</div><h1>${esc(x.title||'매물 소개')}</h1><p class="addr">${esc(brochureAddress(x))}</p></div><div class="price"><small>${esc(crm38DealTypeText(x)||x.transaction_type||'거래조건')}</small><strong>${esc(brochurePrice(x))}</strong></div></div>${photos}<div class="facts">${facts.map(([k,v])=>`<div class="fact"><span>${esc(k)}</span><strong>${esc(v)}</strong></div>`).join('')}</div><div class="foot"><span>매물 조건은 실시간으로 변경될 수 있으므로 계약·방문 전 재확인해 주세요.</span><b>${esc(state.profile?.office_name||state.profile?.full_name||'매물 안내')}</b></div></section>`;
+  }
+  async function openPrint(rows,title){
+    if(!rows?.length) return toast('소개서에 넣을 매물이 없습니다.');
+    const w=window.open('','_blank'); if(!w) return toast('팝업이 차단되었습니다. 이 사이트의 팝업을 허용해주세요.');
+    w.document.write('<div style="font-family:sans-serif;padding:30px">매물 사진과 소개서를 준비하고 있습니다...</div>');
+    const cards=[];
+    for(let i=0;i<rows.length;i++) cards.push(card(rows[i],await brochurePhotos(rows[i],5),i));
+    w.document.open(); w.document.write(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><style>${printCss}</style></head><body><div class="toolbar"><button onclick="window.close()">닫기</button><button class="primary" onclick="window.print()">인쇄 / PDF 저장</button></div><main class="wrap">${cards.join('')}</main></body></html>`); w.document.close();
+  }
+  function loadImage(url){ return new Promise((resolve,reject)=>{ const img=new Image(); img.crossOrigin='anonymous'; img.onload=()=>resolve(img); img.onerror=reject; img.src=url; }); }
+  function cover(ctx,img,x,y,w,h){ const ir=img.naturalWidth/img.naturalHeight,tr=w/h; let sx=0,sy=0,sw=img.naturalWidth,sh=img.naturalHeight; if(ir>tr){sw=sh*tr;sx=(img.naturalWidth-sw)/2}else{sh=sw/tr;sy=(img.naturalHeight-sh)/2} ctx.drawImage(img,sx,sy,sw,sh,x,y,w,h); }
+  async function imageCanvas(x,urls){
+    const c=document.createElement('canvas'); c.width=1200;c.height=1500; const ctx=c.getContext('2d');
+    ctx.fillStyle='#f8fafc';ctx.fillRect(0,0,1200,1500);ctx.fillStyle='#fff';ctx.fillRect(54,54,1092,1392);
+    ctx.fillStyle='#64748b';ctx.font='800 22px sans-serif';ctx.fillText('PROPERTY BRIEF',90,110);ctx.fillStyle='#111827';ctx.fillRect(90,132,1020,3);
+    ctx.fillStyle='#1d4ed8';ctx.font='800 24px sans-serif';ctx.fillText(String(x.property_type||'-'),90,190);ctx.fillStyle='#111827';ctx.font='900 54px sans-serif';ctx.fillText(String(x.title||'매물 소개').slice(0,22),90,258);ctx.fillStyle='#475569';ctx.font='500 24px sans-serif';ctx.fillText(brochureAddress(x).slice(0,48),90,302);ctx.textAlign='right';ctx.fillStyle='#111827';ctx.font='900 34px sans-serif';ctx.fillText(brochurePrice(x).slice(0,28),1110,238);ctx.textAlign='left';
+    const imgs=[]; for(const u of urls.slice(0,3)){try{imgs.push(await loadImage(u))}catch(_){}}
+    const px=90,py=350,pw=1020,ph=650,g=10;ctx.fillStyle='#e5e7eb';ctx.fillRect(px,py,pw,ph);
+    if(imgs.length===1) cover(ctx,imgs[0],px,py,pw,ph); else if(imgs.length){ const lw=650,rw=pw-lw-g,hh=(ph-g)/2; cover(ctx,imgs[0],px,py,lw,ph); cover(ctx,imgs[1]||imgs[0],px+lw+g,py,rw,hh); cover(ctx,imgs[2]||imgs[1]||imgs[0],px+lw+g,py+hh+g,rw,hh); }
+    const facts=[['매물유형',x.property_type||'-'],['방 / 욕실',`${listingRoomText(x)||'-'}개 / ${x.bathroom_count??'-'}개`],['전용면적',brochureArea(x)],['입주가능일',brochureMoveIn(x)]];
+    const fy=1035,fw=247;facts.forEach(([k,v],i)=>{const xx=90+i*257;ctx.fillStyle='#f8fafc';ctx.fillRect(xx,fy,fw,135);ctx.fillStyle='#64748b';ctx.font='800 18px sans-serif';ctx.fillText(k,xx+16,fy+36);ctx.fillStyle='#111827';ctx.font='900 23px sans-serif';ctx.fillText(String(v).slice(0,20),xx+16,fy+82);});
+    ctx.fillStyle='#64748b';ctx.font='500 17px sans-serif';ctx.fillText('매물 조건은 실시간으로 변경될 수 있으므로 계약·방문 전 재확인해 주세요.',90,1378);ctx.textAlign='right';ctx.fillStyle='#334155';ctx.font='800 18px sans-serif';ctx.fillText(state.profile?.office_name||state.profile?.full_name||'매물 안내',1110,1378);ctx.textAlign='left';
+    return c;
+  }
+  async function crmR322OpenImageBrochure(id){
+    const x=(state.listings||[]).find(v=>String(v.id)===String(id)); if(!x) return toast('매물 정보를 찾을 수 없습니다.');
+    const urls=await brochurePhotos(x,5), canvas=await imageCanvas(x,urls);
+    const d=document.createElement('dialog');d.className='crm-r322-preview-dialog';d.innerHTML=`<div class="crm-r322-preview-card"><div class="crm-r322-preview-head"><div><strong>이미지 소개서</strong><span>${esc(x.title)}</span></div><button type="button" class="icon-btn" data-close>×</button></div><div class="crm-r322-preview-image"></div><div class="crm-r322-preview-actions"><button type="button" class="ghost" data-print>인쇄 / PDF</button><button type="button" class="primary" data-save>PNG 이미지 저장</button></div></div>`;
+    d.querySelector('.crm-r322-preview-image').appendChild(canvas);document.body.appendChild(d);const close=()=>{d.close();setTimeout(()=>d.remove(),0)};d.querySelector('[data-close]').onclick=close;d.addEventListener('cancel',e=>{e.preventDefault();close()});d.querySelector('[data-print]').onclick=()=>openPrint([x],`${x.title||'매물'} 소개서`);d.querySelector('[data-save]').onclick=()=>canvas.toBlob(blob=>{if(!blob)return toast('이미지 생성에 실패했습니다.');const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${String(x.title||'매물소개서').replace(/[\/:*?"<>|]/g,'_')}_소개서.png`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500)},'image/png',.95);d.showModal();
+  }
+  window.printSelectedListingBrochure=async function(customerId){ const c=(state.customers||[]).find(v=>String(v.id)===String(customerId));const rows=(state.listings||[]).filter(x=>state.matchSelection.has(x.id));if(!rows.length)return toast('소개서에 넣을 매물을 선택하세요.');return openPrint(rows,c?.name?`${c.name} 고객님 추천 매물`:'추천 매물 소개서'); };
+  try{ printSelectedListingBrochure=window.printSelectedListingBrochure; }catch(_){}
+  Object.assign(window,{crmR322OpenImageBrochure});
+  console.info(`CRM v${VERSION} 전문 매물 소개서 적용`);
 })();
