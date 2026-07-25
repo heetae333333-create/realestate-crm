@@ -2127,3 +2127,42 @@ table.listing-table tbody tr.crm-r311-listing-complete .muted {
     min-width:0;
   }
 }
+
+/* ===== CRM v3.10.24R3.18 · 매물 FU 탭별 footer ===== */
+#modal .modal-actions.crm-r318-listing-fu-actions{
+  display:grid;
+  grid-template-columns:110px minmax(220px,1fr) 74px 74px;
+  align-items:stretch;
+  gap:10px;
+  width:100%;
+  margin-top:18px;
+}
+#modal .modal-actions.crm-r318-listing-fu-actions > button{
+  min-height:46px;
+  height:46px;
+  margin:0;
+  padding:0 14px;
+  border-radius:11px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  white-space:nowrap;
+  line-height:1.2;
+}
+#modal .modal-actions.crm-r318-listing-fu-actions .crm-r318-deal-toggle{
+  width:110px;
+  font-weight:800;
+}
+#modal .modal-actions.crm-r318-listing-fu-actions .crm-r318-kakao{
+  width:100%;
+  min-width:0;
+  font-weight:800;
+}
+@media(max-width:680px){
+  #modal .modal-actions.crm-r318-listing-fu-actions{
+    grid-template-columns:1fr 1fr;
+  }
+  #modal .modal-actions.crm-r318-listing-fu-actions .crm-r318-deal-toggle{
+    width:100%;
+  }
+}

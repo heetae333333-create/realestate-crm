@@ -11305,3 +11305,169 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   window.crmR317CleanListingFuActions = cleanListingFuActions;
   console.info(`CRM v${VERSION} 매물 FU 액션 정리 적용`);
 })();
+
+/* =========================================================
+   CRM v3.10.24R3.18 · 매물 FU 탭별 하단 액션 완전 분리
+   - FU 기록: 거래완료/재개 · 카카오톡 소개 문구 복사 · 취소 · 저장 각 1개
+   - 예정 FU / 가격 이력: 공용 하단 액션 숨김
+   - FU에서 생성된 버튼이 다른 모달(계약 진행/상세 수정)로 새지 않도록 정리
+   ========================================================= */
+(() => {
+  const VERSION = '3.10.24R3.18';
+  const q = (s, r = document) => r.querySelector(s);
+  const qa = (s, r = document) => Array.from(r.querySelectorAll(s));
+  const modal = q('#modal');
+  const actions = q('#modalForm .modal-actions');
+  if (!modal || !actions) return;
+
+  function listingFuOpen() {
+    const title = (q('#modalTitle')?.textContent || '').trim();
+    return modal.open && /FU 관리/.test(title) && !/고객 FU 관리/.test(title);
+  }
+
+  function activeTab() {
+    return q('#modalBody .crm361-fu-tab.active')?.dataset.tab || 'record';
+  }
+
+  function listingId() {
+    return q('#crm361ListingId')?.value || '';
+  }
+
+  function isComplete(id) {
+    const row = (state.listings || []).find(x => String(x.id) === String(id));
+    const s = String(row?.status || '').trim();
+    return s === 'complete' || s === '거래완료' || s === '거래 완료';
+  }
+
+  function baseButtons() {
+    const submit = q('#modalSubmit', actions);
+    const cancel = qa('button', actions).find(btn => btn !== submit && (btn.getAttribute('value') === 'cancel' || (btn.textContent || '').trim() === '취소'));
+    return { submit, cancel };
+  }
+
+  function removeFuInjectedButtons() {
+    // 과거 버전이 body/footer에 남긴 거래완료 버튼/래퍼를 전부 제거한다.
+    qa('#modal .crm-r311-listing-toggle-wrap').forEach(el => el.remove());
+    qa('#modal .crm-r311-listing-toggle').forEach(el => el.remove());
+    qa('#modal .crm-r318-fu-only').forEach(el => el.remove());
+
+    // 공용 footer에 들어간 카카오톡 버튼은 FU에서 매번 새로 1개만 만든다.
+    qa('#modal .modal-actions .crm3107-kakao-copy, #modal .modal-actions .crm3114-kakao-copy').forEach(el => el.remove());
+
+    // R3.17이 붙인 레이아웃/개별 버튼 클래스도 초기화한다.
+    actions.classList.remove('crm-r317-listing-fu-actions', 'crm-r318-listing-fu-actions');
+    qa('.crm-r317-deal-toggle,.crm-r317-kakao,.crm-r317-cancel,.crm-r317-save', actions).forEach(el => {
+      el.classList.remove('crm-r317-deal-toggle','crm-r317-kakao','crm-r317-cancel','crm-r317-save');
+    });
+  }
+
+  function restoreSharedFooter() {
+    removeFuInjectedButtons();
+    actions.style.display = '';
+    const { submit, cancel } = baseButtons();
+    if (cancel) cancel.style.display = '';
+    if (submit) submit.style.display = '';
+  }
+
+  function buildRecordFooter(id) {
+    removeFuInjectedButtons();
+    const { submit, cancel } = baseButtons();
+    if (!submit || !cancel) return;
+
+    actions.style.display = '';
+    actions.classList.add('crm-r318-listing-fu-actions');
+    cancel.style.display = '';
+    submit.style.display = '';
+    submit.textContent = '저장';
+
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = `${isComplete(id) ? 'success' : 'danger'} crm-r318-fu-only crm-r318-deal-toggle`;
+    toggle.textContent = isComplete(id) ? '거래재개' : '거래완료';
+    toggle.onclick = () => window.crmR311ToggleListingDeal?.(id);
+
+    const kakao = document.createElement('button');
+    kakao.type = 'button';
+    kakao.className = 'ghost crm-r318-fu-only crm-r318-kakao';
+    kakao.innerHTML = '💬 카카오톡 소개 문구 복사';
+    kakao.onclick = () => {
+      const fn = window.crm3114CopyListingIntro || window.crm3107CopyListingIntro;
+      if (typeof fn === 'function') fn(id);
+    };
+
+    // footer를 실제로 4개 버튼만 남긴다.
+    qa(':scope > button', actions).forEach(btn => {
+      if (btn !== cancel && btn !== submit) btn.remove();
+    });
+    actions.insertBefore(toggle, cancel);
+    actions.insertBefore(kakao, cancel);
+  }
+
+  function syncFooter(tab = activeTab()) {
+    if (!listingFuOpen()) return;
+    const id = listingId();
+
+    if (tab === 'record') {
+      buildRecordFooter(id);
+      return;
+    }
+
+    // 예정 FU / 가격 이력은 카드 내부 기능만 사용하고 공용 하단 버튼은 전부 숨긴다.
+    removeFuInjectedButtons();
+    actions.style.display = 'none';
+  }
+
+  // 탭 클릭 시 기존 로직을 먼저 실행한 뒤 footer 상태를 탭에 맞게 확정한다.
+  const baseSetTab = window.crm361SetFuTab || globalThis.crm361SetFuTab;
+  if (typeof baseSetTab === 'function' && !baseSetTab.__crmR318Footer) {
+    const wrappedSetTab = function(tab, ...args) {
+      const result = baseSetTab.call(this, tab, ...args);
+      syncFooter(tab);
+      return result;
+    };
+    wrappedSetTab.__crmR318Footer = true;
+    window.crm361SetFuTab = wrappedSetTab;
+    try { crm361SetFuTab = wrappedSetTab; } catch (_) {}
+  }
+
+  // FU 최초 오픈이 끝난 시점에 과거 래퍼가 만든 중복 버튼을 마지막으로 정리한다.
+  const baseOpen = window.crm361OpenListingFu || globalThis.crm361OpenListingFu;
+  if (typeof baseOpen === 'function' && !baseOpen.__crmR318Footer) {
+    const wrappedOpen = async function(id, ...args) {
+      const result = await baseOpen.call(this, id, ...args);
+      syncFooter(activeTab());
+      return result;
+    };
+    wrappedOpen.__crmR318Footer = true;
+    window.crm361OpenListingFu = wrappedOpen;
+    try { crm361OpenListingFu = wrappedOpen; } catch (_) {}
+  }
+
+  // 최종 FU 진입점이 반드시 위의 정리된 함수를 사용하도록 한다.
+  const baseFollow = window.openFollowUpModal || globalThis.openFollowUpModal;
+  if (typeof baseFollow === 'function' && !baseFollow.__crmR318Footer) {
+    const wrappedFollow = function(entityType, id, ...args) {
+      if (entityType === 'listing') return window.crm361OpenListingFu(id, ...args);
+      return baseFollow.call(this, entityType, id, ...args);
+    };
+    wrappedFollow.__crmR318Footer = true;
+    window.openFollowUpModal = wrappedFollow;
+    try { openFollowUpModal = wrappedFollow; } catch (_) {}
+  }
+
+  // FU 닫힌 뒤 공유 footer에 FU 전용 버튼이 남아서 계약/상세 모달로 넘어가는 현상을 차단한다.
+  modal.addEventListener('close', restoreSharedFooter);
+  modal.addEventListener('cancel', () => setTimeout(restoreSharedFooter, 0));
+
+  // 모달 제목이 다른 화면으로 바뀌는 경우에도 FU 전용 버튼을 즉시 제거한다.
+  const title = q('#modalTitle');
+  if (title) {
+    new MutationObserver(() => {
+      const text = (title.textContent || '').trim();
+      if (!/FU 관리/.test(text) || /고객 FU 관리/.test(text)) restoreSharedFooter();
+    }).observe(title, { childList: true, subtree: true, characterData: true });
+  }
+
+  window.crmR318SyncListingFuFooter = syncFooter;
+  console.info(`CRM v${VERSION} 매물 FU 탭별 하단 액션 완전 분리 적용`);
+})();
