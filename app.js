@@ -10109,321 +10109,168 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   console.info(`CRM v${VERSION} 최신 등록순·전 열 정렬·고객 등록일·최초 FU 자동기입 적용`);
 })();
 
-/* ===== CRM v3.10.24R · v3.10.23 기반 매물 입력 UI 재배치 ===== */
+/* ===== CRM v3.10.24R3.4 · 단일 매물 입력 레이아웃 ===== */
 (()=>{
-  const VERSION='3.10.24R3';
-  const q=(s,r=document)=>r.querySelector(s);
+  const VERSION='3.10.24R3.4';
+  const $q=(s,r=document)=>r.querySelector(s);
 
-  function directChild(node,root){
+  function topChild(node,root){
     if(!node||!root)return null;
-    let current=node;
-    while(current&&current.parentElement!==root)current=current.parentElement;
-    return current&&current.parentElement===root?current:null;
+    let cur=node;
+    while(cur&&cur.parentElement!==root)cur=cur.parentElement;
+    return cur&&cur.parentElement===root?cur:null;
   }
-  function fieldBlock(root,name){
-    const input=q(`[name="${name}"]`,root);
-    return input?directChild(input,root):null;
+  function field(root,name){
+    const el=$q(`[name="${name}"]`,root);
+    return el?topChild(el,root):null;
   }
-  function extractDistrict(address){
-    const tokens=String(address||'').replace(/[,()]/g,' ').replace(/\s+/g,' ').trim().split(' ').filter(Boolean);
-    if(!tokens.length)return '';
-    const guIndex=tokens.findIndex(t=>/(구|군)$/.test(t));
-    if(guIndex>=0){
-      const dong=tokens.slice(guIndex+1).find(t=>/(동|읍|면|가)$/.test(t));
-      return dong?`${tokens[guIndex]} ${dong}`:tokens[guIndex];
+  function extractRegion(address){
+    const words=String(address||'').replace(/[(),]/g,' ').replace(/\s+/g,' ').trim().split(' ').filter(Boolean);
+    const gi=words.findIndex(v=>/(구|군)$/.test(v));
+    if(gi>=0){
+      const dong=words.slice(gi+1).find(v=>/(동|읍|면|가)$/.test(v));
+      return dong?`${words[gi]} ${dong}`:words[gi];
     }
-    const cityIndex=tokens.findIndex(t=>/(시)$/.test(t)&&!/^서울|부산|대구|인천|광주|대전|울산|세종/.test(t));
-    if(cityIndex>=0){
-      const dong=tokens.slice(cityIndex+1).find(t=>/(동|읍|면|가)$/.test(t));
-      return dong?`${tokens[cityIndex]} ${dong}`:tokens[cityIndex];
+    const si=words.findIndex(v=>/시$/.test(v));
+    if(si>=0){
+      const dong=words.slice(si+1).find(v=>/(동|읍|면|가)$/.test(v));
+      return dong?`${words[si]} ${dong}`:words[si];
     }
-    const dong=tokens.find(t=>/(동|읍|면|가)$/.test(t));
-    return dong||'';
+    return words.find(v=>/(동|읍|면|가)$/.test(v))||'';
   }
-  function makeCard(className,title,help){
-    const card=document.createElement('section');
-    card.className=`crm31024r-card span-2 ${className}`;
-    card.innerHTML=`<div class="crm31024r-card-head"><strong>${title}</strong>${help?`<span>${help}</span>`:''}</div><div class="crm31024r-card-grid"></div>`;
-    return card;
+  function makeSection(cls,title,help=''){
+    const el=document.createElement('section');
+    el.className=`crm31024r34-section span-2 ${cls}`;
+    el.innerHTML=`<div class="crm31024r34-head"><strong>${title}</strong>${help?`<span>${help}</span>`:''}</div><div class="crm31024r34-grid"></div>`;
+    return el;
   }
-  function setDistrictAutomation(body){
-    const address=q('[name="address"]',body),district=q('[name="district"]',body);
+  function append(grid,node,cls=''){
+    if(!node)return;
+    if(cls)node.classList.add(cls);
+    grid.appendChild(node);
+  }
+  function syncDistrict(body){
+    const address=$q('[name="address"]',body), district=$q('[name="district"]',body);
     if(!address||!district)return;
-    district.readOnly=true;
-    district.setAttribute('aria-readonly','true');
-    district.tabIndex=-1;
-    district.classList.add('crm31024r-readonly');
-    district.placeholder='주소에서 자동 입력';
-    const sync=()=>{
-      const next=extractDistrict(address.value);
-      if(next&&district.value!==next){
-        district.value=next;
-        district.dispatchEvent(new Event('change',{bubbles:true}));
-      }
+    district.readOnly=true; district.tabIndex=-1; district.classList.add('crm31024r34-readonly');
+    const update=()=>{
+      const next=extractRegion(address.value);
+      if(next!==district.value){district.value=next;district.dispatchEvent(new Event('change',{bubbles:true}));}
     };
-    if(address.dataset.crm31024rDistrict!=='1'){
-      address.dataset.crm31024rDistrict='1';
-      ['input','change','blur'].forEach(type=>address.addEventListener(type,sync));
+    if(address.dataset.crmR34Region!=='1'){
+      address.dataset.crmR34Region='1';
+      ['input','change','blur'].forEach(ev=>address.addEventListener(ev,update));
     }
-    sync();
-    const modal=q('#modal');
+    update();
+    const modal=$q('#modal');
     if(modal){
-      clearInterval(modal.__crm31024rDistrictTimer);
-      let previous=address.value;
-      modal.__crm31024rDistrictTimer=setInterval(()=>{
-        if(!modal.open){clearInterval(modal.__crm31024rDistrictTimer);return;}
-        if(address.value!==previous){previous=address.value;sync();}
-      },350);
-      if(modal.dataset.crm31024rCloseBound!=='1'){
-        modal.dataset.crm31024rCloseBound='1';
-        modal.addEventListener('close',()=>clearInterval(modal.__crm31024rDistrictTimer));
-      }
+      clearInterval(modal.__crmR34RegionTimer);
+      let prev=address.value;
+      modal.__crmR34RegionTimer=setInterval(()=>{
+        if(!modal.open){clearInterval(modal.__crmR34RegionTimer);return;}
+        if(address.value!==prev){prev=address.value;update();}
+      },300);
     }
   }
-  function moveUnique(grid,node){
-    if(node&&!grid.contains(node))grid.appendChild(node);
-  }
-  function arrangeListingForm(){
-    const body=q('#modalBody');
-    const root=q('#modalBody .form-grid');
-    const title=q('#modalTitle')?.textContent||'';
-    if(!body||!root||!/^매물 (등록|수정)/.test(title))return false;
+  function arrange(){
+    const body=$q('#modalBody'), root=$q('#modalBody .form-grid');
+    if(!body||!root||!/^매물 (등록|수정)/.test($q('#modalTitle')?.textContent||''))return false;
+    if(root.dataset.crmR34Done==='1')return true;
+    root.dataset.crmR34Done='1';
+    root.classList.add('crm31024r34-form');
 
-    root.classList.add('crm31024r-listing-form');
-    let topRow=q(':scope > .crm31024r-top-row',root);
-    let addressCard=q(':scope > .crm31024r-address-card',root);
-    let propertyCard=q(':scope > .crm31024r-property-card',root);
-    let detailCard=q(':scope > .crm31024r-detail-card',root);
-    if(!topRow){
-      topRow=document.createElement('section');
-      topRow.className='crm31024r-top-row span-2';
-      topRow.innerHTML='<div class="crm31024r-title-slot"></div><div class="crm31024r-contact-slot"></div>';
+    const titleBlock=field(root,'title');
+    const toolbar=$q('.crm386-contact-toolbar',body);
+    const contacts=$q('#crm38ExtraContacts',body);
+
+    const top=document.createElement('section');
+    top.className='crm31024r34-top span-2';
+    top.innerHTML='<div class="crm31024r34-title-line"></div><div class="crm31024r34-contact-list"></div>';
+    const titleLine=$q('.crm31024r34-title-line',top);
+    append(titleLine,titleBlock,'crm31024r34-title-field');
+    if(toolbar){
+      toolbar.className='crm31024r34-contact-toolbar';
+      const add=toolbar.querySelector('button');
+      toolbar.innerHTML='<strong>연락처</strong>';
+      if(add){add.className='ghost crm31024r34-add-contact';toolbar.appendChild(add);}
+      titleLine.appendChild(toolbar);
     }
-    if(!addressCard){addressCard=makeCard('crm31024r-address-card','주소 및 공개 설정','지역은 지번 주소에서 구·동을 자동 추출합니다.');}
-    if(!propertyCard){propertyCard=makeCard('crm31024r-property-card','매물 기본 정보','매물 유형과 전용면적을 입력하세요.');}
-    if(!detailCard){detailCard=makeCard('crm31024r-detail-card','상세 조건 및 사진','기존 입력 기능은 그대로 유지됩니다.');}
+    if(contacts){contacts.className='crm31024r34-contact-list-inner';$q('.crm31024r34-contact-list',top).appendChild(contacts);}
+    root.prepend(top);
 
-    const titleBlock=fieldBlock(root,'title');
-    const extra=q('#crm38ExtraContacts',body);
-    const toolbar=q('.crm386-contact-toolbar',body);
-    const titleSlot=q('.crm31024r-title-slot',topRow);
-    const contactSlot=q('.crm31024r-contact-slot',topRow);
-    if(titleBlock&&titleBlock.parentElement!==titleSlot)titleSlot.appendChild(titleBlock);
-    if(toolbar){ toolbar.classList.add('crm31024r-contact-toolbar'); if(toolbar.parentElement!==contactSlot)contactSlot.appendChild(toolbar); }
-    if(extra){ extra.classList.add('crm31024r-contact-list'); if(extra.parentElement!==contactSlot)contactSlot.appendChild(extra); }
-    if(!topRow.isConnected)root.prepend(topRow);
+    const address=makeSection('crm31024r34-address','주소 및 공개 설정','주소에서 구·동을 자동으로 추출합니다.');
+    const ag=$q('.crm31024r34-grid',address);
+    const addressRow=$q('.crm3852-address-row',root);
+    if(addressRow)append(ag,addressRow,'crm31024r34-wide');
+    else ['address','building_no','unit_no'].forEach(n=>append(ag,field(root,n)));
+    ['district','status','is_public'].forEach(n=>append(ag,field(root,n)));
+    top.after(address);
 
-    if(!addressCard.isConnected){topRow.after(addressCard);}
+    const deal=$q('.crm38-deal-section',root);
+    if(deal){deal.classList.add('crm31024r34-deal');address.after(deal);}
 
-    const deal=q(':scope > .crm38-deal-section',root)||q('.crm38-deal-section',root);
-    if(deal){
-      deal.classList.add('crm31024r-deal-card');
-      addressCard.after(deal);
-      deal.after(propertyCard);
-    }else{
-      addressCard.after(propertyCard);
+    const basic=makeSection('crm31024r34-basic','매물 기본 정보','매물 유형과 전용면적');
+    const bg=$q('.crm31024r34-grid',basic);
+    ['property_type','area_m2'].forEach(n=>append(bg,field(root,n)));
+    (deal||address).after(basic);
+
+    const detail=makeSection('crm31024r34-detail','상세 조건 및 사진');
+    const dg=$q('.crm31024r34-grid',detail);
+    basic.after(detail);
+
+    // 첫 줄: 방 / 화장실 / 관리비
+    append(dg,field(root,'room_count'),'crm31024r34-third');
+    append(dg,field(root,'bathroom_count'),'crm31024r34-third');
+    append(dg,field(root,'management_fee'),'crm31024r34-third');
+
+    // 층수·연식은 기존 기능 카드 그대로 유지
+    const building=$q('.crm3109-building-card',root);
+    if(building)append(dg,building,'crm31024r34-wide');
+    else ['current_floor','total_floors','built_year'].forEach(n=>append(dg,field(root,n)));
+
+    // 입주조건은 박스 테두리 없이 한 줄 전체 폭
+    const move=$q('.crm382-movein-box',root);
+    if(move){move.classList.add('crm31024r34-movein');append(dg,move,'crm31024r34-wide');}
+    else{
+      append(dg,field(root,'move_in_date'),'crm31024r34-wide');
+      append(dg,field(root,'move_in_immediate'));
+      append(dg,field(root,'move_in_negotiable'));
     }
-    propertyCard.after(detailCard);
 
-    const addressGrid=q('.crm31024r-card-grid',addressCard);
-    const propertyGrid=q('.crm31024r-card-grid',propertyCard);
-    const detailGrid=q('.crm31024r-card-grid',detailCard);
+    // 옵션 / 대출 / 최종확인일 한 줄
+    append(dg,field(root,'options'),'crm31024r34-option');
+    append(dg,field(root,'loan_available'),'crm31024r34-loan');
+    append(dg,field(root,'last_confirmed_at'),'crm31024r34-confirm');
 
-    const customAddress=q('.crm3852-address-row',root);
-    if(customAddress)moveUnique(addressGrid,customAddress);
-    else ['address','building_no','unit_no'].forEach(n=>moveUnique(addressGrid,fieldBlock(root,n)));
-    ['district','status','is_public'].forEach(n=>moveUnique(addressGrid,fieldBlock(root,n)));
-    ['property_type','area_m2'].forEach(n=>moveUnique(propertyGrid,fieldBlock(root,n)));
+    // 나머지 기존 필드는 모두 보존
+    ['official_price','next_confirm_at','next_follow_up_at','pet_allowed'].forEach(n=>append(dg,field(root,n)));
+    const feature=$q('.crm361-form-section',root); if(feature)append(dg,feature,'crm31024r34-wide');
+    append(dg,field(root,'listing_photo_files'),'crm31024r34-wide');
+    append(dg,field(root,'description'),'crm31024r34-wide');
 
-    const protectedNodes=new Set([
-      topRow,addressCard,propertyCard,detailCard,deal
-    ].filter(Boolean));
+    // 위에서 명시하지 못한 기존 입력 요소도 빠짐없이 마지막에 보존
+    const protectedSet=new Set([top,address,deal,basic,detail].filter(Boolean));
     [...root.children].forEach(node=>{
-      if(protectedNodes.has(node))return;
+      if(protectedSet.has(node))return;
       if(node.id==='crm390DetailTools'||node.classList.contains('crm390-detail-tools'))return;
-      detailGrid.appendChild(node);
+      append(dg,node,node.classList.contains('span-2')?'crm31024r34-wide':'');
     });
 
-    // 세부 영역 안에서 기존 필드 순서를 유지하되, 사진과 비밀메모는 항상 마지막에 둡니다.
-    const photo=fieldBlock(detailGrid,'listing_photo_files')||q('#listingPhotoFiles',detailGrid)?.closest('label');
-    const description=fieldBlock(detailGrid,'description');
-    if(photo)detailGrid.appendChild(photo);
-    if(description)detailGrid.appendChild(description);
-
-    setDistrictAutomation(body);
-    root.dataset.crm31024r='1';
+    // 연락처가 없을 때 안내는 간단한 한 줄만 유지
+    const empty=contacts?.querySelector('.crm386-contact-empty');
+    if(empty)empty.textContent='등록된 연락처가 없습니다. 위의 + 번호 추가를 눌러주세요.';
+    syncDistrict(body);
     return true;
   }
 
   const base=window.openListingModal||openListingModal;
-  window.openListingModal=function(id){
+  const wrapped=function(){
     const result=base.apply(this,arguments);
-    [0,40,100,220,450,900,1500].forEach(ms=>setTimeout(arrangeListingForm,ms));
+    [0,30,80,160,320].forEach(ms=>setTimeout(arrange,ms));
     return result;
   };
-  openListingModal=window.openListingModal;
-
-  const observer=new MutationObserver(()=>{
-    if(q('#modal')?.open&&/^매물 (등록|수정)/.test(q('#modalTitle')?.textContent||''))requestAnimationFrame(arrangeListingForm);
-  });
-  observer.observe(document.body,{childList:true,subtree:true});
-  Object.assign(window,{openListingModal,crm31024rArrangeListingForm:arrangeListingForm});
-  console.info(`CRM v${VERSION} 매물 입력 UI 재배치 적용`);
-})();
-
-/* ===== CRM v3.10.24R3.2 · R3 직접 수정 보정 ===== */
-(()=>{
-  const q=(s,r=document)=>r.querySelector(s);
-  function directChild(node,root){
-    if(!node||!root)return null;
-    let cur=node;
-    while(cur&&cur.parentElement!==root)cur=cur.parentElement;
-    return cur&&cur.parentElement===root?cur:null;
-  }
-  function fieldBlock(root,name){
-    const input=q(`[name="${name}"]`,root);
-    return input?directChild(input,root):null;
-  }
-  function applyR32(){
-    const modal=q('#modal'),body=q('#modalBody'),root=q('#modalBody .crm31024r-listing-form');
-    const title=q('#modalTitle')?.textContent||'';
-    if(!modal?.open||!body||!root||!/^매물 (등록|수정)/.test(title))return false;
-    if(typeof window.crm31024rArrangeListingForm==='function')window.crm31024rArrangeListingForm();
-
-    const top=q('.crm31024r-top-row',root);
-    const contactSlot=q('.crm31024r-contact-slot',top||root);
-    const toolbar=q('.crm386-contact-toolbar',body);
-    const contacts=q('#crm38ExtraContacts',body);
-    if(contactSlot){
-      if(toolbar&&toolbar.parentElement!==contactSlot)contactSlot.appendChild(toolbar);
-      if(contacts&&contacts.parentElement!==contactSlot)contactSlot.appendChild(contacts);
-    }
-
-    const detailGrid=q('.crm31024r-detail-card .crm31024r-card-grid',root);
-    if(detailGrid){
-      let row=q(':scope > .crm31024r32-loan-confirm-row',detailGrid);
-      const loan=fieldBlock(detailGrid,'loan_available');
-      const last=fieldBlock(detailGrid,'last_confirmed_at');
-      if(loan||last){
-        if(!row){row=document.createElement('div');row.className='crm31024r32-loan-confirm-row span-2';}
-        if(loan&&loan.parentElement!==row)row.appendChild(loan);
-        if(last&&last.parentElement!==row)row.appendChild(last);
-        if(!row.isConnected)detailGrid.appendChild(row);
-      }
-    }
-    root.dataset.crm31024r32='1';
-    return true;
-  }
-  const prior=window.openListingModal||openListingModal;
-  window.openListingModal=function(){
-    const result=prior.apply(this,arguments);
-    [0,30,80,160,320,650,1100].forEach(ms=>setTimeout(applyR32,ms));
-    return result;
-  };
-  openListingModal=window.openListingModal;
-  const observer=new MutationObserver(()=>{
-    if(q('#modal')?.open&&/^매물 (등록|수정)/.test(q('#modalTitle')?.textContent||''))requestAnimationFrame(applyR32);
-  });
-  observer.observe(document.body,{childList:true,subtree:true});
-  window.crm31024r32Apply=applyR32;
-  console.info('CRM v3.10.24R3.2 R3 직접 수정 적용');
-})();
-
-/* ===== CRM v3.10.24R3.3 · 연락처/상세조건 밀도형 레이아웃 ===== */
-(()=>{
-  const q=(s,r=document)=>r.querySelector(s);
-  function directChild(node,root){
-    if(!node||!root)return null;
-    let cur=node;
-    while(cur&&cur.parentElement!==root)cur=cur.parentElement;
-    return cur&&cur.parentElement===root?cur:null;
-  }
-  function fieldBlock(root,name){
-    const input=q(`[name="${name}"]`,root);
-    return input?directChild(input,root):null;
-  }
-  function ensureRow(grid,className){
-    let row=q(`:scope > .${className}`,grid);
-    if(!row){row=document.createElement('div');row.className=`${className} span-2`;}
-    return row;
-  }
-  function appendIf(row,node){if(node&&node.parentElement!==row)row.appendChild(node);}
-
-  function applyR33(){
-    const modal=q('#modal'), body=q('#modalBody');
-    const root=q('#modalBody .crm31024r-listing-form');
-    const title=q('#modalTitle')?.textContent||'';
-    if(!modal?.open||!body||!root||!/^매물 (등록|수정)/.test(title))return false;
-    if(typeof window.crm31024rArrangeListingForm==='function')window.crm31024rArrangeListingForm();
-
-    // 상단: 매물명 + 연락처 추가 버튼, 연락처 입력행은 바로 아래 전체 폭.
-    const top=q('.crm31024r-top-row',root);
-    const titleSlot=q('.crm31024r-title-slot',top||root);
-    const contactSlot=q('.crm31024r-contact-slot',top||root);
-    const toolbar=q('.crm386-contact-toolbar',body);
-    const contacts=q('#crm38ExtraContacts',body);
-    if(top&&titleSlot&&contactSlot){
-      top.classList.add('crm31024r33-top');
-      contactSlot.classList.add('crm31024r33-contact-button-slot');
-      if(toolbar&&toolbar.parentElement!==contactSlot)contactSlot.appendChild(toolbar);
-      let contactRows=q(':scope > .crm31024r33-contact-rows',top);
-      if(!contactRows){
-        contactRows=document.createElement('div');
-        contactRows.className='crm31024r33-contact-rows';
-        top.appendChild(contactRows);
-      }
-      if(contacts&&contacts.parentElement!==contactRows)contactRows.appendChild(contacts);
-    }
-
-    const detailGrid=q('.crm31024r-detail-card .crm31024r-card-grid',root);
-    if(detailGrid){
-      // 방/화장실/관리비를 한 줄에 정렬. 1.5룸은 방 개수 필드 내부 기능 그대로 유지.
-      const roomRow=ensureRow(detailGrid,'crm31024r33-room-row');
-      appendIf(roomRow,fieldBlock(detailGrid,'room_count'));
-      appendIf(roomRow,fieldBlock(detailGrid,'bathroom_count'));
-      appendIf(roomRow,fieldBlock(detailGrid,'management_fee'));
-      if(!roomRow.isConnected)detailGrid.prepend(roomRow);
-
-      // 입주조건 별도 테두리 박스를 해제하고, 필드만 평면형 한 줄로 유지.
-      const moveRow=ensureRow(detailGrid,'crm31024r33-move-row');
-      appendIf(moveRow,fieldBlock(detailGrid,'move_in_date'));
-      appendIf(moveRow,fieldBlock(detailGrid,'move_in_immediate'));
-      appendIf(moveRow,fieldBlock(detailGrid,'move_in_negotiable'));
-      if(!moveRow.isConnected)detailGrid.appendChild(moveRow);
-
-      // 옵션 / 대출 가능 여부 / 최종 확인일을 같은 줄 3칸으로 정렬.
-      const compactRow=ensureRow(detailGrid,'crm31024r33-option-loan-confirm-row');
-      appendIf(compactRow,fieldBlock(detailGrid,'options'));
-      appendIf(compactRow,fieldBlock(detailGrid,'loan_available'));
-      appendIf(compactRow,fieldBlock(detailGrid,'last_confirmed_at'));
-      if(!compactRow.isConnected)detailGrid.appendChild(compactRow);
-
-      // 기존 보정 행이 비었으면 제거하여 여백 방지.
-      detailGrid.querySelectorAll('.crm31024r32-loan-confirm-row,.crm31024r3-loan-confirm-row').forEach(row=>{
-        if(!row.children.length)row.remove();
-      });
-
-      // 사진과 비밀메모는 항상 맨 아래 유지.
-      const photo=fieldBlock(detailGrid,'listing_photo_files')||q('#listingPhotoFiles',detailGrid)?.closest('label');
-      const description=fieldBlock(detailGrid,'description');
-      if(photo)detailGrid.appendChild(photo);
-      if(description)detailGrid.appendChild(description);
-    }
-    root.dataset.crm31024r33='1';
-    return true;
-  }
-
-  const prior=window.openListingModal||openListingModal;
-  window.openListingModal=function(){
-    const result=prior.apply(this,arguments);
-    [0,40,100,200,400,750,1200].forEach(ms=>setTimeout(applyR33,ms));
-    return result;
-  };
-  openListingModal=window.openListingModal;
-  const observer=new MutationObserver(()=>{
-    if(q('#modal')?.open&&/^매물 (등록|수정)/.test(q('#modalTitle')?.textContent||''))requestAnimationFrame(applyR33);
-  });
-  observer.observe(document.body,{childList:true,subtree:true});
-  window.crm31024r33Apply=applyR33;
-  console.info('CRM v3.10.24R3.3 밀도형 매물 입력 레이아웃 적용');
+  window.openListingModal=wrapped;
+  openListingModal=wrapped;
+  Object.assign(window,{openListingModal,crm31024r34Arrange:arrange});
+  console.info(`CRM v${VERSION} 단일 매물 입력 레이아웃 적용`);
 })();

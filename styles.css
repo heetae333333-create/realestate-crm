@@ -1842,343 +1842,38 @@ th.crm31023-sort-active{color:#1d4ed8;background:#eff6ff}
 .crm31023-sort-icon{display:inline-block;margin-left:5px;font-size:11px;color:#64748b;vertical-align:middle}
 .crm31023-created-at{font-size:10px;line-height:1.2;color:#64748b;text-align:center;margin:0 0 4px;white-space:nowrap}
 
-/* ===== CRM v3.10.24R · 매물 등록/수정 UI 재배치 ===== */
-#modalBody .crm31024r-listing-form{
-  display:grid;
-  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
-  gap:14px;
-  align-items:start;
-}
-#modalBody .crm31024r-card{
-  border:1px solid #d9e3f1;
-  border-radius:16px;
-  background:#f8fbff;
-  padding:16px;
-  min-width:0;
-}
-#modalBody .crm31024r-card-head{
-  display:flex;
-  align-items:baseline;
-  gap:10px;
-  margin-bottom:14px;
-  padding-bottom:10px;
-  border-bottom:1px solid #e4ebf5;
-}
-#modalBody .crm31024r-card-head strong{font-size:17px;color:#10233f;white-space:nowrap}
-#modalBody .crm31024r-card-head span{font-size:12px;color:#718096;line-height:1.45}
-#modalBody .crm31024r-card-grid{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:12px 14px;
-  align-items:start;
-}
-#modalBody .crm31024r-address-card .crm31024r-card-grid{
-  grid-template-columns:minmax(0,2fr) minmax(145px,.8fr) minmax(145px,.8fr);
-}
-#modalBody .crm31024r-address-card .crm3852-address-row{grid-column:1/-1;margin:0}
-#modalBody .crm31024r-address-card label,
-#modalBody .crm31024r-property-card label,
-#modalBody .crm31024r-detail-card label{min-width:0;margin:0}
-#modalBody .crm31024r-property-card .crm31024r-card-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-#modalBody .crm31024r-deal-card{
-  border:1px solid #cfdcf0;
-  border-radius:16px;
-  background:#fff;
-  padding:16px;
-  margin:0;
-}
-#modalBody .crm31024r-detail-card .span-2,
-#modalBody .crm31024r-property-card .span-2,
-#modalBody .crm31024r-address-card .span-2{grid-column:1/-1}
-#modalBody .crm31024r-readonly{
-  background:#eef3f8!important;
-  color:#425466!important;
-  cursor:not-allowed;
-  font-weight:600;
-}
-#modalBody .crm31024r-listing-form > label,
-#modalBody .crm31024r-listing-form > #crm38ExtraContacts{min-width:0}
-#modalBody .crm31024r-listing-form > #crm38ExtraContacts{margin-top:-4px}
+/* ===== CRM v3.10.24R3.4 · 단일 매물 입력 레이아웃 ===== */
+#modalBody .crm31024r34-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
+#modalBody .crm31024r34-top,#modalBody .crm31024r34-section,#modalBody .crm31024r34-deal{grid-column:1/-1;min-width:0}
+#modalBody .crm31024r34-top{padding:2px 0 4px}
+#modalBody .crm31024r34-title-line{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,.9fr);gap:16px;align-items:end}
+#modalBody .crm31024r34-title-field{margin:0;min-width:0}
+#modalBody .crm31024r34-contact-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:46px;margin:0;padding:0;border:0;background:transparent}
+#modalBody .crm31024r34-contact-toolbar strong{font-size:15px}
+#modalBody .crm31024r34-add-contact{white-space:nowrap;padding:10px 16px}
+#modalBody .crm31024r34-contact-list{grid-column:1/-1;margin-top:9px}
+#modalBody .crm31024r34-contact-list-inner{display:flex;flex-direction:column;gap:8px;margin:0;width:100%}
+#modalBody .crm31024r34-contact-list-inner .crm38-contact-row{display:grid;grid-template-columns:125px minmax(130px,.8fr) minmax(220px,1.5fr) 72px;gap:9px;align-items:center;width:100%;margin:0;padding:0;border:0;background:transparent}
+#modalBody .crm31024r34-contact-list-inner .crm386-contact-empty{padding:10px 12px;border:1px dashed #d4deeb;border-radius:10px;text-align:left;background:#fafcff}
+#modalBody .crm31024r34-section{border:1px solid #dbe4f0;border-radius:15px;background:#f8fbff;padding:16px}
+#modalBody .crm31024r34-head{display:flex;align-items:baseline;gap:10px;margin-bottom:13px;padding-bottom:10px;border-bottom:1px solid #e2e9f3}
+#modalBody .crm31024r34-head strong{font-size:17px;color:#10233f}.crm31024r34-head span{font-size:12px;color:#718096}
+#modalBody .crm31024r34-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 14px;align-items:start}
+#modalBody .crm31024r34-grid>label,#modalBody .crm31024r34-grid>div,#modalBody .crm31024r34-grid>details{min-width:0;margin:0}
+#modalBody .crm31024r34-address .crm31024r34-grid{grid-template-columns:minmax(0,1.6fr) minmax(130px,.65fr) minmax(130px,.65fr)}
+#modalBody .crm31024r34-address .crm3852-address-row{grid-column:1/-1;margin:0}
+#modalBody .crm31024r34-address .crm31024r34-wide{grid-column:1/-1}
+#modalBody .crm31024r34-basic .crm31024r34-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+#modalBody .crm31024r34-deal{border:1px solid #dbe4f0;border-radius:15px;background:#fff;padding:16px;margin:0}
+#modalBody .crm31024r34-third{grid-column:auto}
+#modalBody .crm31024r34-wide{grid-column:1/-1!important}
+#modalBody .crm31024r34-option,#modalBody .crm31024r34-loan,#modalBody .crm31024r34-confirm{grid-column:auto!important}
+#modalBody .crm31024r34-movein{border:0!important;background:transparent!important;padding:2px 0 4px!important;border-radius:0!important;box-shadow:none!important}
+#modalBody .crm31024r34-movein>.section-title{margin-bottom:9px}
+#modalBody .crm31024r34-readonly{background:#eef3f8!important;color:#425466!important;cursor:not-allowed;font-weight:600}
+#modalBody .crm3109-building-card{margin:0}
 @media(max-width:820px){
-  #modalBody .crm31024r-listing-form,
-  #modalBody .crm31024r-card-grid,
-  #modalBody .crm31024r-address-card .crm31024r-card-grid,
-  #modalBody .crm31024r-property-card .crm31024r-card-grid{grid-template-columns:1fr}
-  #modalBody .crm31024r-card{padding:13px}
-  #modalBody .crm31024r-card-head{display:block}
-  #modalBody .crm31024r-card-head span{display:block;margin-top:4px}
-}
-
-
-/* ===== CRM v3.10.24R2 · 상단 연락처/섹션 순서 보정 ===== */
-#modalBody .crm31024r-top-row{
-  grid-column:1/-1;
-  display:grid;
-  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
-  gap:14px;
-  align-items:stretch;
-}
-#modalBody .crm31024r-title-slot,
-#modalBody .crm31024r-contact-slot{
-  border:1px solid #d9e3f1;
-  border-radius:16px;
-  background:#fff;
-  padding:16px;
-  min-width:0;
-}
-#modalBody .crm31024r-title-slot > label{margin:0;display:block}
-#modalBody .crm31024r-contact-slot{
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
-#modalBody .crm31024r-contact-slot .crm386-contact-toolbar{
-  margin:0;
-  min-height:44px;
-}
-#modalBody .crm31024r-contact-slot #crm38ExtraContacts{
-  margin:0;
-  min-width:0;
-}
-#modalBody .crm31024r-contact-slot .crm38-contact-row{
-  grid-template-columns:minmax(100px,.75fr) minmax(110px,.9fr) minmax(150px,1.2fr) auto;
-}
-#modalBody .crm31024r-address-card{grid-column:1/-1}
-#modalBody .crm31024r-deal-card{grid-column:1/-1}
-#modalBody .crm31024r-property-card{grid-column:1/-1}
-#modalBody .crm31024r-detail-card{grid-column:1/-1}
-@media(max-width:820px){
-  #modalBody .crm31024r-top-row{grid-template-columns:1fr}
-  #modalBody .crm31024r-title-slot,
-  #modalBody .crm31024r-contact-slot{padding:13px}
-  #modalBody .crm31024r-contact-slot .crm38-contact-row{grid-template-columns:1fr}
-}
-
-
-/* ===== CRM v3.10.24R3 · 연락처 실제 상단 고정 및 섹션 순서 확정 ===== */
-#modalBody .crm31024r-top-row{order:10}
-#modalBody .crm31024r-address-card{order:20}
-#modalBody .crm31024r-deal-card{order:30}
-#modalBody .crm31024r-property-card{order:40}
-#modalBody .crm31024r-detail-card{order:50}
-#modalBody .crm31024r-contact-slot .crm386-contact-toolbar,
-#modalBody .crm31024r-contact-slot #crm38ExtraContacts{display:block!important;width:100%!important}
-#modalBody .crm31024r-detail-card .crm386-contact-toolbar,
-#modalBody .crm31024r-detail-card #crm38ExtraContacts{display:none!important}
-#modalBody .crm31024r-contact-slot .crm386-contact-toolbar{display:flex!important;align-items:center;justify-content:space-between;gap:12px}
-#modalBody .crm31024r-contact-slot .crm386-contact-toolbar + #crm38ExtraContacts{margin-top:8px!important}
-
-/* ===== CRM v3.10.24R3.2 · R3 직접 수정: 상단 연락처 완전 평면화 ===== */
-#modalBody .crm31024r-top-row{
-  display:grid!important;
-  grid-template-columns:minmax(0,1fr) minmax(0,1.15fr)!important;
-  gap:14px!important;
-  align-items:start!important;
-}
-#modalBody .crm31024r-top-row > .crm31024r-title-slot,
-#modalBody .crm31024r-top-row > .crm31024r-contact-slot{
-  border:0!important;
-  border-radius:0!important;
-  background:transparent!important;
-  box-shadow:none!important;
-  padding:0!important;
-  min-height:0!important;
-  height:auto!important;
-}
-#modalBody .crm31024r-top-row > .crm31024r-title-slot{
-  display:block!important;
-}
-#modalBody .crm31024r-top-row > .crm31024r-contact-slot{
-  display:block!important;
-}
-#modalBody .crm31024r-contact-slot .crm386-contact-toolbar{
-  display:flex!important;
-  align-items:center!important;
-  justify-content:space-between!important;
-  gap:10px!important;
-  width:100%!important;
-  min-height:0!important;
-  margin:0 0 8px!important;
-  padding:0!important;
-  border:0!important;
-  border-radius:0!important;
-  background:transparent!important;
-  box-shadow:none!important;
-}
-#modalBody .crm31024r-contact-slot .crm386-contact-toolbar::before{
-  content:'연락처';
-  font-size:15px;
-  font-weight:800;
-  color:#111827;
-}
-#modalBody .crm31024r-contact-slot .crm386-contact-toolbar > :not(button){display:none!important}
-#modalBody .crm31024r-contact-slot .crm386-contact-toolbar button{
-  flex:0 0 auto!important;
-  width:auto!important;
-  min-width:92px!important;
-  height:44px!important;
-  margin:0!important;
-  padding:0 14px!important;
-  white-space:nowrap!important;
-}
-#modalBody .crm31024r-contact-slot #crm38ExtraContacts{
-  display:flex!important;
-  flex-direction:column!important;
-  gap:7px!important;
-  width:100%!important;
-  margin:0!important;
-  padding:0!important;
-  border:0!important;
-  border-radius:0!important;
-  background:transparent!important;
-  box-shadow:none!important;
-}
-#modalBody .crm31024r-contact-slot #crm38ExtraContacts:empty{display:none!important}
-#modalBody .crm31024r-contact-slot .crm38-contact-row{
-  display:grid!important;
-  grid-template-columns:minmax(92px,.72fr) minmax(90px,.78fr) minmax(170px,1.35fr) auto!important;
-  gap:7px!important;
-  align-items:center!important;
-  width:100%!important;
-  margin:0!important;
-  padding:0!important;
-  border:0!important;
-  border-radius:0!important;
-  background:transparent!important;
-  box-shadow:none!important;
-}
-#modalBody .crm31024r-contact-slot .crm38-contact-row > *{
-  min-width:0!important;
-  width:100%!important;
-  margin:0!important;
-}
-#modalBody .crm31024r-contact-slot .crm38-contact-row button{
-  width:auto!important;
-  min-width:42px!important;
-}
-/* 상세조건에 남은 연락처 껍데기는 완전 제거 */
-#modalBody .crm31024r-detail-card .crm386-contact-toolbar,
-#modalBody .crm31024r-detail-card #crm38ExtraContacts,
-#modalBody .crm31024r-detail-card .crm386-contact-card{display:none!important}
-
-/* 대출 가능 여부와 최종 확인일 같은 줄 고정 */
-#modalBody .crm31024r-detail-card .crm31024r3-loan-confirm-row,
-#modalBody .crm31024r-detail-card .crm31024r32-loan-confirm-row{
-  grid-column:1/-1!important;
-  display:grid!important;
-  grid-template-columns:repeat(2,minmax(0,1fr))!important;
-  gap:14px!important;
-  align-items:start!important;
-  margin:0!important;
-}
-@media(max-width:820px){
-  #modalBody .crm31024r-top-row{grid-template-columns:1fr!important}
-  #modalBody .crm31024r-contact-slot .crm38-contact-row{grid-template-columns:1fr 1fr!important}
-  #modalBody .crm31024r-contact-slot .crm38-contact-row input[type='tel']{grid-column:1/-1!important}
-  #modalBody .crm31024r-detail-card .crm31024r3-loan-confirm-row,
-  #modalBody .crm31024r-detail-card .crm31024r32-loan-confirm-row{grid-template-columns:1fr!important}
-}
-
-/* ===== CRM v3.10.24R3.3 · 연락처/상세조건 밀도형 레이아웃 ===== */
-#modalBody .crm31024r33-top{
-  display:grid!important;
-  grid-template-columns:minmax(0,1fr) auto!important;
-  gap:10px 14px!important;
-  align-items:end!important;
-}
-#modalBody .crm31024r33-top .crm31024r-title-slot{min-width:0!important}
-#modalBody .crm31024r33-contact-button-slot{
-  display:flex!important;
-  align-items:flex-end!important;
-  justify-content:flex-end!important;
-  min-width:110px!important;
-}
-#modalBody .crm31024r33-contact-button-slot .crm386-contact-toolbar{
-  display:block!important;
-  width:auto!important;
-  margin:0!important;
-}
-#modalBody .crm31024r33-contact-button-slot .crm386-contact-toolbar::before,
-#modalBody .crm31024r33-contact-button-slot .crm386-contact-toolbar > :not(button){display:none!important}
-#modalBody .crm31024r33-contact-button-slot .crm386-contact-toolbar button{
-  height:46px!important;
-  min-width:108px!important;
-  padding:0 16px!important;
-  border-radius:11px!important;
-  font-weight:800!important;
-}
-#modalBody .crm31024r33-contact-rows{
-  grid-column:1/-1!important;
-  min-width:0!important;
-  width:100%!important;
-  margin:0!important;
-}
-#modalBody .crm31024r33-contact-rows #crm38ExtraContacts{
-  display:flex!important;
-  flex-direction:column!important;
-  gap:8px!important;
-  width:100%!important;
-  margin:0!important;
-  padding:0!important;
-  border:0!important;
-  background:transparent!important;
-}
-#modalBody .crm31024r33-contact-rows #crm38ExtraContacts:empty{display:none!important}
-#modalBody .crm31024r33-contact-rows .crm38-contact-row{
-  display:grid!important;
-  grid-template-columns:minmax(105px,.8fr) minmax(130px,1fr) minmax(190px,1.5fr) auto!important;
-  gap:9px!important;
-  align-items:center!important;
-  width:100%!important;
-  padding:0!important;
-  margin:0!important;
-  border:0!important;
-  background:transparent!important;
-  box-shadow:none!important;
-}
-#modalBody .crm31024r33-contact-rows .crm38-contact-row > *{min-width:0!important;width:100%!important;margin:0!important}
-#modalBody .crm31024r33-contact-rows .crm38-contact-row button{width:auto!important;min-width:44px!important}
-
-#modalBody .crm31024r33-room-row,
-#modalBody .crm31024r33-option-loan-confirm-row{
-  grid-column:1/-1!important;
-  display:grid!important;
-  grid-template-columns:repeat(3,minmax(0,1fr))!important;
-  gap:12px 14px!important;
-  align-items:start!important;
-  margin:0!important;
-}
-#modalBody .crm31024r33-move-row{
-  grid-column:1/-1!important;
-  display:grid!important;
-  grid-template-columns:minmax(260px,1.5fr) minmax(110px,.5fr) minmax(110px,.5fr)!important;
-  gap:10px 14px!important;
-  align-items:end!important;
-  margin:0!important;
-  padding:0!important;
-  border:0!important;
-  border-radius:0!important;
-  background:transparent!important;
-  box-shadow:none!important;
-}
-#modalBody .crm31024r33-room-row > *,
-#modalBody .crm31024r33-move-row > *,
-#modalBody .crm31024r33-option-loan-confirm-row > *{min-width:0!important;margin:0!important}
-#modalBody .crm31024r33-option-loan-confirm-row > :first-child{grid-column:auto!important}
-
-/* 기존 입주 조건 카드/껍데기가 남아 있어도 시각적으로 평면화 */
-#modalBody .crm31024r-detail-card fieldset:has([name="move_in_date"]),
-#modalBody .crm31024r-detail-card .move-in-section:has([name="move_in_date"]),
-#modalBody .crm31024r-detail-card .crm-move-in-section:has([name="move_in_date"]){
-  border:0!important;background:transparent!important;padding:0!important;margin:0!important;box-shadow:none!important;
-}
-
-@media(max-width:820px){
-  #modalBody .crm31024r33-top{grid-template-columns:1fr auto!important}
-  #modalBody .crm31024r33-contact-rows .crm38-contact-row{grid-template-columns:1fr 1fr!important}
-  #modalBody .crm31024r33-contact-rows .crm38-contact-row input[type='tel']{grid-column:1/-1!important}
-  #modalBody .crm31024r33-room-row,
-  #modalBody .crm31024r33-option-loan-confirm-row{grid-template-columns:1fr!important}
-  #modalBody .crm31024r33-move-row{grid-template-columns:1fr 1fr!important}
-  #modalBody .crm31024r33-move-row > :first-child{grid-column:1/-1!important}
+ #modalBody .crm31024r34-form,#modalBody .crm31024r34-title-line,#modalBody .crm31024r34-grid,#modalBody .crm31024r34-address .crm31024r34-grid,#modalBody .crm31024r34-basic .crm31024r34-grid{grid-template-columns:1fr}
+ #modalBody .crm31024r34-contact-list-inner .crm38-contact-row{grid-template-columns:1fr}
+ #modalBody .crm31024r34-section,#modalBody .crm31024r34-deal{padding:13px}
 }
