@@ -10588,3 +10588,143 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   });
   console.info(`CRM v${VERSION} 고객 상태 2단계 적용`);
 })();
+
+/* =========================================================
+   CRM v3.10.24R3.10 · 고객 영업 종료/재개 FU 버튼 및 자동 이력
+   ========================================================= */
+(() => {
+  const VERSION = '3.10.24R3.10';
+  const ACTIVE = '영업중';
+  const CLOSED = '영업종료';
+  const normalize = value => String(value || '').trim() === CLOSED ? CLOSED : ACTIVE;
+  const q = (s, r = document) => r.querySelector(s);
+
+  function dateTimeText(date = new Date()) {
+    return date.toLocaleString('ko-KR', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: false
+    });
+  }
+
+  async function loadCustomerFresh(customerId) {
+    const cached = (state.customers || []).find(x => String(x.id) === String(customerId));
+    const { data, error } = await state.client.from('customers').select('*').eq('id', customerId).maybeSingle();
+    if (error) throw error;
+    return data || cached;
+  }
+
+  async function writeStatusHistory(customerId, nextStatus, source = '고객 상세') {
+    const isClosed = nextStatus === CLOSED;
+    const action = isClosed ? '영업 종료' : '영업 재개';
+    const content = `${dateTimeText()}에 ${action}되었습니다.\n처리 위치: ${source}`;
+    const { error } = await state.client.from('interaction_history').insert({
+      customer_id: customerId,
+      listing_id: null,
+      created_by: state.profile.id,
+      follow_up_date: typeof today === 'function' ? today() : new Date().toISOString().slice(0, 10),
+      contact_method: action,
+      content,
+      next_follow_up_at: null
+    });
+    if (error) throw error;
+  }
+
+  async function crmR310ToggleCustomerSales(customerId) {
+    try {
+      const customer = await loadCustomerFresh(customerId);
+      if (!customer) return toast('고객 정보를 찾을 수 없습니다.');
+      const current = normalize(customer.status);
+      const next = current === CLOSED ? ACTIVE : CLOSED;
+      const label = next === CLOSED ? '영업을 종료' : '영업을 재개';
+      if (!confirm(`${customer.name || '고객'}의 ${label}할까요?`)) return;
+
+      const { error } = await state.client.from('customers').update({ status: next }).eq('id', customerId);
+      if (error) return toast(error.message);
+      await writeStatusHistory(customerId, next, '고객 FU');
+
+      const cached = (state.customers || []).find(x => String(x.id) === String(customerId));
+      if (cached) cached.status = next;
+      if (typeof loadCustomers === 'function') await loadCustomers();
+      if (typeof renderCustomers === 'function') await renderCustomers();
+      toast(next === CLOSED ? '고객 상태를 영업종료로 변경했습니다.' : '고객 상태를 영업중으로 변경했습니다.');
+      if (typeof window.openCustomerFuHub === 'function') await window.openCustomerFuHub(customerId, 'records');
+    } catch (err) {
+      toast(err?.message || '고객 상태 변경 중 오류가 발생했습니다.');
+    }
+  }
+
+  async function patchFuStatusButton(customerId, tab) {
+    if (tab !== 'records') return;
+    const body = q('#modalBody');
+    if (!body || !/고객 FU 관리/.test(q('#modalTitle')?.textContent || '')) return;
+    body.querySelectorAll('.crm-r310-sales-toggle-wrap').forEach(el => el.remove());
+    let customer;
+    try { customer = await loadCustomerFresh(customerId); } catch (_) { return; }
+    const closed = normalize(customer?.status) === CLOSED;
+    const wrap = document.createElement('div');
+    wrap.className = 'crm-r310-sales-toggle-wrap';
+    wrap.innerHTML = `<button type="button" class="${closed ? 'success' : 'danger'} crm-r310-sales-toggle" onclick="crmR310ToggleCustomerSales('${customerId}')">${closed ? '영업 재개' : '영업종료'}</button>`;
+    body.appendChild(wrap);
+  }
+
+  const baseHub = window.openCustomerFuHub || globalThis.openCustomerFuHub;
+  if (typeof baseHub === 'function' && !baseHub.__crmR310Wrapped) {
+    const wrappedHub = async function(customerId, tab = 'records', ...args) {
+      const result = await baseHub.call(this, customerId, tab, ...args);
+      [0, 40, 100, 220].forEach(ms => setTimeout(() => patchFuStatusButton(customerId, tab), ms));
+      return result;
+    };
+    wrappedHub.__crmR310Wrapped = true;
+    window.openCustomerFuHub = wrappedHub;
+    try { openCustomerFuHub = wrappedHub; } catch (_) {}
+  }
+
+  function installCustomerModalStatusAudit(customerId, originalStatus) {
+    const modal = q('#modal');
+    const submit = q('#modalSubmit');
+    if (!modal || !submit || !/고객 (등록|수정)/.test(q('#modalTitle')?.textContent || '')) return false;
+    if (submit.dataset.crmR310Audit === String(customerId || 'new')) return true;
+    const oldClick = submit.onclick;
+    if (typeof oldClick !== 'function') return false;
+    submit.dataset.crmR310Audit = String(customerId || 'new');
+    submit.onclick = async function(event) {
+      const selected = normalize(q('#modalBody [name="status"]')?.value);
+      const before = normalize(originalStatus);
+      const wasOpen = modal.open;
+      const result = await oldClick.call(this, event);
+      if (!customerId || selected === before) return result;
+      // 저장 실패 시 모달이 그대로 열려 있는 경우 이력을 남기지 않는다.
+      if (wasOpen && modal.open) return result;
+      try {
+        const fresh = await loadCustomerFresh(customerId);
+        if (normalize(fresh?.status) === selected) {
+          await writeStatusHistory(customerId, selected, '고객 상세 수정');
+          const cached = (state.customers || []).find(x => String(x.id) === String(customerId));
+          if (cached) cached.status = selected;
+          if (typeof renderCustomers === 'function') await renderCustomers();
+        }
+      } catch (err) {
+        toast(err?.message || '영업 상태 이력 기록에 실패했습니다.');
+      }
+      return result;
+    };
+    return true;
+  }
+
+  const baseOpen = window.openCustomerModal || globalThis.openCustomerModal;
+  if (typeof baseOpen === 'function' && !baseOpen.__crmR310Wrapped) {
+    const wrappedOpen = function(customerId = null, ...args) {
+      const customer = (state.customers || []).find(x => String(x.id) === String(customerId));
+      const originalStatus = normalize(customer?.status);
+      const result = baseOpen.call(this, customerId, ...args);
+      [30, 80, 160, 320, 600].forEach(ms => setTimeout(() => installCustomerModalStatusAudit(customerId, originalStatus), ms));
+      return result;
+    };
+    wrappedOpen.__crmR310Wrapped = true;
+    window.openCustomerModal = wrappedOpen;
+    try { openCustomerModal = wrappedOpen; } catch (_) {}
+  }
+
+  Object.assign(window, { crmR310ToggleCustomerSales });
+  console.info(`CRM v${VERSION} 고객 영업종료·재개 기능 적용`);
+})();

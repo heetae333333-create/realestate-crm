@@ -2002,3 +2002,17 @@ th.crm31023-sort-active{color:#1d4ed8;background:#eff6ff}
 #customerTable tbody tr.crm-r39-customer-closed .muted {
   color: #6b7280 !important;
 }
+
+/* CRM v3.10.24R3.10 고객 FU 영업상태 버튼 */
+.crm-r310-sales-toggle-wrap{
+  display:flex;
+  justify-content:flex-start;
+  align-items:center;
+  margin-top:18px;
+  padding-top:14px;
+  border-top:1px solid #e5eaf1;
+}
+.crm-r310-sales-toggle{
+  min-width:104px;
+  font-weight:800;
+}
