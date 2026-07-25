@@ -10192,7 +10192,7 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
     if(toolbar){
       toolbar.className='crm31024r34-contact-toolbar';
       const add=toolbar.querySelector('button');
-      toolbar.innerHTML='<strong>연락처</strong>';
+      toolbar.innerHTML='';
       if(add){add.className='ghost crm31024r34-add-contact';toolbar.appendChild(add);}
       titleLine.appendChild(toolbar);
     }
@@ -10284,7 +10284,7 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
    - 즉시입주 선택 시 날짜/기간 입력 비활성화
    ========================================================= */
 (()=>{
-  const VERSION='3.10.24R3.5';
+  const VERSION='3.10.24R3.6';
   const q=(s,r=document)=>r.querySelector(s);
   function parsePeriod(v){
     const m=String(v||'').trim().match(/^(\d{4})-(\d{2})\s*(초순|중순|말)$/);
@@ -10319,20 +10319,26 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
         <strong>입주 가능일</strong>
         <span class="field-help">정확한 날짜 또는 월의 초순·중순·말로 입력할 수 있습니다.</span>
       </div>
-      <div class="crm31024r35-movein-controls">
+      <div class="crm31024r36-movein-controls">
         <select id="crmR35MoveMode" aria-label="입주 가능일 입력 방식">
           <option value="date" ${initialMode==='date'?'selected':''}>날짜 지정</option>
           <option value="period" ${initialMode==='period'?'selected':''}>초순·중순·말</option>
         </select>
-        <input id="crmR35MoveDate" type="date" value="${date.value||''}" ${initialMode==='period'?'hidden':''}>
-        <input id="crmR35MoveMonth" type="month" value="${parsed.month}" ${initialMode==='date'?'hidden':''}>
-        <select id="crmR35MovePart" ${initialMode==='date'?'hidden':''}>
-          <option ${parsed.part==='초순'?'selected':''}>초순</option>
-          <option ${parsed.part==='중순'?'selected':''}>중순</option>
-          <option ${parsed.part==='말'?'selected':''}>말</option>
-        </select>
-        <label class="inline-check crm31024r35-check"><input id="crmR35Immediate" type="checkbox" ${immediate.checked?'checked':''}> 즉시입주</label>
-        <label class="inline-check crm31024r35-check"><input id="crmR35Negotiable" type="checkbox" ${negotiable.checked?'checked':''}> 협의 가능</label>
+        <div class="crm31024r36-date-area">
+          <input id="crmR35MoveDate" type="date" value="${date.value||''}" ${initialMode==='period'?'hidden':''}>
+          <div id="crmR36PeriodFields" class="crm31024r36-period-fields" ${initialMode==='date'?'hidden':''}>
+            <input id="crmR35MoveMonth" type="month" value="${parsed.month}">
+            <select id="crmR35MovePart">
+              <option ${parsed.part==='초순'?'selected':''}>초순</option>
+              <option ${parsed.part==='중순'?'selected':''}>중순</option>
+              <option ${parsed.part==='말'?'selected':''}>말</option>
+            </select>
+          </div>
+        </div>
+        <div class="crm31024r36-checks">
+          <label class="inline-check crm31024r36-check"><input id="crmR35Immediate" type="checkbox" ${immediate.checked?'checked':''}> 즉시입주</label>
+          <label class="inline-check crm31024r36-check"><input id="crmR35Negotiable" type="checkbox" ${negotiable.checked?'checked':''}> 협의 가능</label>
+        </div>
       </div>
       <input type="hidden" name="move_in_date" id="moveInDateInput" value="${date.value||''}">
       <input type="hidden" name="move_in_period" id="crmR35MovePeriod" value="${current.move_in_period||''}">
@@ -10340,13 +10346,13 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
       <input type="checkbox" name="move_in_negotiable" id="moveInNegotiable" class="hidden" ${negotiable.checked?'checked':''}>
     `;
 
-    const mode=q('#crmR35MoveMode',old), d=q('#crmR35MoveDate',old), month=q('#crmR35MoveMonth',old), part=q('#crmR35MovePart',old);
+    const mode=q('#crmR35MoveMode',old), d=q('#crmR35MoveDate',old), periodFields=q('#crmR36PeriodFields',old), month=q('#crmR35MoveMonth',old), part=q('#crmR35MovePart',old);
     const imm=q('#crmR35Immediate',old), neg=q('#crmR35Negotiable',old);
     const hiddenDate=q('[name="move_in_date"]',old), hiddenPeriod=q('[name="move_in_period"]',old);
     const hiddenImm=q('[name="move_in_immediate"]',old), hiddenNeg=q('[name="move_in_negotiable"]',old);
     const sync=()=>{
       const periodMode=mode.value==='period';
-      d.hidden=periodMode; month.hidden=!periodMode; part.hidden=!periodMode;
+      d.hidden=periodMode; periodFields.hidden=!periodMode;
       const disabled=imm.checked;
       mode.disabled=disabled; d.disabled=disabled; month.disabled=disabled; part.disabled=disabled;
       hiddenImm.checked=imm.checked; hiddenNeg.checked=neg.checked;

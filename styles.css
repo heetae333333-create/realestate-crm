@@ -1889,3 +1889,63 @@ th.crm31023-sort-active{color:#1d4ed8;background:#eff6ff}
 .crm31024r35-check{height:46px;white-space:nowrap;padding:0 4px;justify-content:center}
 .crm31024r35-movein-controls [hidden]{display:none!important}
 @media(max-width:760px){.crm31024r35-movein-controls{grid-template-columns:1fr 1fr}.crm31024r35-check{justify-content:flex-start}.crm31024r35-movein-head{align-items:flex-start;flex-direction:column;gap:3px}}
+
+
+/* CRM v3.10.24R3.6 · 연락처 제목 제거 + 입주가능일 밀림 방지 */
+#modalBody .crm31024r34-contact-toolbar{
+  justify-content:flex-end!important;
+  min-height:46px!important;
+}
+#modalBody .crm31024r34-contact-toolbar>strong{display:none!important}
+#modalBody .crm31024r34-add-contact{margin-left:auto!important}
+.crm31024r36-movein-controls{
+  display:grid;
+  grid-template-columns:150px minmax(260px,1fr) 112px;
+  gap:10px 12px;
+  align-items:stretch;
+  width:100%;
+  min-width:0;
+}
+.crm31024r36-movein-controls>select,
+.crm31024r36-date-area>input,
+.crm31024r36-period-fields>input,
+.crm31024r36-period-fields>select{
+  width:100%;
+  min-width:0;
+  height:46px;
+  box-sizing:border-box;
+}
+.crm31024r36-date-area{min-width:0}
+.crm31024r36-period-fields{
+  display:grid;
+  grid-template-columns:minmax(160px,1fr) 112px;
+  gap:10px;
+  min-width:0;
+}
+.crm31024r36-checks{
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:flex-start;
+  gap:5px;
+  min-width:0;
+  padding:2px 0;
+}
+.crm31024r36-check{
+  display:flex!important;
+  align-items:center!important;
+  gap:6px!important;
+  min-height:20px!important;
+  height:auto!important;
+  padding:0!important;
+  white-space:nowrap!important;
+  font-weight:700;
+}
+.crm31024r36-check input{margin:0!important;flex:0 0 auto}
+.crm31024r36-movein-controls [hidden],
+.crm31024r36-period-fields[hidden]{display:none!important}
+@media(max-width:760px){
+  .crm31024r36-movein-controls{grid-template-columns:1fr;gap:9px}
+  .crm31024r36-period-fields{grid-template-columns:minmax(0,1fr) 105px}
+  .crm31024r36-checks{flex-direction:row;gap:18px;padding-top:2px}
+}
