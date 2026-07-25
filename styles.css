@@ -2222,3 +2222,9 @@ table.listing-table tbody tr.crm-r311-listing-complete .muted {
   font-weight:800;
   letter-spacing:1px;
 }
+
+/* CRM v3.10.24R3.21 · 고객 희망금액 하단 특징 태그 중앙정렬 */
+#customerTable .crm-r320-budget-features{
+  justify-content:center;
+  width:100%;
+}
