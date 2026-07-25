@@ -1877,3 +1877,15 @@ th.crm31023-sort-active{color:#1d4ed8;background:#eff6ff}
  #modalBody .crm31024r34-contact-list-inner .crm38-contact-row{grid-template-columns:1fr}
  #modalBody .crm31024r34-section,#modalBody .crm31024r34-deal{padding:13px}
 }
+
+
+/* CRM v3.10.24R3.5 · 매물 입주가능일 */
+.crm31024r35-movein{border:0!important;background:transparent!important;padding:0!important;box-shadow:none!important}
+.crm31024r35-movein .section-title{display:none!important}
+.crm31024r35-movein-head{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+.crm31024r35-movein-head strong{font-size:15px}
+.crm31024r35-movein-controls{display:grid;grid-template-columns:150px minmax(220px,1fr) 120px auto auto;gap:10px;align-items:center}
+.crm31024r35-movein-controls input,.crm31024r35-movein-controls select{min-width:0;height:46px}
+.crm31024r35-check{height:46px;white-space:nowrap;padding:0 4px;justify-content:center}
+.crm31024r35-movein-controls [hidden]{display:none!important}
+@media(max-width:760px){.crm31024r35-movein-controls{grid-template-columns:1fr 1fr}.crm31024r35-check{justify-content:flex-start}.crm31024r35-movein-head{align-items:flex-start;flex-direction:column;gap:3px}}

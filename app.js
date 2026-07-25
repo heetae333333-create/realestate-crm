@@ -1316,7 +1316,7 @@ openListingModal=function(id){
   const ri=$('#listingRoomCountInput'),r15=$('#listingOnePointFiveCheck');const sync=()=>{if(r15.checked){ri.value='1';ri.disabled=true}else ri.disabled=false};r15.onchange=sync;sync();crm38SyncDealCards();
   const areaInput=$('#listingAreaM2'),areaPyeong=$('#listingAreaPyeong');const syncArea=()=>{const v=Number(areaInput?.value||0);if(areaPyeong)areaPyeong.textContent=v?`약 ${(v/3.3058).toFixed(2)}평`:'㎡를 입력하면 평으로 자동 계산됩니다.'};if(areaInput)areaInput.addEventListener('input',syncArea);syncArea();
   const moveDate=$('#moveInDateInput'),moveImmediate=$('#moveInImmediate'),moveNegotiable=$('#moveInNegotiable');const syncMoveIn=(source)=>{if(source==='immediate'&&moveImmediate.checked)moveNegotiable.checked=false;if(source==='negotiable'&&moveNegotiable.checked)moveImmediate.checked=false;const noDate=moveImmediate.checked;moveDate.disabled=noDate;if(noDate)moveDate.value='';if(moveNegotiable.checked&&!moveDate.value)moveDate.required=true;else moveDate.required=false};moveImmediate.onchange=()=>syncMoveIn('immediate');moveNegotiable.onchange=()=>syncMoveIn('negotiable');syncMoveIn();
-  $('#modalSubmit').style.display='';$('#modalSubmit').onclick=async e=>{e.preventDefault();const fd=new FormData($('#modalForm'));const selected=[...document.querySelectorAll('.crm38-deal-card')].filter(c=>c.querySelector('.crm38-deal-check').checked).map((c,i)=>({deal_type:c.dataset.type,price:Number(c.querySelector('.crm38-deal-price').value||0)||null,monthly_rent:c.dataset.type==='월세'?(Number(c.querySelector('.crm38-deal-rent').value||0)||null):null,is_preferred:c.querySelector('input[type=radio]').checked,sort_order:i}));if(!selected.length)return toast('거래유형을 하나 이상 체크하세요.');const preferred=selected.find(o=>o.is_preferred)||selected[0];const p={title:fd.get('title'),contact_phone:fd.get('contact_phone')||null,transaction_type:preferred.deal_type,price:preferred.price,monthly_rent:preferred.monthly_rent,property_type:fd.get('property_type'),status:fd.get('status'),district:fd.get('district')||null,address:fd.get('address')||null,management_fee:Number(fd.get('management_fee')||0)||null,area_m2:Number(fd.get('area_m2')||0)||null,room_count:Number(fd.get('room_count')||0)||null,bathroom_count:Number(fd.get('bathroom_count')||0)||null,options:fd.get('options')||null,loan_available:fd.get('loan_available')===''?null:fd.get('loan_available')==='true',official_price:Number(fd.get('official_price')||0)||null,move_in_immediate:fd.get('move_in_immediate')==='on',move_in_negotiable:fd.get('move_in_negotiable')==='on',move_in_date:fd.get('move_in_immediate')==='on'?null:(fd.get('move_in_date')||null),is_public:fd.get('is_public')==='true',next_confirm_at:fd.get('next_confirm_at')||null,description:fd.get('description')||null,owner_id:id?(x.owner_id||state.profile.id):state.profile.id,feature_tags:[...document.querySelectorAll('.crm361-feature-check:checked')].map(el=>el.value),is_one_point_five_room:fd.get('is_one_point_five_room')==='on',current_floor:fd.get('current_floor')!==null&&fd.get('current_floor')!==''?Number(fd.get('current_floor')):null,total_floors:fd.get('total_floors')!==null&&fd.get('total_floors')!==''?Number(fd.get('total_floors')):null,built_year:fd.get('built_year')!==null&&fd.get('built_year')!==''?Number(fd.get('built_year')):null};if(p.is_one_point_five_room)p.room_count=1;if(!p.loan_available)p.official_price=null;
+  $('#modalSubmit').style.display='';$('#modalSubmit').onclick=async e=>{e.preventDefault();const fd=new FormData($('#modalForm'));const selected=[...document.querySelectorAll('.crm38-deal-card')].filter(c=>c.querySelector('.crm38-deal-check').checked).map((c,i)=>({deal_type:c.dataset.type,price:Number(c.querySelector('.crm38-deal-price').value||0)||null,monthly_rent:c.dataset.type==='월세'?(Number(c.querySelector('.crm38-deal-rent').value||0)||null):null,is_preferred:c.querySelector('input[type=radio]').checked,sort_order:i}));if(!selected.length)return toast('거래유형을 하나 이상 체크하세요.');const preferred=selected.find(o=>o.is_preferred)||selected[0];const p={title:fd.get('title'),contact_phone:fd.get('contact_phone')||null,transaction_type:preferred.deal_type,price:preferred.price,monthly_rent:preferred.monthly_rent,property_type:fd.get('property_type'),status:fd.get('status'),district:fd.get('district')||null,address:fd.get('address')||null,management_fee:Number(fd.get('management_fee')||0)||null,area_m2:Number(fd.get('area_m2')||0)||null,room_count:Number(fd.get('room_count')||0)||null,bathroom_count:Number(fd.get('bathroom_count')||0)||null,options:fd.get('options')||null,loan_available:fd.get('loan_available')===''?null:fd.get('loan_available')==='true',official_price:Number(fd.get('official_price')||0)||null,move_in_immediate:fd.get('move_in_immediate')==='on',move_in_negotiable:fd.get('move_in_negotiable')==='on',move_in_date:fd.get('move_in_immediate')==='on'?null:(fd.get('move_in_date')||null),move_in_period:fd.get('move_in_immediate')==='on'?null:(fd.get('move_in_period')||null),is_public:fd.get('is_public')==='true',next_confirm_at:fd.get('next_confirm_at')||null,description:fd.get('description')||null,owner_id:id?(x.owner_id||state.profile.id):state.profile.id,feature_tags:[...document.querySelectorAll('.crm361-feature-check:checked')].map(el=>el.value),is_one_point_five_room:fd.get('is_one_point_five_room')==='on',current_floor:fd.get('current_floor')!==null&&fd.get('current_floor')!==''?Number(fd.get('current_floor')):null,total_floors:fd.get('total_floors')!==null&&fd.get('total_floors')!==''?Number(fd.get('total_floors')):null,built_year:fd.get('built_year')!==null&&fd.get('built_year')!==''?Number(fd.get('built_year')):null};if(p.is_one_point_five_room)p.room_count=1;if(!p.loan_available)p.official_price=null;
     let listingId=id;if(id){const {error}=await state.client.from('listings').update(p).eq('id',id);if(error)return toast(error.message)}else{const {data,error}=await state.client.from('listings').insert(p).select('id').single();if(error)return toast(error.message);listingId=data.id}
     await state.client.from('listing_deal_options').delete().eq('listing_id',listingId);const {error:dealErr}=await state.client.from('listing_deal_options').insert(selected.map(o=>({...o,listing_id:listingId})));if(dealErr)return toast(dealErr.message);
     await state.client.from('listing_contacts').delete().eq('listing_id',listingId);const extra=[...document.querySelectorAll('.crm38-contact-row')].map((row,i)=>({listing_id:listingId,contact_role:row.querySelector('.crm38-contact-role').value,contact_name:row.querySelector('.crm38-contact-name').value||null,phone:row.querySelector('.crm38-contact-phone').value,sort_order:i})).filter(c=>c.phone);if(extra.length){const {error}=await state.client.from('listing_contacts').insert(extra);if(error)return toast(error.message)}
@@ -1928,11 +1928,12 @@ console.info('CRM v3.8.12 매물 목록 상세주소 표시 로드 완료');
 /* ================= CRM v3.8.13 목록·장기미접촉·계약서 관리 ================= */
 
 moveInText=function(x){
-  if(x.move_in_immediate)return '즉시입주';
-  if(x.move_in_date&&x.move_in_negotiable)return `${fmtDate(x.move_in_date)}<br><span class="muted">협의 가능</span>`;
-  if(x.move_in_date)return fmtDate(x.move_in_date);
-  if(x.move_in_negotiable)return '협의 가능';
-  return '-';
+  const lines=[];
+  if(x?.move_in_immediate) lines.push('즉시입주');
+  else if(x?.move_in_period) lines.push(escapeHtml(String(x.move_in_period)));
+  else if(x?.move_in_date) lines.push(fmtDate(x.move_in_date));
+  if(x?.move_in_negotiable) lines.push('<span class="muted">협의 가능</span>');
+  return lines.length?lines.join('<br>'):'-';
 };
 
 crm37DormantInfo=function(customer){
@@ -10273,4 +10274,101 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   openListingModal=wrapped;
   Object.assign(window,{openListingModal,crm31024r34Arrange:arrange});
   console.info(`CRM v${VERSION} 단일 매물 입력 레이아웃 적용`);
+})();
+
+
+/* =========================================================
+   CRM v3.10.24R3.5 · 매물 입주가능일 UI 통일
+   - 고객 입주희망일과 같은 날짜/초순중순말 구조
+   - 즉시입주 + 협의가능 동시 체크 허용
+   - 즉시입주 선택 시 날짜/기간 입력 비활성화
+   ========================================================= */
+(()=>{
+  const VERSION='3.10.24R3.5';
+  const q=(s,r=document)=>r.querySelector(s);
+  function parsePeriod(v){
+    const m=String(v||'').trim().match(/^(\d{4})-(\d{2})\s*(초순|중순|말)$/);
+    return m?{month:`${m[1]}-${m[2]}`,part:m[3]}:{month:'',part:'초순'};
+  }
+  function installMoveInUI(){
+    const body=q('#modalBody');
+    if(!body||!/^매물 (등록|수정)/.test(q('#modalTitle')?.textContent||''))return false;
+    const old=q('.crm382-movein-box',body);
+    if(!old||old.dataset.crmR35Done==='1')return !!old;
+    old.dataset.crmR35Done='1';
+    old.classList.add('crm31024r35-movein');
+    const date=q('[name="move_in_date"]',old);
+    const immediate=q('[name="move_in_immediate"]',old);
+    const negotiable=q('[name="move_in_negotiable"]',old);
+    if(!date||!immediate||!negotiable)return false;
+
+    const listingId=(state?.listings||[]).find(x=>String(x.id)===String(window.__crmCurrentListingId||''));
+    // 현재 모달 데이터는 기존 date/checkbox 값과 state의 period 값을 함께 사용
+    const title=q('#modalTitle')?.textContent||'';
+    let current=(state?.listings||[]).find(x=>String(x.id)===String(window.__crmCurrentListingId||''))||{};
+    if(title==='매물 수정'&&!current.id){
+      const address=q('[name="address"]',body)?.value||'';
+      const unit=q('[name="unit_no"]',body)?.value||'';
+      current=(state?.listings||[]).find(x=>String(x.address||'')===String(address)&&String(x.unit_no||'')===String(unit))||{};
+    }
+    const parsed=parsePeriod(current.move_in_period||'');
+    const initialMode=current.move_in_period?'period':'date';
+
+    old.innerHTML=`
+      <div class="crm31024r35-movein-head">
+        <strong>입주 가능일</strong>
+        <span class="field-help">정확한 날짜 또는 월의 초순·중순·말로 입력할 수 있습니다.</span>
+      </div>
+      <div class="crm31024r35-movein-controls">
+        <select id="crmR35MoveMode" aria-label="입주 가능일 입력 방식">
+          <option value="date" ${initialMode==='date'?'selected':''}>날짜 지정</option>
+          <option value="period" ${initialMode==='period'?'selected':''}>초순·중순·말</option>
+        </select>
+        <input id="crmR35MoveDate" type="date" value="${date.value||''}" ${initialMode==='period'?'hidden':''}>
+        <input id="crmR35MoveMonth" type="month" value="${parsed.month}" ${initialMode==='date'?'hidden':''}>
+        <select id="crmR35MovePart" ${initialMode==='date'?'hidden':''}>
+          <option ${parsed.part==='초순'?'selected':''}>초순</option>
+          <option ${parsed.part==='중순'?'selected':''}>중순</option>
+          <option ${parsed.part==='말'?'selected':''}>말</option>
+        </select>
+        <label class="inline-check crm31024r35-check"><input id="crmR35Immediate" type="checkbox" ${immediate.checked?'checked':''}> 즉시입주</label>
+        <label class="inline-check crm31024r35-check"><input id="crmR35Negotiable" type="checkbox" ${negotiable.checked?'checked':''}> 협의 가능</label>
+      </div>
+      <input type="hidden" name="move_in_date" id="moveInDateInput" value="${date.value||''}">
+      <input type="hidden" name="move_in_period" id="crmR35MovePeriod" value="${current.move_in_period||''}">
+      <input type="checkbox" name="move_in_immediate" id="moveInImmediate" class="hidden" ${immediate.checked?'checked':''}>
+      <input type="checkbox" name="move_in_negotiable" id="moveInNegotiable" class="hidden" ${negotiable.checked?'checked':''}>
+    `;
+
+    const mode=q('#crmR35MoveMode',old), d=q('#crmR35MoveDate',old), month=q('#crmR35MoveMonth',old), part=q('#crmR35MovePart',old);
+    const imm=q('#crmR35Immediate',old), neg=q('#crmR35Negotiable',old);
+    const hiddenDate=q('[name="move_in_date"]',old), hiddenPeriod=q('[name="move_in_period"]',old);
+    const hiddenImm=q('[name="move_in_immediate"]',old), hiddenNeg=q('[name="move_in_negotiable"]',old);
+    const sync=()=>{
+      const periodMode=mode.value==='period';
+      d.hidden=periodMode; month.hidden=!periodMode; part.hidden=!periodMode;
+      const disabled=imm.checked;
+      mode.disabled=disabled; d.disabled=disabled; month.disabled=disabled; part.disabled=disabled;
+      hiddenImm.checked=imm.checked; hiddenNeg.checked=neg.checked;
+      if(disabled){hiddenDate.value='';hiddenPeriod.value='';}
+      else if(periodMode){hiddenDate.value='';hiddenPeriod.value=month.value?`${month.value} ${part.value}`:'';}
+      else {hiddenDate.value=d.value||'';hiddenPeriod.value='';}
+    };
+    [mode,d,month,part,imm,neg].forEach(el=>{el.addEventListener('change',sync);el.addEventListener('input',sync)});
+    sync();
+    return true;
+  }
+  const base=window.openListingModal||openListingModal;
+  const wrapped=function(){
+    const args=[...arguments];
+    const id=args[0];
+    window.__crmCurrentListingId=id||null;
+    const result=base.apply(this,args);
+    [0,30,80,160,320,600].forEach(ms=>setTimeout(installMoveInUI,ms));
+    return result;
+  };
+  window.openListingModal=wrapped;
+  openListingModal=wrapped;
+  Object.assign(window,{openListingModal,crmR35InstallMoveInUI:installMoveInUI});
+  console.info(`CRM v${VERSION} 매물 입주가능일 UI 적용`);
 })();
