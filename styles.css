@@ -1953,3 +1953,17 @@ th.crm31023-sort-active{color:#1d4ed8;background:#eff6ff}
   #modalBody .crm31024r-contact-slot{padding:13px}
   #modalBody .crm31024r-contact-slot .crm38-contact-row{grid-template-columns:1fr}
 }
+
+
+/* ===== CRM v3.10.24R3 · 연락처 실제 상단 고정 및 섹션 순서 확정 ===== */
+#modalBody .crm31024r-top-row{order:10}
+#modalBody .crm31024r-address-card{order:20}
+#modalBody .crm31024r-deal-card{order:30}
+#modalBody .crm31024r-property-card{order:40}
+#modalBody .crm31024r-detail-card{order:50}
+#modalBody .crm31024r-contact-slot .crm386-contact-toolbar,
+#modalBody .crm31024r-contact-slot #crm38ExtraContacts{display:block!important;width:100%!important}
+#modalBody .crm31024r-detail-card .crm386-contact-toolbar,
+#modalBody .crm31024r-detail-card #crm38ExtraContacts{display:none!important}
+#modalBody .crm31024r-contact-slot .crm386-contact-toolbar{display:flex!important;align-items:center;justify-content:space-between;gap:12px}
+#modalBody .crm31024r-contact-slot .crm386-contact-toolbar + #crm38ExtraContacts{margin-top:8px!important}

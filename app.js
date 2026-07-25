@@ -10111,7 +10111,7 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
 
 /* ===== CRM v3.10.24R · v3.10.23 기반 매물 입력 UI 재배치 ===== */
 (()=>{
-  const VERSION='3.10.24R2';
+  const VERSION='3.10.24R3';
   const q=(s,r=document)=>r.querySelector(s);
 
   function directChild(node,root){
@@ -10204,13 +10204,13 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
     if(!detailCard){detailCard=makeCard('crm31024r-detail-card','상세 조건 및 사진','기존 입력 기능은 그대로 유지됩니다.');}
 
     const titleBlock=fieldBlock(root,'title');
-    const extra=q('#crm38ExtraContacts',root)||q('#crm38ExtraContacts',topRow);
-    const toolbar=q('.crm386-contact-toolbar',root)||q('.crm386-contact-toolbar',topRow);
+    const extra=q('#crm38ExtraContacts',body);
+    const toolbar=q('.crm386-contact-toolbar',body);
     const titleSlot=q('.crm31024r-title-slot',topRow);
     const contactSlot=q('.crm31024r-contact-slot',topRow);
     if(titleBlock&&titleBlock.parentElement!==titleSlot)titleSlot.appendChild(titleBlock);
-    if(toolbar&&toolbar.parentElement!==contactSlot)contactSlot.appendChild(toolbar);
-    if(extra&&extra.parentElement!==contactSlot)contactSlot.appendChild(extra);
+    if(toolbar){ toolbar.classList.add('crm31024r-contact-toolbar'); if(toolbar.parentElement!==contactSlot)contactSlot.appendChild(toolbar); }
+    if(extra){ extra.classList.add('crm31024r-contact-list'); if(extra.parentElement!==contactSlot)contactSlot.appendChild(extra); }
     if(!topRow.isConnected)root.prepend(topRow);
 
     if(!addressCard.isConnected){topRow.after(addressCard);}
@@ -10219,9 +10219,11 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
     if(deal){
       deal.classList.add('crm31024r-deal-card');
       addressCard.after(deal);
+      deal.after(propertyCard);
+    }else{
+      addressCard.after(propertyCard);
     }
-    if(!propertyCard.isConnected){(deal||addressCard).after(propertyCard);}
-    if(!detailCard.isConnected){propertyCard.after(detailCard);}
+    propertyCard.after(detailCard);
 
     const addressGrid=q('.crm31024r-card-grid',addressCard);
     const propertyGrid=q('.crm31024r-card-grid',propertyCard);
@@ -10256,7 +10258,7 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   const base=window.openListingModal||openListingModal;
   window.openListingModal=function(id){
     const result=base.apply(this,arguments);
-    [0,60,180,420,850].forEach(ms=>setTimeout(arrangeListingForm,ms));
+    [0,40,100,220,450,900,1500].forEach(ms=>setTimeout(arrangeListingForm,ms));
     return result;
   };
   openListingModal=window.openListingModal;
