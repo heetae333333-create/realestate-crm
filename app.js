@@ -10108,3 +10108,221 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   window.crm31023ProcessTables=processTables;
   console.info(`CRM v${VERSION} 최신 등록순·전 열 정렬·고객 등록일·최초 FU 자동기입 적용`);
 })();
+
+/* ===== CRM v3.10.24 매물폼 재배치 · 입주UI · 전체고객관리 · 표 정합성 ===== */
+(function(){
+  const VERSION='3.10.24';
+  const q=(s,r=document)=>r.querySelector(s), qa=(s,r=document)=>[...r.querySelectorAll(s)];
+  const esc=s=>typeof escapeHtml==='function'?escapeHtml(String(s??'')):String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const same=(a,b)=>String(a??'')===String(b??'');
+
+  function labelText(el){
+    if(!el)return '';
+    const c=el.cloneNode(true);qa('input,select,textarea,button,small',c).forEach(x=>x.remove());
+    return c.textContent.replace(/\s+/g,' ').trim();
+  }
+  function findField(form,names){
+    for(const n of names){const el=q(`[name="${n}"],#${n}`,form);if(el)return el.closest('label')||el.closest('.field')||el;}
+    return null;
+  }
+  function findByWords(form,words){
+    return qa('label',form).find(l=>words.some(w=>labelText(l).includes(w)))||null;
+  }
+  function addSection(parent,title,subtitle,cls=''){
+    const sec=document.createElement('section');sec.className=`crm31024-form-section ${cls}`;
+    sec.innerHTML=`<div class="crm31024-section-head"><h3>${esc(title)}</h3>${subtitle?`<p>${esc(subtitle)}</p>`:''}</div><div class="crm31024-section-grid"></div>`;
+    parent.appendChild(sec);return q('.crm31024-section-grid',sec);
+  }
+  function moveIf(grid,node,span=''){
+    if(!node||node.closest('.crm31024-form-section'))return;
+    if(span)node.classList.add(span);grid.appendChild(node);
+  }
+  function parseDistrict(address){
+    const s=String(address||'').replace(/\s+/g,' ').trim();
+    const m=s.match(/(?:서울(?:특별시)?\s*)?([가-힣]+구)\s+([가-힣0-9]+동)/);
+    return m?`${m[1]} ${m[2]}`:'';
+  }
+  function syncDistrict(form){
+    const addr=q('[name="address"]',form), district=q('[name="district"]',form);if(!addr||!district)return;
+    district.readOnly=true;district.tabIndex=-1;district.classList.add('crm31024-readonly');
+    const run=()=>{const parsed=parseDistrict(addr.value);district.value=parsed;district.dispatchEvent(new Event('change',{bubbles:true}));};
+    addr.addEventListener('input',run);addr.addEventListener('change',run);run();
+    const hint=document.createElement('small');hint.className='crm31024-auto-hint';hint.textContent='주소에서 구·동을 자동 추출합니다.';
+    if(!district.parentElement.querySelector('.crm31024-auto-hint'))district.parentElement.appendChild(hint);
+  }
+  function listingMoveText(x){
+    if(x?.move_in_mode==='period'&&x?.move_in_period)return x.move_in_period;
+    if(x?.move_in_immediate)return '즉시입주';
+    if(x?.move_in_negotiable)return '협의 가능';
+    return x?.move_in_date||'';
+  }
+  function installMoveInUI(form,x){
+    if(q('#crm31024MoveInBox',form))return q('#crm31024MoveInBox',form);
+    const oldDate=q('[name="move_in_date"]',form), oldImmediate=q('[name="move_in_immediate"]',form), oldNegotiable=q('[name="move_in_negotiable"]',form);
+    [oldDate,oldImmediate,oldNegotiable].forEach(el=>{if(el){const p=el.closest('label');if(p)p.classList.add('crm31024-hidden-legacy');else el.classList.add('crm31024-hidden-legacy');}});
+    const mode=x?.move_in_mode||(x?.move_in_period?'period':'date');
+    const period=x?.move_in_period||'';
+    const pm=period.match(/(20\d{2})[-.\s년]*(\d{1,2}).*(초순|중순|말)/);
+    const box=document.createElement('div');box.id='crm31024MoveInBox';box.className='crm31024-move-box crm31024-span-2';
+    box.innerHTML=`<div class="crm31024-move-head"><strong>입주가능일</strong><span>정확한 날짜 또는 월의 초순·중순·말로 입력</span></div>
+      <div class="crm31024-move-controls">
+        <select id="crm31024MoveMode"><option value="date" ${mode==='date'?'selected':''}>정확한 날짜</option><option value="period" ${mode==='period'?'selected':''}>초순·중순·말</option><option value="immediate" ${x?.move_in_immediate?'selected':''}>즉시입주</option><option value="negotiable" ${x?.move_in_negotiable?'selected':''}>협의 가능</option></select>
+        <input id="crm31024MoveDate" type="date" value="${esc(mode==='date'?(x?.move_in_date||''): '')}">
+        <input id="crm31024MoveMonth" type="month" value="${pm?`${pm[1]}-${String(pm[2]).padStart(2,'0')}`:''}">
+        <select id="crm31024MovePeriod"><option ${pm?.[3]==='초순'?'selected':''}>초순</option><option ${pm?.[3]==='중순'?'selected':''}>중순</option><option ${pm?.[3]==='말'?'selected':''}>말</option></select>
+      </div>`;
+    const sync=()=>{
+      const m=q('#crm31024MoveMode',box).value;
+      q('#crm31024MoveDate',box).style.display=m==='date'?'':'none';
+      q('#crm31024MoveMonth',box).style.display=m==='period'?'':'none';q('#crm31024MovePeriod',box).style.display=m==='period'?'':'none';
+      if(oldImmediate)oldImmediate.checked=m==='immediate';if(oldNegotiable)oldNegotiable.checked=m==='negotiable';
+      if(oldDate)oldDate.value=m==='date'?q('#crm31024MoveDate',box).value:'';
+    };
+    qa('input,select',box).forEach(el=>el.addEventListener('change',sync));sync();
+    return box;
+  }
+  function captureMovePayload(form){
+    const mode=q('#crm31024MoveMode',form)?.value;if(!mode)return null;
+    const month=q('#crm31024MoveMonth',form)?.value||'', period=q('#crm31024MovePeriod',form)?.value||'';
+    return {move_in_mode:mode,move_in_period:mode==='period'&&month?`${month} ${period}`:null,move_in_date:mode==='date'?(q('#crm31024MoveDate',form)?.value||null):null,move_in_immediate:mode==='immediate',move_in_negotiable:mode==='negotiable'};
+  }
+  function installListingPayloadPatch(){
+    if(!state?.client||state.client.__crm31024ListingPatch)return false;
+    const client=state.client, originalFrom=client.from.bind(client);
+    client.from=function(table){
+      const b=originalFrom(table);if(table!=='listings'||!b)return b;
+      ['insert','update'].forEach(method=>{
+        if(typeof b[method]!=='function'||b[`__crm31024_${method}`])return;
+        const original=b[method].bind(b);
+        b[method]=function(values,...rest){
+          const form=q('#modalForm');const extra=form?captureMovePayload(form):null;
+          const patch=v=>extra&&v&&typeof v==='object'?{...v,...extra}:v;
+          return original(Array.isArray(values)?values.map(patch):patch(values),...rest);
+        };b[`__crm31024_${method}`]=true;
+      });return b;
+    };client.__crm31024ListingPatch=true;return true;
+  }
+  if(!installListingPayloadPatch()){const t=setInterval(()=>{if(installListingPayloadPatch())clearInterval(t)},100);setTimeout(()=>clearInterval(t),10000);}
+
+  function rearrangeListingForm(id){
+    const form=q('#modalForm'),body=q('#modalBody');if(!form||!body||!q('[name="title"]',form)||body.dataset.crm31024Arranged==='1')return;
+    body.dataset.crm31024Arranged='1';body.classList.add('crm31024-listing-form');
+    const x=(state.listings||[]).find(v=>same(v.id,id))||{};
+    const root=document.createElement('div');root.className='crm31024-form-root';
+    const basic=addSection(root,'기본정보','주소와 상태, 공개 여부를 한눈에 확인합니다.');
+    const deal=addSection(root,'거래유형 및 금액','기존 복수 거래유형·선호유형 기능을 그대로 사용합니다.');
+    const detail=addSection(root,'상세조건','방·층수·관리비·입주조건·특징을 정리합니다.');
+    const memo=addSection(root,'사진 및 상세설명','내부사진과 중개사 전용 비밀메모를 관리합니다.');
+
+    const title=findField(form,['title']), contact=findField(form,['contact_phone']);
+    moveIf(basic,title);moveIf(basic,contact);
+    ['address','building_name','unit_number','district','status','is_public','property_type','area_m2'].forEach(n=>moveIf(basic,findField(form,[n])));
+    // 동·호수 구현별 이름도 포함
+    qa('label',body).filter(l=>['동','호수'].includes(labelText(l))).forEach(l=>moveIf(basic,l));
+    const contactBlock=q('.crm38-contacts-card,.crm38-contact-section',body);moveIf(basic,contactBlock,'crm31024-span-2');
+
+    qa('.crm38-deal-card,.crm38-deals,.crm38-deal-section',body).forEach(n=>moveIf(deal,n,'crm31024-span-2'));
+    qa('label',body).filter(l=>/거래유형|매매가|전세금|보증금|월세/.test(labelText(l))).forEach(l=>moveIf(deal,l));
+
+    ['room_count','bathroom_count','current_floor','total_floors','built_year','management_fee','options','loan_available','official_price','next_confirm_at'].forEach(n=>moveIf(detail,findField(form,[n])));
+    const moveBox=installMoveInUI(form,x);moveIf(detail,moveBox,'crm31024-span-2');
+    const feature=q('.crm361-feature-box,.crm361-feature-card,.crm36-check-grid',body)?.closest('section,div');moveIf(detail,feature,'crm31024-span-2');
+    qa('label',body).filter(l=>/매물 특징|반지하|옥탑|엘리베이터|반려동물/.test(labelText(l))).forEach(l=>moveIf(detail,l));
+
+    const photo=findField(form,['listingPhotoFiles']);moveIf(memo,photo,'crm31024-span-2');
+    const desc=findField(form,['description']);moveIf(memo,desc,'crm31024-span-2');
+    // 남은 실사용 필드는 기능 유지를 위해 마지막 섹션에 보존
+    qa(':scope > *',body).forEach(n=>{if(n!==root&&!n.closest('.crm31024-form-section')&&!['SCRIPT','STYLE'].includes(n.tagName))moveIf(detail,n,'crm31024-span-2');});
+    body.prepend(root);syncDistrict(form);
+  }
+  const baseOpenListing=window.openListingModal||globalThis.openListingModal;
+  if(typeof baseOpenListing==='function'&&!baseOpenListing.__crm31024){
+    const wrapped=function(id){const r=baseOpenListing.apply(this,arguments);setTimeout(()=>rearrangeListingForm(id),0);setTimeout(()=>rearrangeListingForm(id),120);return r};
+    wrapped.__crm31024=true;window.openListingModal=wrapped;try{openListingModal=wrapped}catch(_){ }
+  }
+
+  function removeKakaoDuplicates(){
+    const title=q('#modalTitle')?.textContent||'', modal=q('#modal');if(!modal?.open)return;
+    const btns=qa('button',modal).filter(b=>/카카오.*(소개|매물).*복사/.test(b.textContent));
+    const isCustomer=/고객/.test(title), isPrice=/가격 이력/.test(title), allowed=/매물.*FU|FU 관리|매물 상세|매물 수정/.test(title)&&!isCustomer&&!isPrice;
+    if(!allowed){btns.forEach(b=>b.remove());return;}
+    // 가장 왼쪽 첫 버튼만 유지
+    btns.slice(1).forEach(b=>b.remove());
+  }
+  function removeDuplicateSortIcons(){
+    qa('th').forEach(th=>{
+      const icons=qa('.crm31023-sort-icon,.crm396-sort-icon,[class*="sort-icon"]',th);
+      icons.slice(1).forEach(i=>i.remove());
+      const textNodes=[...th.childNodes].filter(n=>n.nodeType===3&&/[↕↑↓]/.test(n.textContent));
+      textNodes.slice(1).forEach(n=>n.remove());
+    });
+  }
+
+  function preferredCategory(c){
+    let arr=c?.preferred_property_types;if(typeof arr==='string'){try{arr=JSON.parse(arr)}catch(_){arr=arr.split(/[,+]/)}}if(!Array.isArray(arr))arr=[];
+    const home=['아파트','오피스텔','단독','다가구','다세대'];
+    const out=[];if(arr.some(x=>home.includes(x)))out.push('주택');['상가','사무실','토지','기타'].forEach(x=>{if(arr.includes(x))out.push(x)});
+    return out.length?out.join(' · '):'전체';
+  }
+  function moveInCustomer(c){return c?.desired_move_in_period||c?.desired_move_in_date||'-';}
+  function customerFeatureText(c){const a=c?.desired_feature_tags;return Array.isArray(a)&&a.length?a.join(' · '):'-';}
+  function customerContactsHtml(c){try{return typeof crm3857ContactHtml==='function'?crm3857ContactHtml(c):esc(c.phone||'-')}catch(_){return esc(c.phone||'-')}}
+  function customerBudget(c){try{return typeof crm3857BudgetText==='function'?crm3857BudgetText(c):esc(c.budget_max||'-')}catch(_){return esc(c.budget_max||'-')}}
+  function customerRoom(c){try{return typeof customerRoomText==='function'?customerRoomText(c):esc(c.desired_rooms||'-')}catch(_){return esc(c.desired_rooms||'-')}}
+  function dateFmt(v){try{return typeof fmtDate==='function'?fmtDate(v):(v||'-')}catch(_){return v||'-'}}
+  function due(v){try{return typeof dueBadge==='function'?dueBadge(v):(v||'-')}catch(_){return v||'-'}}
+  function stage(c){try{return typeof contractStage==='function'?contractStage(c):'-'}catch(_){return '-'}}
+  function statusBadge(c){try{return badge(c.status||'신규인입','blue')}catch(_){return esc(c.status||'신규인입')}}
+  function grade(c){try{return gradeBadge(c.customer_grade)}catch(_){return esc(c.customer_grade||'-')}}
+  function filteredOwnCustomers(){
+    const all=state.crm31024AllCustomers||state.customers||[];
+    const base=state.profile?.role==='admin'?all.filter(c=>same(c.owner_id,state.profile.id)):all;
+    const search=(q('#customerSearch')?.value||'').toLowerCase().replace(/\s/g,''),s=q('#customerStatus')?.value||'',d=q('#customerDealType')?.value||'',g=q('#customerGrade')?.value||'';
+    return base.filter(c=>{const hay=`${c.name||''} ${c.phone||''}`.toLowerCase().replace(/\s/g,'');return(!search||hay.includes(search))&&(!s||c.status===s)&&(!d||String(c.deal_type||'').includes(d))&&(!g||c.customer_grade===g)});
+  }
+  function renderCleanCustomerTable(rows,target='#customerTable',admin=false){
+    const host=typeof target==='string'?q(target):target;if(!host)return;
+    host.innerHTML=rows.length?`<div class="table-wrap crm31024-customer-wrap"><table class="customer-table crm31024-customer-table"><thead><tr>${admin?'<th>담당</th>':''}<th>순번</th><th>상태</th><th>고객명</th><th>연락처</th><th>희망</th><th>등급</th><th>희망지역</th><th>방</th><th>희망금액</th><th>입주희망일</th><th>희망특징</th><th>진행상황</th><th>최종 FU</th><th>예정 FU</th><th>관리</th></tr></thead><tbody>${rows.map((c,i)=>`<tr data-customer-id="${esc(c.id)}">${admin?`<td>${esc(c.owner?.full_name||c.owner_name||'-')}</td>`:''}<td>${i+1}</td><td>${statusBadge(c)}</td><td><button class="crm3857-customer-name" onclick="openCustomerModal('${c.id}')">${esc(c.name||'-')}</button></td><td>${customerContactsHtml(c)}</td><td>${esc(preferredCategory(c))}</td><td>${grade(c)}</td><td><span class="crm31024-clamp" title="${esc(c.preferred_area||'-')}">${esc(c.preferred_area||'-')}</span></td><td>${customerRoom(c)}</td><td>${customerBudget(c)}</td><td>${esc(moveInCustomer(c))}</td><td><span class="crm31024-clamp" title="${esc(customerFeatureText(c))}">${esc(customerFeatureText(c))}</span></td><td>${stage(c)}</td><td>${dateFmt(c.last_follow_up_at)}</td><td>${due(c.next_follow_up_at)}</td><td><div class="crm31024-created">${c.created_at?`등록 ${new Date(c.created_at).toLocaleString('ko-KR',{year:'2-digit',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false})}`:''}</div><div class="row-actions"><button class="success" onclick="openFollowUpModal('customer','${c.id}')">FU</button><button class="ghost" onclick="openContractModal('customer','${c.id}')">진행상황</button><button class="ghost" onclick="openCustomerModal('${c.id}')">수정</button><button class="danger" onclick="deleteCustomer('${c.id}')">삭제</button></div></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 고객이 없습니다.</div>';
+    setTimeout(()=>window.crm31023ProcessTables?.(),0);
+  }
+
+  const originalLoad=window.loadCustomers||globalThis.loadCustomers;
+  if(typeof originalLoad==='function'&&!originalLoad.__crm31024){
+    const wrapped=async function(){const r=await originalLoad.apply(this,arguments);state.crm31024AllCustomers=[...(state.customers||[])];if(state.view==='customers'&&state.profile?.role==='admin')state.customers=state.crm31024AllCustomers.filter(c=>same(c.owner_id,state.profile.id));return r};
+    wrapped.__crm31024=true;window.loadCustomers=wrapped;try{loadCustomers=wrapped}catch(_){ }
+  }
+  window.filterCustomers=function(){renderCleanCustomerTable(filteredOwnCustomers())};
+
+  async function renderAdminCustomers(){
+    if(state.profile?.role!=='admin')return toast('관리자만 사용할 수 있습니다.');
+    if(typeof originalLoad==='function')await originalLoad();state.crm31024AllCustomers=[...(state.customers||[])];
+    const members=state.members||[];const map=new Map(members.map(m=>[String(m.id),m]));state.crm31024AllCustomers.forEach(c=>c.owner=c.owner||map.get(String(c.owner_id)));
+    q('#topActions').innerHTML='';q('#content').innerHTML=`<div class="panel"><div class="filters"><input id="crm31024AdminCustomerSearch" placeholder="고객명·연락처 검색"><select id="crm31024AdminCustomerOwner"><option value="">전체 중개사</option>${members.map(m=>`<option value="${esc(m.id)}">${esc(m.full_name||m.email||m.id)}</option>`).join('')}</select><select id="crm31024AdminCustomerStatus"><option value="">전체 상태</option>${['신규인입','매물추천','방문','계약','보류','영업종료'].map(x=>`<option>${x}</option>`).join('')}</select></div><div id="crm31024AdminCustomerTable"></div></div>`;
+    const paint=()=>{const s=q('#crm31024AdminCustomerSearch').value.toLowerCase().replace(/\s/g,''),o=q('#crm31024AdminCustomerOwner').value,st=q('#crm31024AdminCustomerStatus').value;const rows=state.crm31024AllCustomers.filter(c=>(!s||`${c.name||''}${c.phone||''}`.toLowerCase().replace(/\s/g,'').includes(s))&&(!o||same(c.owner_id,o))&&(!st||c.status===st));renderCleanCustomerTable(rows,'#crm31024AdminCustomerTable',true)};
+    qa('input,select',q('#content')).forEach(el=>el.addEventListener('input',paint));paint();
+  }
+  window.renderAdminCustomers=renderAdminCustomers;
+
+  // 관리자 메뉴 버튼 추가
+  function ensureAdminCustomersNav(){
+    const section=q('.nav-section.admin-only');if(!section||q('[data-view="adminCustomers"]'))return;
+    const btn=document.createElement('button');btn.className='nav admin-nav';btn.dataset.view='adminCustomers';btn.textContent='전체 고객 관리';
+    const listing=q('[data-view="adminListings"]',section);listing?listing.after(btn):section.appendChild(btn);
+    btn.addEventListener('click',()=>window.renderView?.('adminCustomers'));
+  }
+  ensureAdminCustomersNav();
+  const baseRenderView=window.renderView||globalThis.renderView;
+  if(typeof baseRenderView==='function'&&!baseRenderView.__crm31024){
+    const wrapped=async function(view){
+      if(view==='adminCustomers'){
+        state.view=view;qa('.nav').forEach(b=>b.classList.toggle('active',b.dataset.view===view));q('#pageTitle').textContent='전체 고객 관리';q('#pageSubtitle').textContent='관리자 전용 · 모든 중개사의 고객을 조회하고 관리합니다.';return renderAdminCustomers();
+      }
+      return baseRenderView.apply(this,arguments);
+    };wrapped.__crm31024=true;window.renderView=wrapped;try{renderView=wrapped}catch(_){ }
+  }
+
+  const observer=new MutationObserver(()=>{removeKakaoDuplicates();removeDuplicateSortIcons();ensureAdminCustomersNav();});
+  observer.observe(document.body,{childList:true,subtree:true});
+  setTimeout(()=>{removeKakaoDuplicates();removeDuplicateSortIcons();ensureAdminCustomersNav()},100);
+  console.info(`CRM v${VERSION} 매물폼·입주UI·전체고객관리·정렬/표 정합성 적용`);
+})();
