@@ -2052,3 +2052,31 @@ table.listing-table tbody tr.crm-r311-listing-complete .muted {
 .crm-r312-content-label{grid-column:1/-1}
 .crm-r312-edit-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
 @media(max-width:640px){.crm-r312-edit-grid{grid-template-columns:1fr}}
+
+/* CRM v3.10.24R3.16 · FU 모달 흔들림 방지
+   dialog 기본 중앙정렬은 내용 높이가 바뀔 때 위/아래 위치를 다시 계산한다.
+   FU에서만 위쪽 기준 위치를 고정하고 본문만 스크롤시킨다. */
+#modal.crm-r316-fu-stable {
+  margin: 5vh auto 0 !important;
+  max-height: 90vh;
+  overflow: hidden;
+  transition: none !important;
+  animation: none !important;
+}
+#modal.crm-r316-fu-stable .modal-card {
+  max-height: 90vh;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+#modal.crm-r316-fu-stable #modalBody {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+#modal.crm-r316-fu-stable .modal-header,
+#modal.crm-r316-fu-stable .modal-actions {
+  flex: 0 0 auto;
+}

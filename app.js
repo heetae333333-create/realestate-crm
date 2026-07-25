@@ -11143,3 +11143,68 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
 
   console.info(`CRM v${VERSION} FU 흔들림 제거 적용`);
 })();
+
+/* =========================================================
+   CRM v3.10.24R3.16 · FU 모달 위치 고정(센터 재계산 흔들림 제거)
+   - FU 내용이 비동기로 추가/교체되어 높이가 바뀌어도 dialog 위치는 고정
+   - 고객/매물 FU에서만 적용
+   ========================================================= */
+(() => {
+  const VERSION = '3.10.24R3.16';
+  const modal = document.getElementById('modal');
+  if (!modal) return;
+
+  function markFuModal() {
+    modal.classList.add('crm-r316-fu-stable');
+  }
+  function clearFuModal() {
+    modal.classList.remove('crm-r316-fu-stable');
+  }
+
+  // inline onclick은 최종 window 함수를 사용하므로 최종 진입점 한 곳에서만 표시 상태를 설정한다.
+  const finalOpen = window.openFollowUpModal || globalThis.openFollowUpModal;
+  if (typeof finalOpen === 'function' && !finalOpen.__crmR316StablePosition) {
+    const wrapped = function(entityType, id, ...args) {
+      markFuModal();
+      try {
+        return finalOpen.call(this, entityType, id, ...args);
+      } catch (err) {
+        clearFuModal();
+        throw err;
+      }
+    };
+    wrapped.__crmR316StablePosition = true;
+    window.openFollowUpModal = wrapped;
+    try { openFollowUpModal = wrapped; } catch (_) {}
+  }
+
+  // 고객 상세 탭에서 openCustomerFuHub를 직접 호출하는 경로도 동일하게 고정한다.
+  const hub = window.openCustomerFuHub || globalThis.openCustomerFuHub;
+  if (typeof hub === 'function' && !hub.__crmR316StablePosition) {
+    const wrappedHub = function(...args) {
+      markFuModal();
+      try { return hub.apply(this, args); }
+      catch (err) { clearFuModal(); throw err; }
+    };
+    wrappedHub.__crmR316StablePosition = true;
+    window.openCustomerFuHub = wrappedHub;
+    try { openCustomerFuHub = wrappedHub; } catch (_) {}
+  }
+
+  // 매물 FU를 직접 호출하는 기존 코드 경로도 처리.
+  const listingFu = window.crm361OpenListingFu || globalThis.crm361OpenListingFu;
+  if (typeof listingFu === 'function' && !listingFu.__crmR316StablePosition) {
+    const wrappedListing = function(...args) {
+      markFuModal();
+      try { return listingFu.apply(this, args); }
+      catch (err) { clearFuModal(); throw err; }
+    };
+    wrappedListing.__crmR316StablePosition = true;
+    window.crm361OpenListingFu = wrappedListing;
+    try { crm361OpenListingFu = wrappedListing; } catch (_) {}
+  }
+
+  modal.addEventListener('close', clearFuModal);
+  modal.addEventListener('cancel', clearFuModal);
+  console.info(`CRM v${VERSION} FU 모달 상단 고정 안정화 적용`);
+})();
