@@ -1949,3 +1949,19 @@ th.crm31023-sort-active{color:#1d4ed8;background:#eff6ff}
   .crm31024r36-period-fields{grid-template-columns:minmax(0,1fr) 105px}
   .crm31024r36-checks{flex-direction:row;gap:18px;padding-top:2px}
 }
+
+
+/* CRM v3.10.24R3.7 사진 선택 삭제 관리 */
+.crm31024r37-photo-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.crm31024r37-delete-bar{display:flex;align-items:center;gap:14px;margin:0 0 12px;padding:10px 12px;border:1px solid #fecaca;border-radius:12px;background:#fff7f7}
+.crm31024r37-delete-bar.hidden{display:none!important}
+.crm31024r37-delete-bar label{display:flex;align-items:center;gap:7px;font-weight:700}
+.crm31024r37-delete-bar #crm31024r37SelectedCount{margin-left:auto;color:#64748b;font-weight:700}
+.crm31024r37-photo-select{display:none;position:absolute;z-index:3;left:10px;top:10px;align-items:center;gap:6px;padding:7px 10px;border:1px solid #cbd5e1;border-radius:999px;background:rgba(255,255,255,.95);font-size:13px;font-weight:800;box-shadow:0 2px 8px rgba(15,23,42,.12);cursor:pointer}
+.photo-manage-on .crm31024r37-photo-select{display:flex}
+.crm38-photo-card{position:relative}
+.photo-manage-on .crm38-photo-card img{cursor:pointer}
+.crm38-photo-card.crm31024r37-selected{outline:3px solid #ef4444;outline-offset:-3px}
+.crm38-photo-card.crm31024r37-selected::after{content:'선택됨';position:absolute;right:10px;top:10px;z-index:2;padding:5px 8px;border-radius:999px;background:#ef4444;color:#fff;font-size:12px;font-weight:800}
+.photo-manage-on .crm38-photo-meta{display:none!important}
+@media(max-width:640px){.crm31024r37-photo-toolbar{align-items:flex-start}.crm31024r37-photo-actions{width:100%;justify-content:flex-start}.crm31024r37-delete-bar{align-items:stretch;flex-wrap:wrap}.crm31024r37-delete-bar #crm31024r37SelectedCount{margin-left:0}.crm31024r37-delete-bar button{margin-left:auto}}

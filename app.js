@@ -1323,12 +1323,94 @@ openListingModal=function(id){
     const files=$('#listingPhotoFiles')?.files;let photoResult={uploaded:0,failed:0};if(files?.length)photoResult=await uploadListingPhotos(listingId,files);await loadListings();$('#modal').close();toast(`저장했습니다.${photoResult.uploaded?` 사진 ${photoResult.uploaded}장 등록.`:''}`);state.view==='adminListings'?renderAdminListings():renderMyListings()};$('#modal').showModal();
 };
 openListingPhotos=async function(listingId){
-  const listing=state.listings.find(x=>x.id===listingId);if(!listing)return toast('매물을 찾지 못했습니다.');$('#modalTitle').textContent=`내부 사진 · ${listing.title}`;
-  const {data,error}=await state.client.from('listing_photos').select('*').eq('listing_id',listingId).order('sort_order').order('created_at');if(error)return toast(error.message);const photos=data||[];const cards=[];
-  for(const p of photos){const url=await signedPhotoUrl(p.storage_path);cards.push(`<div class="photo-card crm38-photo-card ${listing.cover_photo_id===p.id?'cover':''}">${url?`<img src="${url}" onclick="window.open('${url}','_blank')" alt="매물 사진">`:''}<div class="photo-meta crm38-photo-meta"><input value="${escapeHtml(p.caption||'')}" placeholder="사진 설명" onchange="updatePhotoMeta('${p.id}','caption',this.value)"><select onchange="updatePhotoMeta('${p.id}','photo_category',this.value)">${['거실','주방','방','화장실','외관','뷰','기타'].map(c=>`<option ${p.photo_category===c?'selected':''}>${c}</option>`).join('')}</select><label><input type="checkbox" ${p.is_customer_visible?'checked':''} onchange="updatePhotoMeta('${p.id}','is_customer_visible',this.checked)"> 고객용 공개</label><input type="number" value="${p.sort_order||0}" onchange="updatePhotoMeta('${p.id}','sort_order',Number(this.value))"><button onclick="setCoverPhoto('${listing.id}','${p.id}')">대표사진</button>${canManageListing(listing)?`<button class="danger" onclick="deleteListingPhoto('${listing.id}','${p.id}','${p.storage_path}')">삭제</button>`:''}</div></div>`)}
-  $('#modalBody').innerHTML=`<div class="photo-toolbar"><div><strong>${photos.length}장</strong><div class="muted">사진을 누르면 원본 크기로 볼 수 있습니다.</div></div><div><button class="ghost" onclick="crm38TogglePhotoManage(this)">사진 관리</button><button class="ghost" onclick="downloadAllListingPhotos('${listing.id}')">전체 ZIP 다운로드</button>${canManageListing(listing)?`<button class="primary" onclick="addListingPhotos('${listing.id}')">사진 추가</button>`:''}</div></div><div class="photo-grid crm38-photo-grid">${cards.join('')||'<div class="empty">등록된 사진이 없습니다.</div>'}</div>`;$('#modalSubmit').style.display='none';const reset=()=>{$('#modalSubmit').style.display='';$('#modal').removeEventListener('close',reset)};$('#modal').addEventListener('close',reset);$('#modal').showModal();
+  const listing=state.listings.find(x=>x.id===listingId);
+  if(!listing)return toast('매물을 찾지 못했습니다.');
+  $('#modalTitle').textContent=`내부 사진 · ${listing.title}`;
+  const {data,error}=await state.client.from('listing_photos').select('*').eq('listing_id',listingId).order('sort_order').order('created_at');
+  if(error)return toast(error.message);
+  const photos=data||[];
+  const manageable=canManageListing(listing);
+  const cards=[];
+  for(const p of photos){
+    const url=await signedPhotoUrl(p.storage_path);
+    cards.push(`<div class="photo-card crm38-photo-card ${listing.cover_photo_id===p.id?'cover':''}" data-photo-id="${p.id}" data-storage-path="${escapeHtml(p.storage_path||'')}">
+      ${manageable?`<label class="crm31024r37-photo-select"><input type="checkbox" class="crm31024r37-photo-check" value="${p.id}" onchange="crm31024r37UpdatePhotoSelection()"><span>선택</span></label>`:''}
+      ${url?`<img src="${escapeHtml(url)}" onclick="window.open('${escapeHtml(url)}','_blank')" alt="매물 사진">`:''}
+      <div class="photo-meta crm38-photo-meta">
+        <input value="${escapeHtml(p.caption||'')}" placeholder="사진 설명" onchange="updatePhotoMeta('${p.id}','caption',this.value)">
+        <select onchange="updatePhotoMeta('${p.id}','photo_category',this.value)">${['거실','주방','방','화장실','외관','뷰','기타'].map(c=>`<option ${p.photo_category===c?'selected':''}>${c}</option>`).join('')}</select>
+        <label><input type="checkbox" ${p.is_customer_visible?'checked':''} onchange="updatePhotoMeta('${p.id}','is_customer_visible',this.checked)"> 고객용 공개</label>
+        <input type="number" value="${p.sort_order||0}" onchange="updatePhotoMeta('${p.id}','sort_order',Number(this.value))">
+        <button onclick="setCoverPhoto('${listing.id}','${p.id}')">대표사진</button>
+      </div>
+    </div>`)
+  }
+  $('#modalBody').innerHTML=`
+    <div class="photo-toolbar crm31024r37-photo-toolbar">
+      <div><strong>${photos.length}장</strong><div class="muted">사진을 누르면 원본 크기로 볼 수 있습니다.</div></div>
+      <div class="crm31024r37-photo-actions">
+        ${manageable?`<button type="button" class="ghost" id="crm31024r37ManageBtn" onclick="crm38TogglePhotoManage(this,'${listing.id}')">사진 관리</button>`:''}
+        <button type="button" class="ghost" onclick="downloadAllListingPhotos('${listing.id}')">전체 ZIP 다운로드</button>
+        ${manageable?`<button type="button" class="primary" onclick="addListingPhotos('${listing.id}')">사진 추가</button>`:''}
+      </div>
+    </div>
+    ${manageable?`<div id="crm31024r37DeleteBar" class="crm31024r37-delete-bar hidden"><label><input type="checkbox" id="crm31024r37SelectAll" onchange="crm31024r37ToggleAllPhotos(this.checked)"> 전체 선택</label><span id="crm31024r37SelectedCount">0장 선택</span><button type="button" class="danger" id="crm31024r37DeleteSelectedBtn" disabled onclick="crm31024r37DeleteSelectedPhotos('${listing.id}')">선택 사진 삭제</button></div>`:''}
+    <div class="photo-grid crm38-photo-grid">${cards.join('')||'<div class="empty">등록된 사진이 없습니다.</div>'}</div>`;
+  $('#modalSubmit').style.display='none';
+  const reset=()=>{$('#modalSubmit').style.display='';$('#modal').removeEventListener('close',reset)};
+  $('#modal').addEventListener('close',reset);
+  $('#modal').showModal();
 };
-function crm38TogglePhotoManage(btn){const on=$('#modalBody').classList.toggle('photo-manage-on');btn.textContent=on?'사진만 보기':'사진 관리'}
+function crm38TogglePhotoManage(btn){
+  const body=$('#modalBody');
+  const on=body.classList.toggle('photo-manage-on');
+  btn.textContent=on?'관리 종료':'사진 관리';
+  const bar=$('#crm31024r37DeleteBar');
+  if(bar)bar.classList.toggle('hidden',!on);
+  if(!on){
+    body.querySelectorAll('.crm31024r37-photo-check').forEach(c=>c.checked=false);
+    const all=$('#crm31024r37SelectAll');if(all)all.checked=false;
+  }
+  crm31024r37UpdatePhotoSelection();
+}
+function crm31024r37UpdatePhotoSelection(){
+  const checks=[...document.querySelectorAll('.crm31024r37-photo-check')];
+  const selected=checks.filter(c=>c.checked);
+  const count=$('#crm31024r37SelectedCount');if(count)count.textContent=`${selected.length}장 선택`;
+  const del=$('#crm31024r37DeleteSelectedBtn');if(del)del.disabled=!selected.length;
+  const all=$('#crm31024r37SelectAll');if(all){all.checked=checks.length>0&&selected.length===checks.length;all.indeterminate=selected.length>0&&selected.length<checks.length;}
+  checks.forEach(c=>c.closest('.crm38-photo-card')?.classList.toggle('crm31024r37-selected',c.checked));
+}
+function crm31024r37ToggleAllPhotos(checked){
+  document.querySelectorAll('.crm31024r37-photo-check').forEach(c=>c.checked=checked);
+  crm31024r37UpdatePhotoSelection();
+}
+async function crm31024r37DeleteSelectedPhotos(listingId){
+  const listing=state.listings.find(x=>x.id===listingId);
+  if(!canManageListing(listing))return toast('사진을 삭제할 권한이 없습니다.');
+  const selected=[...document.querySelectorAll('.crm31024r37-photo-check:checked')];
+  if(!selected.length)return toast('삭제할 사진을 선택하세요.');
+  if(!confirm(`선택한 사진 ${selected.length}장을 삭제할까요? 삭제 후 복구할 수 없습니다.`))return;
+  const cards=selected.map(c=>c.closest('.crm38-photo-card')).filter(Boolean);
+  const ids=cards.map(c=>c.dataset.photoId).filter(Boolean);
+  const paths=cards.map(c=>c.dataset.storagePath).filter(Boolean);
+  const btn=$('#crm31024r37DeleteSelectedBtn');
+  if(btn){btn.disabled=true;btn.textContent='삭제 중...';}
+  try{
+    if(paths.length){
+      const {error:storageError}=await state.client.storage.from('listing-photos').remove(paths);
+      if(storageError)throw storageError;
+    }
+    const {error}=await state.client.from('listing_photos').delete().in('id',ids);
+    if(error)throw error;
+    toast(`사진 ${ids.length}장을 삭제했습니다.`);
+    await openListingPhotos(listingId);
+  }catch(e){
+    toast(`사진 삭제 실패: ${e.message||e}`);
+    if(btn){btn.disabled=false;btn.textContent='선택 사진 삭제';}
+  }
+}
+Object.assign(window,{crm31024r37UpdatePhotoSelection,crm31024r37ToggleAllPhotos,crm31024r37DeleteSelectedPhotos});
 renderListingTable=function(rows,target,mine,adminMode=false){const el=$('#'+target);el.innerHTML=rows.length?`<div class="table-wrap listing-table-wrap"><table class="listing-table"><thead><tr>${adminMode?'<th class="select-col">선택</th>':''}<th>상태</th><th>거래</th><th>유형</th><th>매물명</th><th>지역</th><th>금액</th><th>연락처</th><th>대출</th><th>전용면적</th><th>방/욕실</th><th>입주</th><th>담당</th><th>진행상황</th><th>최종 FU</th><th>예정 FU</th>${mine?'<th>관리</th>':''}</tr></thead><tbody>${rows.map(x=>`<tr>${adminMode?`<td><input type="checkbox" class="admin-listing-check" value="${x.id}" onchange="toggleAdminListingSelection('${x.id}',this.checked)"></td>`:''}<td class="crm3812-status-cell"><div class="crm3812-list-address" title="${escapeHtml(x.address||x.district||'주소 미입력')}">${escapeHtml(x.address||x.district||'주소 미입력')}</div>${badge(x.status==='available'?'거래 가능':x.status==='complete'?'거래 완료':'협의 중',x.status==='available'?'green':x.status==='complete'?'gray':'yellow')}</td><td>${escapeHtml(crm38DealTypeText(x))}</td><td>${escapeHtml(x.property_type)}</td><td><button type="button" class="crm3814-listing-title-link" onclick="openListingDetail('${x.id}')" title="매물 상세정보 보기">${escapeHtml(x.title)}</button>${x.is_public?'':' '+badge('비공개','red')}<br><button class="photo-link" onclick="openListingPhotos('${x.id}')">📷 내부사진</button></td><td>${escapeHtml(listingAreaText(x))}</td><td>${listingPriceText(x)}</td><td>${crm382ContactDisplay(x)}</td><td>${x.loan_available===true?badge('O','green'):x.loan_available===false?badge('X','red'):badge('미확인','gray')}</td><td>${x.area_m2?`${x.area_m2}㎡<br><span class="muted">약 ${(Number(x.area_m2)/3.3058).toFixed(2)}평</span>`:'-'}</td><td>${listingRoomText(x)} / ${x.bathroom_count??'-'}</td><td>${moveInText(x)}</td><td>${escapeHtml(x.owner?.full_name||'-')}</td><td>${contractStage(x)}</td><td>${fmtDate(x.last_follow_up_at||x.last_confirmed_at)}</td><td>${dueBadge(x.next_follow_up_at)}</td>${mine?`<td><div class="row-actions"><button class="success" onclick="openFollowUpModal('listing','${x.id}')">FU</button><button class="ghost" onclick="openHistoryModal('listing','${x.id}')">히스토리</button><button class="ghost" onclick="openContractModal('listing','${x.id}')">진행상황</button><button class="ghost" onclick="openListingModal('${x.id}')">수정</button>${adminMode?`<button class="primary" onclick="openSingleListingTransfer('${x.id}')">개별 이관</button>`:''}<button class="danger" onclick="deleteListing('${x.id}')">삭제</button></div></td>`:''}</tr>`).join('')}</tbody></table></div>`:'<div class="empty">조건에 맞는 매물이 없습니다.</div>';if(adminMode)updateBulkTransferControls()};
 Object.assign(window,{openListingModal,openListingPhotos,crm38AddContactRow,crm38SyncDealCards,crm38TogglePhotoManage,renderListingTable});
 console.info('CRM v3.8 매물 입력·사진·복수거래 개선 로드 완료');
