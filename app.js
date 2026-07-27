@@ -12917,3 +12917,376 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   Object.assign(window,{crmR332OpenSelfProfileEdit:openSelfProfileEdit});
   console.info(`CRM v${VERSION} 내 회원정보 수정 적용`);
 })();
+
+
+/* =========================================================
+   CRM v3.10.24R3.33 · 실전형 자동매칭 알고리즘 + 간결 UI
+   - 현재 고객/매물 입력항목과 DB 구조 변경 없음
+   - 예산 자동 확장, 방/면적/연식 중심 점수
+   - 추천 카드는 주소·방/욕실·면적·금액 중심
+   ========================================================= */
+(() => {
+  const VERSION='3.10.24R3.33';
+
+  function num(v){const n=Number(v);return Number.isFinite(n)?n:0}
+  function arr(v){
+    if(Array.isArray(v))return v.filter(Boolean);
+    if(!v)return [];
+    try{const x=JSON.parse(v);if(Array.isArray(x))return x.filter(Boolean)}catch(_){}
+    return String(v).split(/[,|+]/).map(x=>x.trim()).filter(Boolean);
+  }
+  function currentYear(){return new Date().getFullYear()}
+  function roomValue(x,isCustomer=false){
+    if(isCustomer)return customerRoomValue(x);
+    return listingRoomValue(x);
+  }
+  function budgetExtension(budget){
+    if(!budget)return 0;
+    if(budget<10000)return 1500;
+    if(budget<20000)return 2000;
+    if(budget<30000)return 3000;
+    if(budget<50000)return 4000;
+    return 5000;
+  }
+  function propertyTypes(customer){
+    const values=arr(customer.preferred_property_types);
+    if(values.includes('주택 전체')){
+      return [...new Set([...values,'아파트','오피스텔','단독','다가구','다세대'])];
+    }
+    return values;
+  }
+  function listingDeals(listing){
+    try{
+      const opts=typeof crm38DealOptions==='function'?crm38DealOptions(listing):[];
+      if(opts?.length)return opts.map(o=>({
+        type:o.deal_type||listing.transaction_type,
+        price:num(o.price),
+        rent:num(o.monthly_rent),
+        preferred:!!o.is_preferred
+      }));
+    }catch(_){}
+    return [{
+      type:listing.transaction_type||'',
+      price:num(listing.price),
+      rent:num(listing.monthly_rent),
+      preferred:true
+    }];
+  }
+  function ageScore(listing){
+    const y=num(listing.built_year);
+    if(!y)return {score:4,age:null,label:'연식 미확인'};
+    const age=Math.max(0,currentYear()-y);
+    if(age<=5)return {score:15,age,label:`준공 ${age}년`};
+    if(age<=10)return {score:13,age,label:`준공 ${age}년`};
+    if(age<=15)return {score:10,age,label:`준공 ${age}년`};
+    if(age<=20)return {score:7,age,label:`준공 ${age}년`};
+    if(age<=25)return {score:3,age,label:`준공 ${age}년`};
+    return {score:0,age,label:`구옥 · 준공 ${age}년`};
+  }
+  function featureScore(customer,listing){
+    const wanted=arr(customer.desired_feature_tags);
+    const got=arr(listing.feature_tags);
+    if(!wanted.length)return {score:5,matched:[],missing:[]};
+    const matched=wanted.filter(x=>got.includes(x));
+    const missing=wanted.filter(x=>!got.includes(x));
+    return {score:Math.min(10,matched.length*3),matched,missing};
+  }
+  function areaScore(listing){
+    const a=num(listing.area_m2);
+    if(!a)return 4;
+    if(a>=85)return 20;
+    if(a>=59)return 18;
+    if(a>=49)return 16;
+    if(a>=39)return 14;
+    if(a>=29)return 11;
+    if(a>=20)return 8;
+    return 5;
+  }
+  function roomScore(customer,listing){
+    const wanted=roomValue(customer,true);
+    const actual=roomValue(listing,false);
+    if(!wanted){
+      if(actual>=3)return 30;
+      if(actual>=2)return 27;
+      if(actual>=1.5)return 24;
+      if(actual>=1)return 20;
+      return 10;
+    }
+    const diff=actual-wanted;
+    if(diff>=2)return 30;
+    if(diff>=1)return 28;
+    if(diff>=0.5)return 25;
+    if(diff>=0)return 21;
+    if(diff>=-0.5)return 9;
+    return 0;
+  }
+  function recentScore(listing){
+    const d=listing.last_confirmed_at||listing.updated_at||listing.created_at;
+    if(!d)return 0;
+    const days=Math.floor((Date.now()-new Date(d).getTime())/86400000);
+    if(days<=7)return 5;
+    if(days<=30)return 3;
+    if(days<=90)return 1;
+    return 0;
+  }
+  function regionScore(customer,listing){
+    const pref=String(customer.preferred_area||'').trim();
+    if(!pref)return 0;
+    const hay=`${listing.district||''} ${listing.address||''}`;
+    const tokens=pref.split(/[,\s/]+/).filter(x=>x.length>=2);
+    return tokens.some(t=>hay.includes(t))?3:0;
+  }
+  function directDealMatch(customerType,dealType){
+    return customerType===dealType;
+  }
+  function chooseDeal(customer,listing){
+    const wanted=customerDealTypes(customer);
+    const budget=num(customer.budget_max);
+    const wantedRent=num(customer.desired_monthly_rent);
+    const deals=listingDeals(listing);
+    const candidates=[];
+
+    for(const d of deals){
+      let direct=wanted.includes(d.type);
+      let alternative=false;
+      let base=budget, ceiling=budget?budget+budgetExtension(budget):0;
+      let priceMetric=d.price;
+      let priceScore=0;
+      let over=0;
+      let eligible=true;
+      let explanation='';
+
+      if(direct && ['매매','전세'].includes(d.type)){
+        if(ceiling&&d.price>ceiling)eligible=false;
+        over=Math.max(0,d.price-budget);
+        if(!budget)priceScore=12;
+        else if(d.price<=budget)priceScore=20;
+        else priceScore=Math.max(6,20-Math.ceil((over/Math.max(1,budgetExtension(budget)))*12));
+        explanation=over>0?`희망가보다 ${fmtMoney(over)} 높음`:'희망금액 이내';
+      }else if(direct && d.type==='월세'){
+        const depositCeiling=budget?budget+1000:0;
+        const rentCeiling=wantedRent?Math.ceil(wantedRent*1.2):0;
+        if(depositCeiling&&d.price>depositCeiling)eligible=false;
+        if(rentCeiling&&d.rent>rentCeiling)eligible=false;
+        const depRatio=budget?Math.max(0,(d.price-budget)/1000):0;
+        const rentRatio=wantedRent?Math.max(0,(d.rent-wantedRent)/Math.max(1,wantedRent*.2)):0;
+        priceScore=Math.max(6,20-Math.ceil((depRatio+rentRatio)*6));
+        over=Math.max(0,d.price-budget);
+        explanation=(d.price<=budget&&(!wantedRent||d.rent<=wantedRent))?'희망 월세조건 이내':'확장 월세조건';
+        priceMetric=d.price+d.rent*100;
+      }else if(wanted.includes('전세')&&d.type==='월세'){
+        alternative=true;
+        const converted=d.price+d.rent*100;
+        ceiling=budget?budget+budgetExtension(budget):0;
+        if(ceiling&&converted>ceiling)eligible=false;
+        priceMetric=converted;
+        over=Math.max(0,converted-budget);
+        priceScore=Math.max(4,14-Math.ceil((over/Math.max(1,budgetExtension(budget)))*8));
+        explanation='월세 대안';
+      }else if(wanted.includes('월세')&&d.type==='전세'){
+        alternative=true;
+        base=budget+wantedRent*100;
+        ceiling=base?base+budgetExtension(base):0;
+        if(ceiling&&d.price>ceiling)eligible=false;
+        priceMetric=d.price;
+        over=Math.max(0,d.price-base);
+        priceScore=Math.max(4,14-Math.ceil((over/Math.max(1,budgetExtension(base)))*8));
+        explanation='전세 대안';
+      }else{
+        eligible=false;
+      }
+
+      if(eligible)candidates.push({...d,direct,alternative,base,ceiling,priceMetric,priceScore,over,explanation});
+    }
+    if(!candidates.length)return null;
+    return candidates.sort((a,b)=>{
+      if(a.direct!==b.direct)return a.direct?-1:1;
+      if(a.priceScore!==b.priceScore)return b.priceScore-a.priceScore;
+      return a.priceMetric-b.priceMetric;
+    })[0];
+  }
+
+  function compactAddress(listing){
+    const district=String(listing.district||'').trim();
+    if(district)return district;
+    const a=String(listing.address||'').trim();
+    const m=a.match(/([가-힣]+구)\s+([가-힣0-9]+동)/);
+    return m?`${m[1]} ${m[2]}`:a||'-';
+  }
+  function matchSummary(customer,listing,match){
+    const wanted=roomValue(customer,true), actual=roomValue(listing,false);
+    const phrases=[];
+    if(actual>wanted&&wanted)phrases.push(`방 ${actual-wanted}개 증가`);
+    else if(actual>=wanted)phrases.push('방 조건 충족');
+    const age=match.age;
+    if(age?.age!==null&&age.age<=10)phrases.push(age.label);
+    else if(num(listing.area_m2)>=39)phrases.push(`전용 ${num(listing.area_m2)}㎡`);
+    else phrases.push(match.deal.explanation);
+    return phrases.slice(0,2).join(' · ');
+  }
+
+  function evaluate(customer,listing){
+    if(!customer||!listing)return {matched:false,reasons:['정보 부족']};
+    if(listing.status!=='available'||listing.is_public===false)return {matched:false,reasons:['추천 제외 상태']};
+
+    const prefs=propertyTypes(customer);
+    if(prefs.length&&!prefs.includes(listing.property_type)){
+      return {matched:false,reasons:['희망 매물유형 불일치']};
+    }
+
+    const deal=chooseDeal(customer,listing);
+    if(!deal)return {matched:false,reasons:['거래유형 또는 확장 예산 불일치']};
+
+    const rs=roomScore(customer,listing);
+    if(rs===0)return {matched:false,reasons:['방 개수 부족']};
+
+    const as=areaScore(listing);
+    const age=ageScore(listing);
+    const fs=featureScore(customer,listing);
+    const extra=recentScore(listing)+regionScore(customer,listing);
+    const score=Math.round(rs+as+deal.priceScore+age.score+fs.score+extra);
+
+    let category='조건일치';
+    let matchKind='direct';
+    if(deal.alternative){category='대안추천';matchKind='alternative'}
+    else if(deal.over>0)category='상향추천';
+    else if(age.age!==null&&age.age>25&&num(listing.area_m2)>=39)category='가성비';
+
+    const detailed=[
+      `방 ${listingRoomText(listing)} · 희망 ${customerRoomText(customer)}`,
+      `전용면적 ${listing.area_m2?`${listing.area_m2}㎡`: '미확인'}`,
+      age.label,
+      deal.explanation,
+      fs.matched.length?`희망특징 일치: ${fs.matched.join(', ')}`:'',
+      fs.missing.length?`미확인 또는 불일치: ${fs.missing.join(', ')}`:''
+    ].filter(Boolean);
+
+    const result={
+      matched:true,
+      category,
+      matchKind,
+      score,
+      reasons:detailed,
+      deal,
+      age,
+      shortReason:''
+    };
+    result.shortReason=matchSummary(customer,listing,result);
+    return result;
+  }
+
+  function cardHtml(customer,x,index){
+    const m=x._match;
+    const area=x.area_m2?`${Number(x.area_m2).toLocaleString('ko-KR',{maximumFractionDigits:2})}㎡`:'-';
+    const old=m.age?.age!==null&&m.age.age>25?`<span class="crm-r333-old">구옥</span>`:'';
+    return `<article class="crm-r333-card">
+      <div class="crm-r333-card-top">
+        <label class="crm-r333-select"><input type="checkbox" onchange="toggleMatchSelection('${x.id}',this.checked)"> 소개서 선택</label>
+        <span class="crm-r333-type ${m.matchKind==='alternative'?'alternative':''}">${escapeHtml(m.category)}</span>
+      </div>
+      <div class="crm-r333-main">
+        <h3>${escapeHtml(x.title||'매물')}</h3>
+        <div class="crm-r333-address">${escapeHtml(compactAddress(x))} ${old}</div>
+        <div class="crm-r333-facts">
+          <span>방 ${escapeHtml(listingRoomText(x))}</span>
+          <span>욕실 ${x.bathroom_count??'-'}</span>
+          <span>전용 ${area}</span>
+        </div>
+        <strong class="crm-r333-price">${escapeHtml(listingPriceText(x))}</strong>
+        <div class="crm-r333-summary">${escapeHtml(m.shortReason)}</div>
+        <details class="crm-r333-reasons">
+          <summary>추천 이유 보기</summary>
+          <div>${m.reasons.map(r=>`<p>• ${escapeHtml(r)}</p>`).join('')}</div>
+          <div class="crm-r333-score">내부 추천점수 ${m.score}점</div>
+        </details>
+      </div>
+      <div class="crm-r333-actions">
+        <button type="button" class="ghost" onclick="openListingPhotos('${x.id}')">사진 보기</button>
+        <button type="button" class="ghost" onclick="openListingModal('${x.id}')">상세 보기</button>
+        <button type="button" class="success" onclick="crm36SaveRecommendation('${customer.id}','${x.id}')">FU에 추천 저장</button>
+        <button type="button" class="ghost" onclick="crm36QuickVisit('${customer.id}','${x.id}')">방문 일정</button>
+      </div>
+    </article>`;
+  }
+
+  async function renderSmart(){
+    await Promise.all([loadCustomers(),loadListings()]);
+    const demand=state.customers.filter(x=>['매수','임차'].includes(x.customer_type));
+    document.querySelector('#content').innerHTML=`<div class="panel">
+      <div class="notice crm-r333-rule">
+        <strong>실전형 추천 기준</strong><br>
+        고객 제시금액보다 전세·매매는 최대 1,500만~5,000만 원까지 자동 확장하고, 월세는 보증금 +1,000만 원·월차임 120%까지 봅니다.
+        그 안에서 <b>방 개수 → 전용면적 → 연식 → 가격 → 희망특징</b> 순으로 점수를 계산합니다.
+      </div>
+      <div class="filters" style="margin-top:16px">
+        <select id="matchCustomer" onchange="showCustomerMatches()">
+          <option value="">고객 선택</option>
+          ${demand.map(x=>`<option value="${x.id}">${escapeHtml(x.name)} · ${escapeHtml(x.deal_type||x.customer_type)} · 방 ${customerRoomText(x)} · ${fmtMoney(x.budget_max)}</option>`).join('')}
+        </select>
+        <button class="ghost" onclick="renderView('customers')">고객 관리</button>
+      </div>
+      <div id="matchResults" class="empty">고객을 선택하면 예산 안팎에서 방이 많고 넓으며 연식이 좋은 매물을 우선 추천합니다.</div>
+    </div>`;
+  }
+
+  async function showMatches(){
+    const customer=state.customers.find(x=>x.id===document.querySelector('#matchCustomer')?.value);
+    if(!customer)return;
+    state.matchSelection.clear();
+
+    const rows=state.listings
+      .map(x=>({...x,_match:evaluate(customer,x)}))
+      .filter(x=>x._match.matched)
+      .sort((a,b)=>{
+        if(a._match.score!==b._match.score)return b._match.score-a._match.score;
+        const roomDiff=roomValue(b,false)-roomValue(a,false);
+        if(roomDiff)return roomDiff;
+        const areaDiff=num(b.area_m2)-num(a.area_m2);
+        if(areaDiff)return areaDiff;
+        return a._match.deal.priceMetric-b._match.deal.priceMetric;
+      })
+      .slice(0,30);
+
+    const result=document.querySelector('#matchResults');
+    result.innerHTML=`<div class="match-toolbar crm-r333-toolbar">
+      <strong>${escapeHtml(customer.name)} 추천 매물 ${rows.length}개</strong>
+      <div>
+        <button class="primary" onclick="printSelectedListingBrochure('${customer.id}')">선택 매물 소개서 인쇄/PDF</button>
+        <button class="success" onclick="crm36KakaoMessage('${customer.id}')">카카오톡 추천문구</button>
+      </div>
+    </div>
+    ${rows.length?`<div class="crm-r333-grid">${rows.map((x,i)=>cardHtml(customer,x,i)).join('')}</div>`:'<div class="empty">확장 예산과 방·면적·연식 조건에 맞는 공개 매물이 없습니다.</div>'}`;
+  }
+
+  async function modalMatches(type,id){
+    await loadCustomers();await loadListings();
+    let html='';
+    if(type==='customer'){
+      const c=state.customers.find(x=>String(x.id)===String(id));
+      const rows=state.listings.map(l=>({...l,_match:evaluate(c,l)})).filter(x=>x._match.matched).sort((a,b)=>b._match.score-a._match.score).slice(0,20);
+      html=rows.length?`<div class="crm-r333-modal-list">${rows.map(x=>`<article>
+        <div><strong>${escapeHtml(x.title)}</strong><div class="muted">${escapeHtml(compactAddress(x))} · 방 ${listingRoomText(x)} / 욕실 ${x.bathroom_count??'-'} · ${x.area_m2||'-'}㎡ · ${listingPriceText(x)}</div><small>${escapeHtml(x._match.shortReason)}</small></div>
+        <button class="ghost" onclick="openListingModal('${x.id}')">열기</button>
+      </article>`).join('')}</div>`:'<div class="empty">조건에 맞는 매물이 없습니다.</div>';
+    }else{
+      const l=state.listings.find(x=>String(x.id)===String(id));
+      const rows=state.customers.map(c=>({c,m:evaluate(c,l)})).filter(x=>x.m.matched).sort((a,b)=>b.m.score-a.m.score).slice(0,20);
+      html=rows.length?`<div class="crm-r333-modal-list">${rows.map(({c,m})=>`<article><div><strong>${escapeHtml(c.name)}</strong><div class="muted">${escapeHtml(c.deal_type||c.customer_type||'')} · 희망 ${fmtMoney(c.budget_max)} · 방 ${customerRoomText(c)}</div><small>${escapeHtml(m.shortReason)}</small></div><button class="ghost" onclick="openCustomerModal('${c.id}')">열기</button></article>`).join('')}</div>`:'<div class="empty">조건에 맞는 고객이 없습니다.</div>';
+    }
+    document.querySelector('#modalTitle').textContent=type==='customer'?'추천 매물':'맞는 고객';
+    document.querySelector('#modalBody').innerHTML=html;
+    document.querySelector('#modalSubmit').style.display='none';
+    document.querySelector('#modal').showModal();
+  }
+
+  window.evaluateListingMatch=evaluate;
+  window.renderSmartMatch=renderSmart;
+  window.showCustomerMatches=showMatches;
+  window.crm390OpenMatches=modalMatches;
+  try{evaluateListingMatch=evaluate}catch(_){}
+  try{renderSmartMatch=renderSmart}catch(_){}
+  try{showCustomerMatches=showMatches}catch(_){}
+  try{crm390OpenMatches=modalMatches}catch(_){}
+
+  console.info(`CRM v${VERSION} 실전형 자동매칭 적용`);
+})();
