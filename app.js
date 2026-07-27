@@ -13290,3 +13290,48 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
 
   console.info(`CRM v${VERSION} 실전형 자동매칭 적용`);
 })();
+
+/* CRM v3.10.24R3.34 · 선택 고객 조건 요약 */
+(() => {
+  const money=v=>{const n=Number(v);return Number.isFinite(n)&&n>0?`${n.toLocaleString('ko-KR')}만원`:'-'};
+  const textList=v=>{
+    if(Array.isArray(v))return v.filter(Boolean).join(' · ')||'-';
+    if(!v)return '-';
+    try{const a=JSON.parse(v);if(Array.isArray(a))return a.filter(Boolean).join(' · ')||'-'}catch(_){}
+    return String(v).split(/[,|+]/).map(x=>x.trim()).filter(Boolean).join(' · ')||'-';
+  };
+  const card=c=>`<section class="crm-r334-customer-box">
+    <div class="crm-r334-customer-head">
+      <div><span>선택 고객 조건</span><strong>${escapeHtml(c.name||'고객')}</strong></div>
+      <button type="button" class="ghost" onclick="openCustomerModal('${c.id}')">고객 상세</button>
+    </div>
+    <div class="crm-r334-condition-grid">
+      <div><span>거래유형</span><strong>${escapeHtml(textList(c.deal_type||c.transaction_type||c.customer_type))}</strong></div>
+      <div><span>희망금액</span><strong>${escapeHtml(money(c.budget_max))}</strong></div>
+      <div><span>희망 월세</span><strong>${escapeHtml(money(c.desired_monthly_rent))}</strong></div>
+      <div><span>희망 방</span><strong>${escapeHtml(typeof customerRoomText==='function'?customerRoomText(c):(c.room_count??'-'))}</strong></div>
+      <div><span>희망지역</span><strong>${escapeHtml(c.preferred_area||c.district||'-')}</strong></div>
+      <div><span>매물유형</span><strong>${escapeHtml(textList(c.preferred_property_types||c.property_types||c.preferred_type))}</strong></div>
+      <div><span>입주일</span><strong>${escapeHtml(c.move_in_date||c.preferred_move_in_date||'-')}</strong></div>
+      <div class="crm-r334-wide"><span>희망특징</span><strong>${escapeHtml(textList(c.desired_feature_tags||c.features))}</strong></div>
+    </div>
+  </section>`;
+
+  const base=window.showCustomerMatches||globalThis.showCustomerMatches;
+  if(typeof base==='function'){
+    const wrapped=async function(...args){
+      const out=await base.apply(this,args);
+      const id=document.querySelector('#matchCustomer')?.value;
+      const c=state.customers?.find(x=>String(x.id)===String(id));
+      const box=document.querySelector('#matchResults');
+      if(c&&box&&!box.querySelector('.crm-r334-customer-box')){
+        const toolbar=box.querySelector('.crm-r333-toolbar');
+        if(toolbar)toolbar.insertAdjacentHTML('beforebegin',card(c));
+        else box.insertAdjacentHTML('afterbegin',card(c));
+      }
+      return out;
+    };
+    window.showCustomerMatches=wrapped;
+    try{showCustomerMatches=wrapped}catch(_){}
+  }
+})();
