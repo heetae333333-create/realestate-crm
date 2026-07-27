@@ -13335,3 +13335,54 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
     try{showCustomerMatches=wrapped}catch(_){}
   }
 })();
+
+/* CRM v3.10.24R3.35 · 선택 고객 조건 한줄 요약 */
+(() => {
+  const money=v=>{const n=Number(v);return Number.isFinite(n)&&n>0?`${n.toLocaleString('ko-KR')}만원`:'-'};
+  const list=v=>{
+    if(Array.isArray(v))return v.filter(Boolean).join('·')||'-';
+    if(!v)return '-';
+    try{const a=JSON.parse(v);if(Array.isArray(a))return a.filter(Boolean).join('·')||'-'}catch(_){}
+    return String(v).split(/[,|+]/).map(x=>x.trim()).filter(Boolean).join('·')||'-';
+  };
+  const compact=c=>{
+    const room=typeof customerRoomText==='function'?customerRoomText(c):(c.room_count??'-');
+    const deal=list(c.deal_type||c.transaction_type||c.customer_type);
+    const property=list(c.preferred_property_types||c.property_types||c.preferred_type);
+    const features=list(c.desired_feature_tags||c.features);
+    const area=c.preferred_area||c.district||'-';
+    const rent=Number(c.desired_monthly_rent)>0?` · 월 ${money(c.desired_monthly_rent)}`:'';
+    return `<section class="crm-r335-customer-line">
+      <div class="crm-r335-name"><span>선택 고객</span><strong>${escapeHtml(c.name||'고객')}</strong></div>
+      <div class="crm-r335-text">
+        <span>${escapeHtml(deal)}</span>
+        <span>희망 ${escapeHtml(money(c.budget_max))}${escapeHtml(rent)}</span>
+        <span>방 ${escapeHtml(room)}</span>
+        <span>${escapeHtml(area)}</span>
+        <span>${escapeHtml(property)}</span>
+        ${features!=='-'?`<span>${escapeHtml(features)}</span>`:''}
+      </div>
+      <button type="button" class="ghost" onclick="openCustomerModal('${c.id}')">고객 상세</button>
+    </section>`;
+  };
+
+  const base=window.showCustomerMatches||globalThis.showCustomerMatches;
+  if(typeof base==='function'){
+    const wrapped=async function(...args){
+      const out=await base.apply(this,args);
+      const id=document.querySelector('#matchCustomer')?.value;
+      const c=state.customers?.find(x=>String(x.id)===String(id));
+      const box=document.querySelector('#matchResults');
+      if(c&&box){
+        box.querySelector('.crm-r334-customer-box')?.remove();
+        box.querySelector('.crm-r335-customer-line')?.remove();
+        const toolbar=box.querySelector('.crm-r333-toolbar');
+        if(toolbar)toolbar.insertAdjacentHTML('beforebegin',compact(c));
+        else box.insertAdjacentHTML('afterbegin',compact(c));
+      }
+      return out;
+    };
+    window.showCustomerMatches=wrapped;
+    try{showCustomerMatches=wrapped}catch(_){}
+  }
+})();

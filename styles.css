@@ -2706,3 +2706,74 @@ table.listing-table tbody tr.crm-r311-listing-complete .muted {
 .crm-r334-wide{grid-column:span 2}
 @media(max-width:1000px){.crm-r334-condition-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.crm-r334-customer-head{align-items:stretch;flex-direction:column}.crm-r334-customer-head>div{display:block}.crm-r334-customer-head span{display:block;margin-bottom:3px}.crm-r334-condition-grid{grid-template-columns:1fr}.crm-r334-wide{grid-column:auto}}
+
+/* CRM v3.10.24R3.35 · 선택 고객 조건 한줄 요약 */
+.crm-r334-customer-box{display:none!important}
+.crm-r335-customer-line{
+  display:grid;
+  grid-template-columns:auto 1fr auto;
+  align-items:center;
+  gap:16px;
+  margin:20px 0 12px;
+  padding:12px 14px;
+  border:1px solid #cbd5e1;
+  border-radius:12px;
+  background:#f8fafc;
+}
+.crm-r335-name{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  white-space:nowrap;
+}
+.crm-r335-name span{
+  color:#64748b;
+  font-size:12px;
+  font-weight:800;
+}
+.crm-r335-name strong{
+  font-size:15px;
+}
+.crm-r335-text{
+  display:flex;
+  align-items:center;
+  gap:0;
+  min-width:0;
+  overflow:hidden;
+  color:#334155;
+  font-size:13px;
+  white-space:nowrap;
+}
+.crm-r335-text span{
+  display:inline-flex;
+  align-items:center;
+}
+.crm-r335-text span:not(:last-child)::after{
+  content:"·";
+  margin:0 9px;
+  color:#94a3b8;
+}
+.crm-r335-customer-line button{
+  min-width:88px;
+  padding:7px 10px;
+}
+@media(max-width:850px){
+  .crm-r335-customer-line{
+    grid-template-columns:1fr auto;
+  }
+  .crm-r335-text{
+    grid-column:1 / -1;
+    flex-wrap:wrap;
+    white-space:normal;
+    row-gap:5px;
+  }
+}
+@media(max-width:560px){
+  .crm-r335-customer-line{
+    grid-template-columns:1fr;
+    gap:9px;
+  }
+  .crm-r335-customer-line button{
+    width:100%;
+  }
+}
