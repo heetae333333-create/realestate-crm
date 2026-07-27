@@ -2430,3 +2430,27 @@ table.listing-table tbody tr.crm-r311-listing-complete .muted {
     margin-left:0;
   }
 }
+
+/* ===== CRM v3.10.24R3.30 · 매물 상세 사진보기 ===== */
+#crm390DetailTools.crm-r330-detail-tools{
+  display:flex;
+  align-items:center;
+  gap:9px;
+  width:100%;
+}
+#crm390DetailTools.crm-r330-detail-tools .crm-r330-photo-view{
+  margin-left:auto;
+  min-width:112px;
+  border-color:#bfdbfe;
+  background:#eff6ff;
+  color:#1d4ed8;
+  font-weight:800;
+}
+@media(max-width:620px){
+  #crm390DetailTools.crm-r330-detail-tools{
+    flex-wrap:wrap;
+  }
+  #crm390DetailTools.crm-r330-detail-tools .crm-r330-photo-view{
+    margin-left:0;
+  }
+}

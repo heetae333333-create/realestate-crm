@@ -12558,3 +12558,89 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   Object.assign(window,{crmR329ClearAdFilters:clear});
   console.info(`CRM v${VERSION} 내 매물 광고 필터 적용`);
 })();
+
+
+/* =========================================================
+   CRM v3.10.24R3.30 · 매물 상세 상단 사진보기
+   - 내 매물 / 공동매물망 / 지도 상세에 동일 적용
+   - 변경 이력 복원과 같은 행의 우측 끝에 배치
+   - 사진 추가·삭제는 기존 canManageListing 권한 그대로 유지
+   ========================================================= */
+(() => {
+  const VERSION='3.10.24R3.30';
+  const q=(s,r=document)=>r.querySelector(s);
+
+  function isListingDetail(){
+    const modal=q('#modal');
+    const body=q('#modalBody');
+    if(!modal?.open||!body)return false;
+    const title=(q('#modalTitle')?.textContent||'').trim();
+    if(/FU 관리|진행상황|사진|히스토리/.test(title))return false;
+    return !!q('[name="title"]',body);
+  }
+
+  function addPhotoButton(id){
+    if(!id||!isListingDetail())return false;
+    const tools=q('#crm390DetailTools');
+    if(!tools)return false;
+
+    let btn=q('#crmR330PhotoView',tools);
+    if(!btn){
+      btn=document.createElement('button');
+      btn.type='button';
+      btn.id='crmR330PhotoView';
+      btn.className='ghost crm-r330-photo-view';
+      btn.innerHTML='🖼 사진보기';
+      tools.appendChild(btn);
+    }
+    btn.onclick=()=>window.openListingPhotos?.(id);
+    tools.classList.add('crm-r330-detail-tools');
+    return true;
+  }
+
+  function install(id){
+    window.__crmR330ListingId=id||window.__crmR330ListingId||null;
+    addPhotoButton(window.__crmR330ListingId);
+  }
+
+  const base=window.openListingModal||globalThis.openListingModal;
+  if(typeof base==='function'&&!base.__crmR330PhotoButton){
+    const wrapped=function(id,...args){
+      window.__crmR330ListingId=id||null;
+      const result=base.call(this,id,...args);
+      Promise.resolve(result).finally(()=>install(id));
+      [80,220,500,900].forEach(ms=>setTimeout(()=>install(id),ms));
+      return result;
+    };
+    wrapped.__crmR330PhotoButton=true;
+    window.openListingModal=wrapped;
+    try{openListingModal=wrapped}catch(_){}
+  }
+
+  const detailBase=window.openListingDetail||globalThis.openListingDetail;
+  if(typeof detailBase==='function'&&!detailBase.__crmR330PhotoButton){
+    const wrapped=function(id,...args){
+      window.__crmR330ListingId=id||null;
+      const result=detailBase.call(this,id,...args);
+      Promise.resolve(result).finally(()=>install(id));
+      [80,220,500,900].forEach(ms=>setTimeout(()=>install(id),ms));
+      return result;
+    };
+    wrapped.__crmR330PhotoButton=true;
+    window.openListingDetail=wrapped;
+    try{openListingDetail=wrapped}catch(_){}
+  }
+
+  // 기존 코드가 상세 도구의 innerHTML을 다시 그려도 사진보기 버튼을 복구한다.
+  const body=q('#modalBody');
+  if(body){
+    new MutationObserver(()=>{
+      if(isListingDetail()&&window.__crmR330ListingId){
+        addPhotoButton(window.__crmR330ListingId);
+      }
+    }).observe(body,{childList:true,subtree:true});
+  }
+
+  Object.assign(window,{crmR330InstallPhotoButton:install});
+  console.info(`CRM v${VERSION} 매물 상세 사진보기 버튼 적용`);
+})();
