@@ -13959,3 +13959,149 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
 
   console.info(`CRM v${VERSION} 공지 중심 대시보드 적용`);
 })();
+
+
+/* =========================================================
+   CRM v3.10.24R3.38 · 밀린 일정 + 매물 확인 일정
+   ========================================================= */
+(() => {
+  const VERSION='3.10.24R3.38';
+  const q=(s,r=document)=>r.querySelector(s);
+  const esc=v=>escapeHtml(String(v??''));
+  const today=()=>new Date().toISOString().slice(0,10);
+  const dateOnly=v=>v?String(v).slice(0,10):'';
+
+  function mineCustomers(){
+    return state.profile?.role==='admin'
+      ? state.customers
+      : state.customers.filter(x=>!x.owner_id||x.owner_id===state.profile?.id);
+  }
+
+  function mineListings(){
+    return state.profile?.role==='admin'
+      ? state.listings
+      : state.listings.filter(x=>x.owner_id===state.profile?.id);
+  }
+
+  function overdueRows(customers,listings){
+    const t=today();
+    const rows=[];
+
+    const add=(name,date,label,id,type)=>{
+      const d=dateOnly(date);
+      if(d&&d<t)rows.push({name,label,date:d,id,type});
+    };
+
+    customers.forEach(x=>{
+      add(x.name,x.next_follow_up_at,'고객 FU',x.id,'customer');
+      add(x.name,x.visit_date||x.visit_at||x.visit_schedule,'고객 방문',x.id,'customer');
+      add(x.name,x.provisional_contract_date,'가계약',x.id,'customer');
+      add(x.name,x.contract_date,'본계약',x.id,'customer');
+      add(x.name,x.interim_payment_date,'중도금',x.id,'customer');
+      add(x.name,x.final_payment_date,'잔금',x.id,'customer');
+    });
+
+    listings.forEach(x=>{
+      add(x.title,x.next_follow_up_at,'매물 FU',x.id,'listing');
+      add(x.title,x.visit_date||x.visit_at||x.visit_schedule,'매물 방문',x.id,'listing');
+      add(x.title,x.provisional_contract_date,'가계약',x.id,'listing');
+      add(x.title,x.contract_date,'본계약',x.id,'listing');
+      add(x.title,x.interim_payment_date,'중도금',x.id,'listing');
+      add(x.title,x.final_payment_date,'잔금',x.id,'listing');
+    });
+
+    return rows.sort((a,b)=>a.date.localeCompare(b.date));
+  }
+
+  function confirmRows(listings){
+    const t=today();
+    return listings
+      .filter(x=>!['complete','completed','거래완료'].includes(x.status||''))
+      .map(x=>({
+        name:x.title||'매물',
+        date:dateOnly(x.next_confirm_at||x.last_confirmed_at||x.updated_at||x.created_at),
+        id:x.id
+      }))
+      .filter(x=>x.date&&x.date<=t)
+      .sort((a,b)=>a.date.localeCompare(b.date));
+  }
+
+  function daysLate(date){
+    const a=new Date(date+'T00:00:00');
+    const b=new Date(today()+'T00:00:00');
+    return Math.max(1,Math.floor((b-a)/86400000));
+  }
+
+  function overdueHtml(rows){
+    if(!rows.length)return '<div class="crm-r338-empty">밀린 일정이 없습니다.</div>';
+    return rows.slice(0,6).map(x=>{
+      const action=x.type==='customer'
+        ? `openCustomerModal('${x.id}')`
+        : `openListingModal('${x.id}')`;
+      return `<button type="button" class="crm-r338-row" onclick="${action}">
+        <div><strong>${esc(x.name)}</strong><small>${esc(x.label)} · ${daysLate(x.date)}일 지남</small></div>
+        <span>열기</span>
+      </button>`;
+    }).join('');
+  }
+
+  function confirmHtml(rows){
+    if(!rows.length)return '<div class="crm-r338-empty">확인 예정인 매물이 없습니다.</div>';
+    return rows.slice(0,6).map(x=>`
+      <button type="button" class="crm-r338-row" onclick="openFollowUpModal('listing','${x.id}')">
+        <div><strong>${esc(x.name)}</strong><small>매물 확인 · ${daysLate(x.date)}일 경과</small></div>
+        <span>확인</span>
+      </button>`).join('');
+  }
+
+  const baseRender=window.renderDashboard||globalThis.renderDashboard;
+  if(typeof baseRender==='function'){
+    const wrapped=async function(...args){
+      const out=await baseRender.apply(this,args);
+      const customers=mineCustomers();
+      const listings=mineListings();
+      const overdue=overdueRows(customers,listings);
+      const confirms=confirmRows(listings);
+
+      const dashboard=q('.crm-r337-dashboard');
+      if(!dashboard)return out;
+
+      // 상단 현황에 밀린 일정과 매물 확인 추가
+      const stats=q('.crm-r337-stats',dashboard);
+      if(stats){
+        stats.insertAdjacentHTML('beforeend',`
+          <button onclick="document.querySelector('.crm-r338-extra-grid')?.scrollIntoView({behavior:'smooth'})">
+            <span>밀린 일정</span><strong>${overdue.length}</strong>
+          </button>
+          <button onclick="document.querySelector('.crm-r338-extra-grid')?.scrollIntoView({behavior:'smooth'})">
+            <span>매물 확인</span><strong>${confirms.length}</strong>
+          </button>`);
+      }
+
+      // 오늘/다가오는 일정 아래에 별도 영역 추가
+      const scheduleGrid=q('.crm-r337-schedule-grid',dashboard);
+      if(scheduleGrid){
+        scheduleGrid.insertAdjacentHTML('afterend',`
+          <div class="crm-r338-extra-grid">
+            <section class="crm-r337-panel">
+              <div class="crm-r337-panel-head">
+                <div><h3>밀린 일정</h3>${overdue.length?`<span>${overdue.length}건</span>`:''}</div>
+              </div>
+              <div>${overdueHtml(overdue)}</div>
+            </section>
+            <section class="crm-r337-panel">
+              <div class="crm-r337-panel-head">
+                <div><h3>매물 확인 일정</h3>${confirms.length?`<span>${confirms.length}건</span>`:''}</div>
+              </div>
+              <div>${confirmHtml(confirms)}</div>
+            </section>
+          </div>`);
+      }
+      return out;
+    };
+    window.renderDashboard=wrapped;
+    try{renderDashboard=wrapped}catch(_){}
+  }
+
+  console.info(`CRM v${VERSION} 밀린 일정 및 매물 확인 일정 적용`);
+})();
