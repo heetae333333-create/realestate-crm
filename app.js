@@ -12451,3 +12451,110 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   Object.assign(window,{crmR328InstallListingFields:install});
   console.info(`CRM v${VERSION} 건물전체·단독 면적 확장 적용`);
 })();
+
+
+/* =========================================================
+   CRM v3.10.24R3.29 · 내 매물 광고 상태/매체 필터
+   ========================================================= */
+(() => {
+  const VERSION='3.10.24R3.29';
+  const AD_FIELDS=[
+    ['ad_naver','네이버'],
+    ['ad_danggeun','당근'],
+    ['ad_zippl','집플 등'],
+    ['ad_blog','블로그']
+  ];
+
+  function hasAnyAd(x){
+    return AD_FIELDS.some(([key])=>!!x?.[key]);
+  }
+
+  function selectedMedia(prefix){
+    return Array.from(document.querySelectorAll(`.crm-r329-ad-media[data-prefix="${prefix}"]:checked`))
+      .map(el=>el.value);
+  }
+
+  const baseFilterBar=window.crm3826FilterBar||globalThis.crm3826FilterBar;
+  if(typeof baseFilterBar==='function'&&!baseFilterBar.__crmR329Ads){
+    const wrapped=function(prefix){
+      let html=baseFilterBar(prefix);
+      if(prefix!=='myListing')return html;
+
+      const select=`<select id="${prefix}AdStatus" onchange="filterMyListings()">
+        <option value="">전체 광고</option>
+        <option value="on">광고 중</option>
+        <option value="off">광고 없음</option>
+      </select>`;
+
+      html=html.replace(
+        `<input id="${prefix}Max"`,
+        `${select}<input id="${prefix}Max"`
+      );
+
+      html+=`<div class="crm-r329-ad-filter">
+        <strong>광고 매체</strong>
+        ${AD_FIELDS.map(([key,label])=>`<label><input type="checkbox" class="crm-r329-ad-media" data-prefix="${prefix}" value="${key}" onchange="filterMyListings()"> ${label}</label>`).join('')}
+        <button type="button" class="ghost" onclick="crmR329ClearAdFilters('${prefix}')">광고 초기화</button>
+      </div>`;
+
+      return html;
+    };
+    wrapped.__crmR329Ads=true;
+    window.crm3826FilterBar=wrapped;
+    try{crm3826FilterBar=wrapped}catch(_){}
+  }
+
+  const baseFilterRows=window.crm3826FilterRows||globalThis.crm3826FilterRows;
+  if(typeof baseFilterRows==='function'&&!baseFilterRows.__crmR329Ads){
+    const wrapped=function(source,prefix){
+      let rows=baseFilterRows(source,prefix);
+      if(prefix!=='myListing')return rows;
+
+      const status=document.getElementById(`${prefix}AdStatus`)?.value||'';
+      const media=selectedMedia(prefix);
+
+      if(status==='on')rows=rows.filter(hasAnyAd);
+      if(status==='off')rows=rows.filter(x=>!hasAnyAd(x));
+
+      if(media.length){
+        rows=rows.filter(x=>media.some(key=>!!x?.[key]));
+      }
+      return rows;
+    };
+    wrapped.__crmR329Ads=true;
+    window.crm3826FilterRows=wrapped;
+    try{crm3826FilterRows=wrapped}catch(_){}
+  }
+
+  const baseSummary=window.crm3826RenderSummary||globalThis.crm3826RenderSummary;
+  if(typeof baseSummary==='function'&&!baseSummary.__crmR329Ads){
+    const wrapped=function(targetId,rows,title){
+      const result=baseSummary(targetId,rows,title);
+      if(targetId==='myListingSummary'){
+        const el=document.getElementById(targetId);
+        const grid=el?.querySelector('.crm3826-summary-grid')||el?.firstElementChild;
+        if(grid){
+          const adOn=rows.filter(hasAnyAd).length;
+          const adOff=rows.length-adOn;
+          grid.insertAdjacentHTML('beforeend',`
+            <div class="crm-r329-summary-item"><span>광고 중</span><strong>${adOn}</strong></div>
+            <div class="crm-r329-summary-item"><span>광고 없음</span><strong>${adOff}</strong></div>`);
+        }
+      }
+      return result;
+    };
+    wrapped.__crmR329Ads=true;
+    window.crm3826RenderSummary=wrapped;
+    try{crm3826RenderSummary=wrapped}catch(_){}
+  }
+
+  function clear(prefix){
+    const status=document.getElementById(`${prefix}AdStatus`);
+    if(status)status.value='';
+    document.querySelectorAll(`.crm-r329-ad-media[data-prefix="${prefix}"]`).forEach(el=>el.checked=false);
+    if(prefix==='myListing'&&typeof filterMyListings==='function')filterMyListings();
+  }
+
+  Object.assign(window,{crmR329ClearAdFilters:clear});
+  console.info(`CRM v${VERSION} 내 매물 광고 필터 적용`);
+})();

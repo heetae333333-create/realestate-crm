@@ -2366,3 +2366,67 @@ table.listing-table tbody tr.crm-r311-listing-complete .muted {
     width:100%;
   }
 }
+
+/* ===== CRM v3.10.24R3.29 · 내 매물 광고 필터 ===== */
+.crm3826-listing-filters{
+  grid-template-columns:minmax(250px,1.15fr) repeat(5,minmax(135px,.8fr));
+}
+.crm-r329-ad-filter{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  flex-wrap:wrap;
+  margin-top:10px;
+  padding:12px 14px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#f8fafc;
+}
+.crm-r329-ad-filter strong{
+  margin-right:2px;
+}
+.crm-r329-ad-filter label{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  font-size:13px;
+  font-weight:800;
+  white-space:nowrap;
+}
+.crm-r329-ad-filter input{
+  width:auto;
+  margin:0;
+}
+.crm-r329-ad-filter .ghost{
+  margin-left:auto;
+  padding:7px 11px;
+}
+.crm-r329-summary-item{
+  background:#f8fafc;
+  border-radius:10px;
+  padding:9px 12px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.crm-r329-summary-item span{
+  color:#64748b;
+  font-size:12px;
+}
+.crm-r329-summary-item strong{
+  font-size:16px;
+}
+@media(max-width:1200px){
+  .crm3826-listing-filters{
+    grid-template-columns:repeat(3,minmax(150px,1fr));
+  }
+}
+@media(max-width:720px){
+  .crm3826-listing-filters{
+    grid-template-columns:1fr 1fr;
+  }
+  .crm-r329-ad-filter .ghost{
+    margin-left:0;
+  }
+}
