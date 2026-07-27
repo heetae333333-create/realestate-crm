@@ -12084,3 +12084,246 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   Object.assign(window,{crmR325InstallListingDetailTools:install});
   console.info(`CRM v${VERSION} 매물 상세 하단 소개 도구 적용`);
 })();
+
+
+/* =========================================================
+   CRM v3.10.24R3.27 · 광고 저장 / 계약 저장 완전 분리
+   - 광고 체크 후 광고 등록 버튼으로만 광고와 광고 히스토리 저장
+   - 체크 해제 후 광고 등록 버튼을 누르면 광고 취소 히스토리 저장
+   - 하단 저장은 계약저장으로 변경하고 계약 정보만 저장
+   ========================================================= */
+(() => {
+  const VERSION='3.10.24R3.27';
+  const q=(s,r=document)=>r.querySelector(s);
+
+  function adValues(){
+    return {
+      ad_naver:!!q('#crm3829AdNaver')?.checked,
+      ad_danggeun:!!q('#crm3829AdDanggeun')?.checked,
+      ad_zippl:!!q('#crm3829AdZippl')?.checked,
+      ad_blog:!!q('#crm3829AdBlog')?.checked
+    };
+  }
+
+  function adHistory(before,after){
+    const labels={
+      ad_naver:'네이버',
+      ad_danggeun:'당근',
+      ad_zippl:'집플 등',
+      ad_blog:'블로그'
+    };
+    const lines=[];
+    Object.keys(labels).forEach(key=>{
+      if(!before[key]&&after[key]) lines.push(`${labels[key]} 광고 등록`);
+      if(before[key]&&!after[key]) lines.push(`${labels[key]} 광고 취소`);
+    });
+    return lines.join('\n');
+  }
+
+  async function refreshListingView(){
+    await loadListings();
+    if(state.view==='adminListings' && typeof renderAdminListings==='function') return renderAdminListings();
+    if(state.view==='network' && typeof renderNetwork==='function') return renderNetwork();
+    if(typeof renderMyListings==='function') return renderMyListings();
+  }
+
+  async function saveAdsOnly(id,button){
+    const listing=(state.listings||[]).find(x=>String(x.id)===String(id));
+    if(!listing)return toast('매물 정보를 찾을 수 없습니다.');
+
+    const before={
+      ad_naver:!!listing.ad_naver,
+      ad_danggeun:!!listing.ad_danggeun,
+      ad_zippl:!!listing.ad_zippl,
+      ad_blog:!!listing.ad_blog
+    };
+    const after=adValues();
+    const changed=Object.keys(after).some(k=>before[k]!==after[k]);
+    if(!changed)return toast('변경된 광고 항목이 없습니다.');
+
+    const dateMap={
+      ad_naver:'ad_naver_at',
+      ad_danggeun:'ad_danggeun_at',
+      ad_zippl:'ad_zippl_at',
+      ad_blog:'ad_blog_at'
+    };
+    const payload={...after};
+    Object.entries(dateMap).forEach(([flag,dateKey])=>{
+      payload[dateKey]=after[flag] ? (listing[dateKey]||today()) : null;
+    });
+
+    const originalText=button?.textContent;
+    if(button){button.disabled=true;button.textContent='저장 중...';}
+
+    const {error}=await state.client.from('listings').update(payload).eq('id',id);
+    if(error){
+      if(button){button.disabled=false;button.textContent=originalText;}
+      return toast(`광고 저장 실패: ${error.message}`);
+    }
+
+    const historyText=adHistory(before,after);
+    if(historyText){
+      const {error:hErr}=await state.client.from('interaction_history').insert({
+        listing_id:id,
+        customer_id:null,
+        created_by:state.profile.id,
+        follow_up_date:today(),
+        contact_method:'광고',
+        content:historyText,
+        next_follow_up_at:null
+      });
+      if(hErr){
+        if(button){button.disabled=false;button.textContent=originalText;}
+        return toast(`광고는 저장됐지만 히스토리 기록에 실패했습니다: ${hErr.message}`);
+      }
+    }
+
+    Object.assign(listing,payload);
+    await refreshListingView();
+    if(button){button.disabled=false;button.textContent=originalText;}
+    toast(historyText.includes('광고 취소')&&!historyText.includes('광고 등록')
+      ? '광고 취소를 저장했습니다.'
+      : '광고 등록 상태를 저장했습니다.');
+  }
+
+  function contractPayload(item){
+    const fd=new FormData(q('#modalForm'));
+    const payload={
+      provisional_contract_date:fd.get('provisional_contract_date')||null,
+      provisional_contract_amount:fd.get('provisional_contract_amount')?Number(fd.get('provisional_contract_amount')):null,
+      provisional_contract_completed:fd.get('provisional_contract_completed')==='on',
+
+      contract_date:fd.get('contract_date')||null,
+      contract_amount:fd.get('contract_amount')?Number(fd.get('contract_amount')):null,
+      contract_completed:fd.get('contract_completed')==='on',
+
+      interim_payment_date:fd.get('interim_payment_date')||null,
+      interim_payment_amount:fd.get('interim_payment_amount')?Number(fd.get('interim_payment_amount')):null,
+      interim_payment_completed:fd.get('interim_payment_completed')==='on',
+      interim_payment_not_applicable:!!q('#interimNotApplicable')?.checked,
+
+      final_payment_date:fd.get('final_payment_date')||null,
+      final_payment_amount:fd.get('final_payment_amount')?Number(fd.get('final_payment_amount')):null,
+      final_payment_completed:fd.get('final_payment_completed')==='on',
+
+      contracted_property_name:fd.get('contracted_property_name')||null,
+      contracted_transaction_type:fd.get('contracted_transaction_type')||null,
+      contracted_amount:fd.get('contracted_amount')?Number(fd.get('contracted_amount')):null,
+      contracted_monthly_rent:fd.get('contracted_transaction_type')==='월세'&&fd.get('contracted_monthly_rent')
+        ? Number(fd.get('contracted_monthly_rent'))
+        : null,
+      counterparty_name:fd.get('counterparty_name')||null,
+      counterparty_phone:fd.get('counterparty_phone')||null,
+      last_follow_up_at:today()
+    };
+
+    if(payload.interim_payment_not_applicable){
+      payload.interim_payment_date=null;
+      payload.interim_payment_amount=null;
+      payload.interim_payment_completed=false;
+    }
+
+    const hasProgress=!!(
+      payload.provisional_contract_completed ||
+      payload.contract_completed ||
+      (!payload.interim_payment_not_applicable&&payload.interim_payment_completed) ||
+      payload.final_payment_completed
+    );
+    payload.status=hasProgress?'complete':'available';
+    return payload;
+  }
+
+  async function saveContractOnly(id,button){
+    const item=(state.listings||[]).find(x=>String(x.id)===String(id));
+    if(!item)return toast('매물 정보를 찾을 수 없습니다.');
+
+    const payload=contractPayload(item);
+    const tracked=[
+      'provisional_contract_date','provisional_contract_amount','provisional_contract_completed',
+      'contract_date','contract_amount','contract_completed',
+      'interim_payment_date','interim_payment_amount','interim_payment_completed','interim_payment_not_applicable',
+      'final_payment_date','final_payment_amount','final_payment_completed',
+      'contracted_property_name','contracted_transaction_type','contracted_amount','contracted_monthly_rent',
+      'counterparty_name','counterparty_phone'
+    ];
+    const changed=tracked.some(k=>String(item[k]??'')!==String(payload[k]??''));
+
+    const originalText=button?.textContent;
+    if(button){button.disabled=true;button.textContent='저장 중...';}
+
+    const {error}=await state.client.from('listings').update(payload).eq('id',id);
+    if(error){
+      if(button){button.disabled=false;button.textContent=originalText;}
+      return toast(error.message);
+    }
+
+    if(changed){
+      const updated={...item,...payload};
+      const {error:hErr}=await state.client.from('interaction_history').insert({
+        listing_id:id,
+        customer_id:null,
+        created_by:state.profile.id,
+        follow_up_date:today(),
+        contact_method:'진행상황',
+        content:crm3859ContractHistory(item,updated,'listing'),
+        next_follow_up_at:null
+      });
+      if(hErr){
+        if(button){button.disabled=false;button.textContent=originalText;}
+        return toast(`계약 진행상황은 저장됐지만 히스토리 기록에 실패했습니다: ${hErr.message}`);
+      }
+    }
+
+    await loadListings();
+    q('#modal')?.close();
+    toast('계약 진행상황을 저장했습니다.');
+    if(state.view==='adminListings'&&typeof renderAdminListings==='function')renderAdminListings();
+    else if(state.view==='network'&&typeof renderNetwork==='function')renderNetwork();
+    else if(typeof renderMyListings==='function')renderMyListings();
+  }
+
+  function install(entityType,id){
+    if(entityType!=='listing')return;
+    const section=q('.crm3829-ad-section');
+    const checks=q('.crm3829-ad-checks');
+    const submit=q('#modalSubmit');
+    if(!section||!checks||!submit)return;
+
+    // 기존 안내문을 새 동작에 맞게 교체
+    const help=q('.crm3829-section-head span',section);
+    if(help)help.textContent='광고 매체를 체크하거나 해제한 뒤 광고 등록 버튼을 누르면 광고 이력만 저장됩니다.';
+
+    let adButton=q('#crmR327AdSave',section);
+    if(!adButton){
+      adButton=document.createElement('button');
+      adButton.type='button';
+      adButton.id='crmR327AdSave';
+      adButton.className='primary crm-r327-ad-save';
+      adButton.textContent='광고 등록';
+      checks.insertAdjacentElement('afterend',adButton);
+    }
+    adButton.onclick=()=>saveAdsOnly(id,adButton);
+
+    // 하단 저장은 광고를 전혀 건드리지 않는 계약 전용 저장
+    submit.textContent='계약저장';
+    submit.onclick=e=>{
+      e.preventDefault();
+      saveContractOnly(id,submit);
+    };
+  }
+
+  const base=window.openContractModal||globalThis.openContractModal;
+  if(typeof base==='function'&&!base.__crmR327Separated){
+    const wrapped=async function(entityType,id,...args){
+      const result=await base.call(this,entityType,id,...args);
+      install(entityType,id);
+      return result;
+    };
+    wrapped.__crmR327Separated=true;
+    window.openContractModal=wrapped;
+    try{openContractModal=wrapped}catch(_){}
+  }
+
+  Object.assign(window,{crmR327SaveAdsOnly:saveAdsOnly,crmR327SaveContractOnly:saveContractOnly});
+  console.info(`CRM v${VERSION} 광고/계약 저장 분리 적용`);
+})();

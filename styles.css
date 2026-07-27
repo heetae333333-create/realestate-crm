@@ -2316,3 +2316,19 @@ table.listing-table tbody tr.crm-r311-listing-complete .muted {
   font-size:16px;
   font-weight:800;
 }
+
+/* ===== CRM v3.10.24R3.27 · 광고 등록 버튼 ===== */
+.crm3829-ad-section .crm-r327-ad-save{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  width:auto;
+  min-width:108px;
+  height:42px;
+  margin:12px 0 0 auto;
+  padding:0 18px;
+  border-radius:10px;
+}
+#modalSubmit{
+  white-space:nowrap;
+}
