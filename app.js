@@ -1316,7 +1316,7 @@ openListingModal=function(id){
   const ri=$('#listingRoomCountInput'),r15=$('#listingOnePointFiveCheck');const sync=()=>{if(r15.checked){ri.value='1';ri.disabled=true}else ri.disabled=false};r15.onchange=sync;sync();crm38SyncDealCards();
   const areaInput=$('#listingAreaM2'),areaPyeong=$('#listingAreaPyeong');const syncArea=()=>{const v=Number(areaInput?.value||0);if(areaPyeong)areaPyeong.textContent=v?`약 ${(v/3.3058).toFixed(2)}평`:'㎡를 입력하면 평으로 자동 계산됩니다.'};if(areaInput)areaInput.addEventListener('input',syncArea);syncArea();
   const moveDate=$('#moveInDateInput'),moveImmediate=$('#moveInImmediate'),moveNegotiable=$('#moveInNegotiable');const syncMoveIn=(source)=>{if(source==='immediate'&&moveImmediate.checked)moveNegotiable.checked=false;if(source==='negotiable'&&moveNegotiable.checked)moveImmediate.checked=false;const noDate=moveImmediate.checked;moveDate.disabled=noDate;if(noDate)moveDate.value='';if(moveNegotiable.checked&&!moveDate.value)moveDate.required=true;else moveDate.required=false};moveImmediate.onchange=()=>syncMoveIn('immediate');moveNegotiable.onchange=()=>syncMoveIn('negotiable');syncMoveIn();
-  $('#modalSubmit').style.display='';$('#modalSubmit').onclick=async e=>{e.preventDefault();const fd=new FormData($('#modalForm'));const selected=[...document.querySelectorAll('.crm38-deal-card')].filter(c=>c.querySelector('.crm38-deal-check').checked).map((c,i)=>({deal_type:c.dataset.type,price:Number(c.querySelector('.crm38-deal-price').value||0)||null,monthly_rent:c.dataset.type==='월세'?(Number(c.querySelector('.crm38-deal-rent').value||0)||null):null,is_preferred:c.querySelector('input[type=radio]').checked,sort_order:i}));if(!selected.length)return toast('거래유형을 하나 이상 체크하세요.');const preferred=selected.find(o=>o.is_preferred)||selected[0];const p={title:fd.get('title'),contact_phone:fd.get('contact_phone')||null,transaction_type:preferred.deal_type,price:preferred.price,monthly_rent:preferred.monthly_rent,property_type:fd.get('property_type'),status:fd.get('status'),district:fd.get('district')||null,address:fd.get('address')||null,management_fee:Number(fd.get('management_fee')||0)||null,area_m2:Number(fd.get('area_m2')||0)||null,room_count:Number(fd.get('room_count')||0)||null,bathroom_count:Number(fd.get('bathroom_count')||0)||null,options:fd.get('options')||null,loan_available:fd.get('loan_available')===''?null:fd.get('loan_available')==='true',official_price:Number(fd.get('official_price')||0)||null,move_in_immediate:fd.get('move_in_immediate')==='on',move_in_negotiable:fd.get('move_in_negotiable')==='on',move_in_date:fd.get('move_in_immediate')==='on'?null:(fd.get('move_in_date')||null),move_in_period:fd.get('move_in_immediate')==='on'?null:(fd.get('move_in_period')||null),is_public:fd.get('is_public')==='true',next_confirm_at:fd.get('next_confirm_at')||null,description:fd.get('description')||null,owner_id:id?(x.owner_id||state.profile.id):state.profile.id,feature_tags:[...document.querySelectorAll('.crm361-feature-check:checked')].map(el=>el.value),is_one_point_five_room:fd.get('is_one_point_five_room')==='on',current_floor:fd.get('current_floor')!==null&&fd.get('current_floor')!==''?Number(fd.get('current_floor')):null,total_floors:fd.get('total_floors')!==null&&fd.get('total_floors')!==''?Number(fd.get('total_floors')):null,built_year:fd.get('built_year')!==null&&fd.get('built_year')!==''?Number(fd.get('built_year')):null};if(p.is_one_point_five_room)p.room_count=1;if(!p.loan_available)p.official_price=null;
+  $('#modalSubmit').style.display='';$('#modalSubmit').onclick=async e=>{e.preventDefault();const fd=new FormData($('#modalForm'));const selected=[...document.querySelectorAll('.crm38-deal-card')].filter(c=>c.querySelector('.crm38-deal-check').checked).map((c,i)=>({deal_type:c.dataset.type,price:Number(c.querySelector('.crm38-deal-price').value||0)||null,monthly_rent:c.dataset.type==='월세'?(Number(c.querySelector('.crm38-deal-rent').value||0)||null):null,is_preferred:c.querySelector('input[type=radio]').checked,sort_order:i}));if(!selected.length)return toast('거래유형을 하나 이상 체크하세요.');const preferred=selected.find(o=>o.is_preferred)||selected[0];const p={title:fd.get('title'),contact_phone:fd.get('contact_phone')||null,transaction_type:preferred.deal_type,price:preferred.price,monthly_rent:preferred.monthly_rent,property_type:fd.get('property_type'),status:fd.get('status'),district:fd.get('district')||null,address:fd.get('address')||null,management_fee:Number(fd.get('management_fee')||0)||null,area_m2:Number(fd.get('area_m2')||0)||null,land_area_m2:Number(fd.get('land_area_m2')||0)||null,building_area_m2:Number(fd.get('building_area_m2')||0)||null,is_whole_building:fd.get('is_whole_building')==='on',room_count:Number(fd.get('room_count')||0)||null,bathroom_count:Number(fd.get('bathroom_count')||0)||null,options:fd.get('options')||null,loan_available:fd.get('loan_available')===''?null:fd.get('loan_available')==='true',official_price:Number(fd.get('official_price')||0)||null,move_in_immediate:fd.get('move_in_immediate')==='on',move_in_negotiable:fd.get('move_in_negotiable')==='on',move_in_date:fd.get('move_in_immediate')==='on'?null:(fd.get('move_in_date')||null),move_in_period:fd.get('move_in_immediate')==='on'?null:(fd.get('move_in_period')||null),is_public:fd.get('is_public')==='true',next_confirm_at:fd.get('next_confirm_at')||null,description:fd.get('description')||null,owner_id:id?(x.owner_id||state.profile.id):state.profile.id,feature_tags:[...document.querySelectorAll('.crm361-feature-check:checked')].map(el=>el.value),is_one_point_five_room:fd.get('is_one_point_five_room')==='on',current_floor:fd.get('current_floor')!==null&&fd.get('current_floor')!==''?Number(fd.get('current_floor')):null,total_floors:fd.get('total_floors')!==null&&fd.get('total_floors')!==''?Number(fd.get('total_floors')):null,built_year:fd.get('built_year')!==null&&fd.get('built_year')!==''?Number(fd.get('built_year')):null};if(p.is_one_point_five_room)p.room_count=1;if(!p.loan_available)p.official_price=null;
     let listingId=id;if(id){const {error}=await state.client.from('listings').update(p).eq('id',id);if(error)return toast(error.message)}else{const {data,error}=await state.client.from('listings').insert(p).select('id').single();if(error)return toast(error.message);listingId=data.id}
     await state.client.from('listing_deal_options').delete().eq('listing_id',listingId);const {error:dealErr}=await state.client.from('listing_deal_options').insert(selected.map(o=>({...o,listing_id:listingId})));if(dealErr)return toast(dealErr.message);
     await state.client.from('listing_contacts').delete().eq('listing_id',listingId);const extra=[...document.querySelectorAll('.crm38-contact-row')].map((row,i)=>({listing_id:listingId,contact_role:row.querySelector('.crm38-contact-role').value,contact_name:row.querySelector('.crm38-contact-name').value||null,phone:row.querySelector('.crm38-contact-phone').value,sort_order:i})).filter(c=>c.phone);if(extra.length){const {error}=await state.client.from('listing_contacts').insert(extra);if(error)return toast(error.message)}
@@ -12326,4 +12326,128 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
 
   Object.assign(window,{crmR327SaveAdsOnly:saveAdsOnly,crmR327SaveContractOnly:saveContractOnly});
   console.info(`CRM v${VERSION} 광고/계약 저장 분리 적용`);
+})();
+
+
+/* =========================================================
+   CRM v3.10.24R3.28 · 건물전체 + 단독 면적 확장
+   ========================================================= */
+(() => {
+  const VERSION='3.10.24R3.28';
+  const q=(s,r=document)=>r.querySelector(s);
+
+  function listingFromModal(){
+    const id=window.__crmCurrentListingId;
+    if(id) return (state.listings||[]).find(x=>String(x.id)===String(id))||{};
+    const address=q('#modalBody [name="address"]')?.value||'';
+    const unit=q('#modalBody [name="unit_no"]')?.value||'';
+    return (state.listings||[]).find(x=>String(x.address||'')===String(address)&&String(x.unit_no||'')===String(unit))||{};
+  }
+
+  function installWholeBuilding(){
+    const body=q('#modalBody');
+    if(!body||!/^매물 (등록|수정)/.test(q('#modalTitle')?.textContent||'')) return false;
+
+    const row=q('.crm3852-address-row',body);
+    const building=q('[name="building_no"]',body);
+    const unit=q('[name="unit_no"]',body);
+    if(!row||!building||!unit) return false;
+    if(q('.crm-r328-whole-building',row)) return true;
+
+    const current=listingFromModal();
+    const wrap=document.createElement('label');
+    wrap.className='crm-r328-whole-building inline-check';
+    wrap.innerHTML=`<input type="checkbox" name="is_whole_building" ${current.is_whole_building?'checked':''}> 건물 전체`;
+    row.appendChild(wrap);
+
+    const check=q('[name="is_whole_building"]',wrap);
+    const sync=()=>{
+      const disabled=check.checked;
+      building.disabled=disabled;
+      unit.disabled=disabled;
+      if(disabled){
+        building.value='';
+        unit.value='';
+      }
+      building.closest('label')?.classList.toggle('crm-r328-disabled',disabled);
+      unit.closest('label')?.classList.toggle('crm-r328-disabled',disabled);
+    };
+    check.addEventListener('change',sync);
+    sync();
+    return true;
+  }
+
+  function installDetachedAreas(){
+    const body=q('#modalBody');
+    if(!body||!/^매물 (등록|수정)/.test(q('#modalTitle')?.textContent||'')) return false;
+
+    const property=q('[name="property_type"]',body);
+    const area=q('[name="area_m2"]',body);
+    if(!property||!area) return false;
+
+    const grid=area.closest('.crm31024r34-grid')||area.parentElement?.parentElement;
+    if(!grid) return false;
+
+    let wrap=q('.crm-r328-detached-areas',grid);
+    const current=listingFromModal();
+
+    if(!wrap){
+      wrap=document.createElement('div');
+      wrap.className='crm-r328-detached-areas';
+      wrap.innerHTML=`
+        <label>토지면적(㎡)
+          <input type="number" name="land_area_m2" min="0" step="0.01" value="${current.land_area_m2??''}" placeholder="예: 165">
+          <span class="field-help crm-r328-land-pyeong"></span>
+        </label>
+        <label>건물면적(㎡)
+          <input type="number" name="building_area_m2" min="0" step="0.01" value="${current.building_area_m2??''}" placeholder="예: 101">
+          <span class="field-help crm-r328-building-pyeong"></span>
+        </label>`;
+      area.closest('label')?.insertAdjacentElement('afterend',wrap);
+    }
+
+    const land=q('[name="land_area_m2"]',wrap);
+    const buildingArea=q('[name="building_area_m2"]',wrap);
+    const landHelp=q('.crm-r328-land-pyeong',wrap);
+    const buildingHelp=q('.crm-r328-building-pyeong',wrap);
+
+    const pyeong=(input,help)=>{
+      const n=Number(input.value||0);
+      help.textContent=n?`약 ${(n/3.3058).toFixed(2)}평`:'㎡를 입력하면 평으로 자동 계산됩니다.';
+    };
+    const sync=()=>{
+      const show=property.value==='단독';
+      wrap.hidden=!show;
+      land.disabled=!show;
+      buildingArea.disabled=!show;
+      pyeong(land,landHelp);
+      pyeong(buildingArea,buildingHelp);
+    };
+    property.addEventListener('change',sync);
+    land.addEventListener('input',()=>pyeong(land,landHelp));
+    buildingArea.addEventListener('input',()=>pyeong(buildingArea,buildingHelp));
+    sync();
+    return true;
+  }
+
+  function install(){
+    installWholeBuilding();
+    installDetachedAreas();
+  }
+
+  const base=window.openListingModal||globalThis.openListingModal;
+  if(typeof base==='function'&&!base.__crmR328Fields){
+    const wrapped=function(id,...args){
+      window.__crmCurrentListingId=id||null;
+      const result=base.call(this,id,...args);
+      [0,40,100,220,450,800].forEach(ms=>setTimeout(install,ms));
+      return result;
+    };
+    wrapped.__crmR328Fields=true;
+    window.openListingModal=wrapped;
+    try{openListingModal=wrapped}catch(_){}
+  }
+
+  Object.assign(window,{crmR328InstallListingFields:install});
+  console.info(`CRM v${VERSION} 건물전체·단독 면적 확장 적용`);
 })();

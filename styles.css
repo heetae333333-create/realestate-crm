@@ -2332,3 +2332,37 @@ table.listing-table tbody tr.crm-r311-listing-complete .muted {
 #modalSubmit{
   white-space:nowrap;
 }
+
+/* ===== CRM v3.10.24R3.28 · 건물전체 / 단독 면적 ===== */
+.crm3852-address-row{
+  align-items:end;
+}
+.crm3852-address-row .crm-r328-whole-building{
+  min-height:44px;
+  padding:0 14px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#f8fafc;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  white-space:nowrap;
+}
+.crm3852-address-row .crm-r328-whole-building input{
+  width:auto;
+  margin:0 8px 0 0;
+}
+.crm-r328-disabled{
+  opacity:.55;
+}
+.crm-r328-detached-areas{
+  display:contents;
+}
+.crm-r328-detached-areas[hidden]{
+  display:none!important;
+}
+@media(max-width:720px){
+  .crm3852-address-row .crm-r328-whole-building{
+    width:100%;
+  }
+}
