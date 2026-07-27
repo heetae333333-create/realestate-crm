@@ -11893,7 +11893,7 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   const printCss=`*{box-sizing:border-box}body{margin:0;background:#eef2f6;color:#111827;font-family:Pretendard,'Noto Sans KR',Arial,sans-serif}.toolbar{position:sticky;top:0;z-index:5;display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;background:#fff;border-bottom:1px solid #dbe2ea}.toolbar button{border:1px solid #d5dce5;background:#fff;border-radius:10px;padding:10px 16px;font-weight:800;cursor:pointer}.toolbar .primary{background:#1d4ed8;color:#fff;border-color:#1d4ed8}.wrap{width:min(1040px,calc(100% - 32px));margin:24px auto 48px}.sheet{background:#fff;border-radius:22px;padding:34px;box-shadow:0 20px 60px rgba(15,23,42,.1);margin-bottom:24px;page-break-after:always}.sheet:last-child{page-break-after:auto}.topline{display:flex;justify-content:space-between;border-bottom:2px solid #111827;padding-bottom:10px;font-size:11px;font-weight:900;letter-spacing:.16em;color:#64748b}.head{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:end;padding:26px 0 22px}.ptype{display:inline-flex;background:#eaf1ff;color:#1d4ed8;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:900;margin-bottom:10px}.head h1{font-size:34px;line-height:1.15;margin:0 0 10px;letter-spacing:-.04em}.addr{margin:0;color:#475569;font-size:15px}.price{text-align:right;min-width:210px}.price small{display:block;color:#64748b;font-weight:800;margin-bottom:6px}.price strong{display:block;font-size:24px}.photos{display:grid;grid-template-columns:2fr 1fr 1fr;grid-template-rows:210px 210px;gap:8px;border-radius:16px;overflow:hidden;background:#e5e7eb}.photos img{width:100%;height:100%;object-fit:cover;display:block}.photos img:first-child{grid-row:1/3}.photos.count-1{grid-template-columns:1fr;grid-template-rows:430px}.photos.count-1 img:first-child{grid-row:auto}.photos.count-2{grid-template-columns:1fr 1fr;grid-template-rows:360px}.photos.count-2 img:first-child{grid-row:auto}.photos.count-3{grid-template-columns:2fr 1fr;grid-template-rows:210px 210px}.photos.count-3 img:nth-child(2),.photos.count-3 img:nth-child(3){grid-column:2}.no-photo{height:300px;border:1px dashed #cbd5e1;border-radius:16px;display:grid;place-items:center;background:#f8fafc;color:#94a3b8;font-weight:800}.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:18px}.fact{border:1px solid #e2e8f0;border-radius:13px;padding:14px 15px}.fact span{display:block;color:#64748b;font-size:12px;font-weight:800;margin-bottom:6px}.fact strong{font-size:15px;line-height:1.35}.foot{display:flex;justify-content:flex-start;margin-top:22px;padding-top:14px;border-top:1px solid #e2e8f0;color:#64748b;font-size:11px}@media(max-width:760px){.sheet{padding:22px}.head{grid-template-columns:1fr}.price{text-align:left}.facts{grid-template-columns:1fr 1fr}.photos{grid-template-columns:1fr 1fr;grid-template-rows:220px 160px}.photos img:first-child{grid-column:1/3;grid-row:auto}}@page{size:A4;margin:8mm}@media print{body{background:#fff}.toolbar{display:none!important}.wrap{width:100%;margin:0}.sheet{box-shadow:none;border-radius:0;margin:0;padding:8mm;min-height:277mm}.photos{grid-template-rows:62mm 62mm}.photos.count-1{grid-template-rows:126mm}.photos.count-2{grid-template-rows:105mm}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}`;
   function card(x,urls,i){
     const facts=[['매물유형',x.property_type||'-'],['방 / 욕실',`${listingRoomText(x)||'-'}개 / ${x.bathroom_count??'-'}개`],['전용면적',brochureArea(x)],['입주가능일',brochureMoveIn(x)],['층수',brochureFloor(x)],['준공년도',brochureBuiltYear(x)]];
-    const photos=urls.length?`<div class="photos count-${urls.length}">${urls.map((u,j)=>`<img src="${u}" alt="${esc(x.title)} 사진 ${j+1}">`).join('')}</div>`:`<div class="no-photo">등록된 고객 공개 사진이 없습니다</div>`;
+    const photos=urls.length?`<div class="photos count-${urls.length}">${urls.map((u,j)=>`<img src="${u}" alt="${esc(x.title)} 사진 ${j+1}">`).join('')}</div>`:`<div class="no-photo">해당 매물은 거주자 혹은 의뢰인의 요청으로 사진 촬영이 불가하여 사진이 없으니 양해 부탁드립니다.</div>`;
     return `<section class="sheet"><div class="topline"><span>PROPERTY BRIEF</span><span>${String(i+1).padStart(2,'0')}</span></div><div class="head"><div><div class="ptype">${esc(x.property_type||'-')}</div><h1>${esc(x.title||'매물 소개')}</h1><p class="addr">${esc(brochureAddress(x))}</p></div><div class="price"><small>${esc(crm38DealTypeText(x)||x.transaction_type||'거래조건')}</small><strong>${esc(brochurePrice(x))}</strong></div></div>${photos}<div class="facts">${facts.map(([k,v])=>`<div class="fact"><span>${esc(k)}</span><strong>${esc(v)}</strong></div>`).join('')}</div><div class="foot"><span>매물 조건은 실시간으로 변경될 수 있으므로 계약·방문 전 재확인해 주세요.</span></div></section>`;
   }
   async function openPrint(rows,title){
@@ -11913,7 +11913,25 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
     ctx.fillStyle='#1d4ed8';ctx.font='800 24px sans-serif';ctx.fillText(String(x.property_type||'-'),90,190);ctx.fillStyle='#111827';ctx.font='900 54px sans-serif';ctx.fillText(String(x.title||'매물 소개').slice(0,22),90,258);ctx.fillStyle='#475569';ctx.font='500 24px sans-serif';ctx.fillText(brochureAddress(x).slice(0,48),90,302);ctx.textAlign='right';ctx.fillStyle='#111827';ctx.font='900 34px sans-serif';ctx.fillText(brochurePrice(x).slice(0,28),1110,238);ctx.textAlign='left';
     const imgs=[]; for(const u of urls.slice(0,3)){try{imgs.push(await loadImage(u))}catch(_){}}
     const px=90,py=350,pw=1020,ph=650,g=10;ctx.fillStyle='#e5e7eb';ctx.fillRect(px,py,pw,ph);
-    if(imgs.length===1) cover(ctx,imgs[0],px,py,pw,ph); else if(imgs.length){ const lw=650,rw=pw-lw-g,hh=(ph-g)/2; cover(ctx,imgs[0],px,py,lw,ph); cover(ctx,imgs[1]||imgs[0],px+lw+g,py,rw,hh); cover(ctx,imgs[2]||imgs[1]||imgs[0],px+lw+g,py+hh+g,rw,hh); }
+    if(imgs.length===1) {
+      cover(ctx,imgs[0],px,py,pw,ph);
+    } else if(imgs.length) {
+      const lw=650,rw=pw-lw-g,hh=(ph-g)/2;
+      cover(ctx,imgs[0],px,py,lw,ph);
+      cover(ctx,imgs[1]||imgs[0],px+lw+g,py,rw,hh);
+      cover(ctx,imgs[2]||imgs[1]||imgs[0],px+lw+g,py+hh+g,rw,hh);
+    } else {
+      ctx.fillStyle='#64748b';
+      ctx.textAlign='center';
+      ctx.font='800 25px sans-serif';
+      const noPhotoLines=[
+        '해당 매물은 거주자 혹은 의뢰인의 요청으로',
+        '사진 촬영이 불가하여 사진이 없으니',
+        '양해 부탁드립니다.'
+      ];
+      noPhotoLines.forEach((line,i)=>ctx.fillText(line,px+pw/2,py+ph/2-34+i*40));
+      ctx.textAlign='left';
+    }
     const facts=[['매물유형',x.property_type||'-'],['방 / 욕실',`${listingRoomText(x)||'-'}개 / ${x.bathroom_count??'-'}개`],['전용면적',brochureArea(x)],['입주가능일',brochureMoveIn(x)],['층수',brochureFloor(x)],['준공년도',brochureBuiltYear(x)]];
     const fy=1035,cols=3,gap=10,fw=(1020-gap*2)/cols,fh=112;
     facts.forEach(([k,v],i)=>{const col=i%cols,row=Math.floor(i/cols),xx=90+col*(fw+gap),yy=fy+row*(fh+10);ctx.fillStyle='#f8fafc';ctx.fillRect(xx,yy,fw,fh);ctx.fillStyle='#64748b';ctx.font='800 17px sans-serif';ctx.fillText(k,xx+16,yy+31);ctx.fillStyle='#111827';ctx.font='900 22px sans-serif';ctx.fillText(String(v).slice(0,24),xx+16,yy+72);});

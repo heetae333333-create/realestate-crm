@@ -2303,3 +2303,16 @@ table.listing-table tbody tr.crm-r311-listing-complete .muted {
     min-width:510px;
   }
 }
+
+/* ===== CRM v3.10.24R3.26 · 이미지 소개서 사진 없음 안내 ===== */
+.no-photo{
+  height:300px;
+  min-height:300px;
+  padding:36px;
+  text-align:center;
+  line-height:1.8;
+  word-break:keep-all;
+  color:#64748b;
+  font-size:16px;
+  font-weight:800;
+}
