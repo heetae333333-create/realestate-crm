@@ -2246,3 +2246,60 @@ table.listing-table tbody tr.crm-r311-listing-complete .muted {
 #modal .modal-actions.crm-r318-listing-fu-actions .crm-r318-cancel{margin-left:7px}
 @media(max-width:720px){#modal .modal-actions.crm-r318-listing-fu-actions{min-width:650px}}
 .crm-r324-brief-dialog{width:min(760px,94vw);border:0;border-radius:18px;padding:0}.crm-r324-brief-dialog::backdrop{background:rgba(15,23,42,.58)}.crm-r324-brief-card{padding:20px;background:#fff}.crm-r324-brief-head{display:flex;justify-content:space-between;align-items:center;gap:14px}.crm-r324-brief-head>div{display:grid;gap:3px}.crm-r324-brief-head strong{font-size:21px}.crm-r324-brief-head span{font-size:13px;color:#64748b}.crm-r324-brief-summary{margin-top:16px;padding:16px;border-radius:13px;background:#f8fafc;border:1px solid #e2e8f0;display:flex;justify-content:space-between;gap:12px}.crm-r324-brief-summary span{font-weight:900}.crm-r324-brief-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}.crm-r324-brief-grid>div{border:1px solid #e2e8f0;border-radius:11px;padding:11px}.crm-r324-brief-grid span{display:block;color:#64748b;font-size:11px;font-weight:800;margin-bottom:4px}.crm-r324-brief-grid strong{font-size:13px;line-height:1.4}.crm-r324-brief-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:16px}.crm-r324-brief-actions button{height:44px}@media(max-width:620px){.crm-r324-brief-grid{grid-template-columns:1fr 1fr}.crm-r324-brief-actions{grid-template-columns:1fr}}
+
+/* ===== CRM v3.10.24R3.25 · 매물 상세 하단 소개 도구 ===== */
+#modal .modal-actions.crm-r325-listing-detail-actions{
+  display:flex;
+  align-items:center;
+  flex-wrap:nowrap;
+  gap:9px;
+  width:100%;
+}
+#modal .modal-actions.crm-r325-listing-detail-actions .crm-r325-detail-tools{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(150px,1fr));
+  gap:8px;
+  flex:1 1 auto;
+  min-width:0;
+  margin-right:8px;
+}
+#modal .modal-actions.crm-r325-listing-detail-actions .crm-r325-detail-tools button{
+  width:100%;
+  min-width:0;
+  height:46px;
+  padding:0 12px;
+  border-radius:11px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  white-space:nowrap;
+  font-size:14px;
+  font-weight:800;
+}
+#modal .modal-actions.crm-r325-listing-detail-actions .crm-r325-brief{
+  border-color:#c4b5fd;
+  background:#f5f3ff;
+  color:#6d28d9;
+}
+#modal .modal-actions.crm-r325-listing-detail-actions .crm-r325-kakao{
+  border-color:#86efac;
+  background:#f0fdf4;
+  color:#166534;
+}
+#modal .modal-actions.crm-r325-listing-detail-actions .crm-r325-image{
+  border-color:#bfdbfe;
+  background:#eff6ff;
+  color:#1d4ed8;
+}
+#modal .modal-actions.crm-r325-listing-detail-actions > button{
+  flex:0 0 auto;
+}
+@media(max-width:720px){
+  #modal .modal-actions.crm-r325-listing-detail-actions{
+    overflow-x:auto;
+    scrollbar-width:thin;
+  }
+  #modal .modal-actions.crm-r325-listing-detail-actions .crm-r325-detail-tools{
+    min-width:510px;
+  }
+}

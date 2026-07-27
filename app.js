@@ -11974,3 +11974,95 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   Object.assign(window,{crmR324OpenBriefingSheet});
   console.info(`CRM v${VERSION} 매물 브리핑시트 적용`);
 })();
+
+
+/* =========================================================
+   CRM v3.10.24R3.25 · 매물 상세 하단 소개 도구
+   - 내 매물 상세/수정 및 공동매물망 읽기 전용 상세에 동일 적용
+   - 기존 카카오톡 단독 버튼 제거
+   - 브리핑시트 / 카카오톡 소개문구 / 이미지 소개서 한 줄 배치
+   - 기존 수정 권한 및 읽기 전용 권한은 변경하지 않음
+   ========================================================= */
+(() => {
+  const VERSION='3.10.24R3.25';
+  const q=(s,r=document)=>r.querySelector(s);
+  const qa=(s,r=document)=>Array.from(r.querySelectorAll(s));
+
+  function isListingDetailModal(){
+    const modal=q('#modal');
+    const body=q('#modalBody');
+    if(!modal?.open||!body)return false;
+    if(!q('[name="title"]',body))return false;
+    const title=(q('#modalTitle')?.textContent||'').trim();
+    if(/FU 관리|진행상황|히스토리|사진/.test(title))return false;
+    return true;
+  }
+
+  function install(listingId){
+    if(!listingId||!isListingDetailModal())return false;
+    const actions=q('#modalForm .modal-actions');
+    if(!actions)return false;
+
+    // 기존에 상세 하단에 추가되던 카카오톡 단독 버튼과 이전 설치 그룹 제거
+    qa('.crm3107-kakao-copy,.crm3114-kakao-copy,.crm-r325-detail-tools',actions).forEach(el=>el.remove());
+
+    const group=document.createElement('div');
+    group.className='crm-r325-detail-tools';
+    group.innerHTML=`
+      <button type="button" class="ghost crm-r325-brief">📋 브리핑시트</button>
+      <button type="button" class="ghost crm-r325-kakao">💬 카카오톡 소개문구</button>
+      <button type="button" class="ghost crm-r325-image">🖼 이미지 소개서</button>
+    `;
+
+    group.querySelector('.crm-r325-brief').onclick=()=>window.crmR324OpenBriefingSheet?.(listingId);
+    group.querySelector('.crm-r325-kakao').onclick=()=>window.crm3114CopyListingIntro?.(listingId);
+    group.querySelector('.crm-r325-image').onclick=()=>window.crmR322OpenImageBrochure?.(listingId);
+
+    // 취소/저장 앞에 소개 도구 그룹을 배치한다.
+    actions.insertBefore(group,actions.firstChild);
+    actions.classList.add('crm-r325-listing-detail-actions');
+    return true;
+  }
+
+  function schedule(listingId){
+    [0,40,100,220,450].forEach(ms=>setTimeout(()=>install(listingId),ms));
+  }
+
+  const baseListing=window.openListingModal||globalThis.openListingModal;
+  if(typeof baseListing==='function'&&!baseListing.__crmR325DetailTools){
+    const wrapped=function(id,...args){
+      const result=baseListing.call(this,id,...args);
+      if(id)Promise.resolve(result).finally(()=>schedule(id));
+      return result;
+    };
+    wrapped.__crmR325DetailTools=true;
+    window.openListingModal=wrapped;
+    try{openListingModal=wrapped}catch(_){}
+  }
+
+  const baseDetail=window.openListingDetail||globalThis.openListingDetail;
+  if(typeof baseDetail==='function'&&!baseDetail.__crmR325DetailTools){
+    const wrapped=function(id,...args){
+      const result=baseDetail.call(this,id,...args);
+      Promise.resolve(result).finally(()=>schedule(id));
+      return result;
+    };
+    wrapped.__crmR325DetailTools=true;
+    window.openListingDetail=wrapped;
+    try{openListingDetail=wrapped}catch(_){}
+  }
+
+  // 다른 종류의 모달이 열릴 때 상세 전용 클래스가 남지 않도록 정리
+  const title=q('#modalTitle');
+  if(title){
+    new MutationObserver(()=>{
+      if(!isListingDetailModal()){
+        q('#modalForm .modal-actions')?.classList.remove('crm-r325-listing-detail-actions');
+        qa('#modal .crm-r325-detail-tools').forEach(el=>el.remove());
+      }
+    }).observe(title,{childList:true,subtree:true,characterData:true});
+  }
+
+  Object.assign(window,{crmR325InstallListingDetailTools:install});
+  console.info(`CRM v${VERSION} 매물 상세 하단 소개 도구 적용`);
+})();
