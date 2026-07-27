@@ -12644,3 +12644,144 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   Object.assign(window,{crmR330InstallPhotoButton:install});
   console.info(`CRM v${VERSION} 매물 상세 사진보기 버튼 적용`);
 })();
+
+
+/* =========================================================
+   CRM v3.10.24R3.31 · 관리자 회원정보/로그인 이메일 수정
+   ========================================================= */
+(() => {
+  const VERSION='3.10.24R3.31';
+  const q=(s,r=document)=>r.querySelector(s);
+
+  function memberById(id){
+    return (state.members||[]).find(x=>String(x.id)===String(id));
+  }
+
+  function formatPhoneInput(input){
+    const digits=String(input.value||'').replace(/\D/g,'').slice(0,11);
+    if(digits.length<=3) input.value=digits;
+    else if(digits.length<=7) input.value=`${digits.slice(0,3)}-${digits.slice(3)}`;
+    else input.value=`${digits.slice(0,3)}-${digits.slice(3,7)}-${digits.slice(7)}`;
+  }
+
+  async function openMemberEdit(id){
+    if(state.profile?.role!=='admin')return toast('관리자만 회원 정보를 수정할 수 있습니다.');
+    const member=memberById(id);
+    if(!member)return toast('회원 정보를 찾을 수 없습니다.');
+
+    q('#modalTitle').textContent='회원 정보 수정';
+    q('#modalBody').innerHTML=`
+      <div class="crm-r331-member-edit">
+        <div class="notice">
+          이메일은 로그인 아이디로 사용됩니다. 이메일을 바꾸면 다음 로그인부터 변경된 이메일을 사용해야 합니다.
+        </div>
+        <div class="form-grid">
+          <label>이름
+            <input id="crmR331Name" value="${escapeHtml(member.full_name||'')}" maxlength="40">
+          </label>
+          <label>사무소
+            <input id="crmR331Office" value="${escapeHtml(member.office_name||'')}" maxlength="100">
+          </label>
+          <label>연락처
+            <input id="crmR331Phone" value="${escapeHtml(member.phone||'')}" placeholder="010-0000-0000" inputmode="numeric">
+          </label>
+          <label>이메일 · 로그인 아이디
+            <input id="crmR331Email" type="email" value="${escapeHtml(member.email||'')}" autocomplete="off">
+          </label>
+        </div>
+      </div>`;
+
+    const phone=q('#crmR331Phone');
+    phone.addEventListener('input',()=>formatPhoneInput(phone));
+
+    const submit=q('#modalSubmit');
+    submit.style.display='';
+    submit.textContent='변경 저장';
+    submit.onclick=async e=>{
+      e.preventDefault();
+      const full_name=q('#crmR331Name').value.trim();
+      const office_name=q('#crmR331Office').value.trim();
+      const memberPhone=q('#crmR331Phone').value.trim();
+      const email=q('#crmR331Email').value.trim().toLowerCase();
+
+      if(!full_name)return toast('이름을 입력하세요.');
+      if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return toast('올바른 이메일을 입력하세요.');
+
+      const changedEmail=email!==String(member.email||'').trim().toLowerCase();
+      const original=submit.textContent;
+      submit.disabled=true;
+      submit.textContent='저장 중...';
+
+      const {data,error}=await state.client.rpc('admin_update_member_identity',{
+        p_member_id:id,
+        p_full_name:full_name,
+        p_office_name:office_name||null,
+        p_phone:memberPhone||null,
+        p_email:email
+      });
+
+      if(error){
+        submit.disabled=false;
+        submit.textContent=original;
+        const msg=String(error.message||'');
+        if(msg.includes('already')||msg.includes('duplicate')||msg.includes('unique')){
+          return toast('이미 사용 중인 이메일입니다.');
+        }
+        return toast(`회원 정보 수정 실패: ${msg}`);
+      }
+
+      q('#modal').close();
+      await loadMembers();
+      await renderMembers();
+      toast(changedEmail?'회원 정보와 로그인 아이디를 변경했습니다.':'회원 정보를 변경했습니다.');
+
+      if(String(id)===String(state.profile?.id)){
+        state.profile={...state.profile,full_name,office_name:office_name||null,phone:memberPhone||null,email};
+        q('#userBadge').innerHTML=`<strong>${escapeHtml(full_name)}</strong><div class="muted">관리자</div>`;
+        if(changedEmail){
+          setTimeout(async()=>{
+            alert('현재 관리자 계정의 로그인 이메일이 변경되었습니다. 보안을 위해 로그아웃되며, 변경된 이메일로 다시 로그인하세요.');
+            await state.client.auth.signOut();
+            location.reload();
+          },250);
+        }
+      }
+    };
+
+    const reset=()=>{
+      submit.textContent='저장';
+      submit.disabled=false;
+      q('#modal').removeEventListener('close',reset);
+    };
+    q('#modal').addEventListener('close',reset);
+    q('#modal').showModal();
+  }
+
+  // 회원 목록 렌더링 완료 후 모든 회원에게 수정 버튼 추가
+  const baseRender=window.renderMembers||globalThis.renderMembers;
+  if(typeof baseRender==='function'&&!baseRender.__crmR331Edit){
+    const wrapped=async function(...args){
+      const result=await baseRender.apply(this,args);
+      const rows=Array.from(document.querySelectorAll('#content table tbody tr'));
+      rows.forEach((tr,index)=>{
+        const member=state.members?.[index];
+        if(!member)return;
+        const actions=tr.querySelector('.row-actions');
+        if(!actions||actions.querySelector('.crm-r331-member-edit-btn'))return;
+        const btn=document.createElement('button');
+        btn.type='button';
+        btn.className='ghost crm-r331-member-edit-btn';
+        btn.textContent='정보 수정';
+        btn.onclick=()=>openMemberEdit(member.id);
+        actions.prepend(btn);
+      });
+      return result;
+    };
+    wrapped.__crmR331Edit=true;
+    window.renderMembers=wrapped;
+    try{renderMembers=wrapped}catch(_){}
+  }
+
+  Object.assign(window,{crmR331OpenMemberEdit:openMemberEdit});
+  console.info(`CRM v${VERSION} 회원정보 및 로그인 이메일 수정 적용`);
+})();

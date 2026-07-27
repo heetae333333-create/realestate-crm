@@ -2454,3 +2454,17 @@ table.listing-table tbody tr.crm-r311-listing-complete .muted {
     margin-left:0;
   }
 }
+
+/* ===== CRM v3.10.24R3.31 · 회원정보 수정 ===== */
+.crm-r331-member-edit{
+  display:grid;
+  gap:16px;
+}
+.crm-r331-member-edit .notice{
+  line-height:1.6;
+}
+.crm-r331-member-edit-btn{
+  border-color:#bfdbfe;
+  color:#1d4ed8;
+  background:#eff6ff;
+}
