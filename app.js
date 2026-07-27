@@ -13386,3 +13386,234 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
     try{showCustomerMatches=wrapped}catch(_){}
   }
 })();
+
+
+/* =========================================================
+   CRM v3.10.24R3.36 · 콤팩트 업무형 대시보드
+   ========================================================= */
+(() => {
+  const VERSION='3.10.24R3.36';
+  const q=(s,r=document)=>r.querySelector(s);
+  const esc=v=>escapeHtml(String(v??''));
+  const todayStr=()=>new Date().toISOString().slice(0,10);
+  const dateOnly=v=>v?String(v).slice(0,10):'';
+  const daysAgo=v=>{
+    if(!v)return null;
+    const d=new Date(dateOnly(v)+'T00:00:00');
+    const t=new Date(todayStr()+'T00:00:00');
+    return Math.floor((t-d)/86400000);
+  };
+  const activeCustomer=c=>!['계약완료','보류'].includes(c.status||'');
+  const activeListing=l=>!['complete','completed','거래완료'].includes(l.status||'');
+
+  function dashboardScope(){
+    const admin=state.profile?.role==='admin';
+    const customers=admin?state.customers:state.customers.filter(x=>!x.owner_id||x.owner_id===state.profile?.id);
+    const listings=admin?state.listings:state.listings.filter(x=>x.owner_id===state.profile?.id);
+    return {admin,customers,listings};
+  }
+
+  function contractItems(customers,listings){
+    const rows=[];
+    [...customers,...listings].forEach(x=>{
+      const name=x.name||x.title||'이름 없음';
+      [
+        ['가계약',x.provisional_contract_date],
+        ['본계약',x.contract_date],
+        ['중도금',x.interim_payment_date],
+        ['잔금',x.final_payment_date]
+      ].forEach(([label,date])=>{
+        const d=dateOnly(date);
+        if(d)rows.push({kind:'계약',label,name,date:d,id:x.id,type:x.name?'customer':'listing'});
+      });
+    });
+    return rows;
+  }
+
+  function taskRows(customers,listings){
+    const today=todayStr();
+    const rows=[];
+
+    customers.filter(activeCustomer).forEach(x=>{
+      const d=dateOnly(x.next_follow_up_at);
+      if(d&&d<=today)rows.push({
+        kind:'FU',name:x.name||'고객',sub:d<today?`${Math.abs(daysAgo(d))}일 지연`:'오늘 예정',
+        priority:d<today?0:1,sort:d,id:x.id,type:'customer',
+        action:`openFollowUpModal('customer','${x.id}')`
+      });
+    });
+
+    listings.filter(activeListing).forEach(x=>{
+      const d=dateOnly(x.next_follow_up_at);
+      if(d&&d<=today)rows.push({
+        kind:'매물',name:x.title||'매물',sub:d<today?`${Math.abs(daysAgo(d))}일 지연`:'오늘 예정',
+        priority:d<today?0:1,sort:d,id:x.id,type:'listing',
+        action:`openFollowUpModal('listing','${x.id}')`
+      });
+    });
+
+    contractItems(customers,listings).filter(x=>x.date<=today).forEach(x=>{
+      rows.push({
+        kind:'계약',name:x.name,sub:`${x.label} · ${x.date<today?`${Math.abs(daysAgo(x.date))}일 지연`:'오늘'}`,
+        priority:x.date<today?0:1,sort:x.date,id:x.id,type:x.type,
+        action:x.type==='customer'?`openContractModal('customer','${x.id}')`:`openContractModal('listing','${x.id}')`
+      });
+    });
+
+    return rows.sort((a,b)=>a.priority-b.priority||a.sort.localeCompare(b.sort)).slice(0,10);
+  }
+
+  function alertRows(customers,listings){
+    const staleCustomers=customers.filter(x=>activeCustomer(x)&&((daysAgo(x.last_follow_up_at??x.created_at)??0)>=30));
+    const staleListings=listings.filter(x=>activeListing(x)&&((daysAgo(x.last_confirmed_at||x.updated_at||x.created_at)??0)>=15));
+    const noPhoto=listings.filter(x=>activeListing(x)&&!x.cover_photo_id);
+    const noNextFu=customers.filter(x=>activeCustomer(x)&&!x.next_follow_up_at);
+    const adAfterComplete=listings.filter(x=>!activeListing(x)&&(x.ad_naver||x.ad_danggeun||x.ad_zippl||x.ad_blog));
+
+    return [
+      {label:'30일 이상 미접촉 고객',count:staleCustomers.length,view:'customers',tone:'danger'},
+      {label:'15일 이상 미확인 매물',count:staleListings.length,view:'myListings',tone:'warn'},
+      {label:'사진 없는 매물',count:noPhoto.length,view:'myListings',tone:'neutral'},
+      {label:'다음 FU 없는 고객',count:noNextFu.length,view:'customers',tone:'neutral'},
+      {label:'거래완료 후 광고 중',count:adAfterComplete.length,view:'myListings',tone:'danger'}
+    ].filter(x=>x.count>0);
+  }
+
+  function upcomingVisits(customers,listings){
+    const today=todayStr(), max=new Date();
+    max.setDate(max.getDate()+7);
+    const end=max.toISOString().slice(0,10);
+    const rows=[];
+    [...customers,...listings].forEach(x=>{
+      const fields=[
+        x.visit_date,x.visit_at,x.visit_schedule,x.appointment_date,x.appointment_at
+      ].filter(Boolean);
+      fields.forEach(v=>{
+        const d=dateOnly(v);
+        if(d>=today&&d<=end)rows.push({name:x.name||x.title||'일정',date:d,id:x.id,type:x.name?'customer':'listing'});
+      });
+    });
+    return rows.sort((a,b)=>a.date.localeCompare(b.date));
+  }
+
+  function upcomingContracts(customers,listings){
+    const today=todayStr(), max=new Date();
+    max.setDate(max.getDate()+7);
+    const end=max.toISOString().slice(0,10);
+    return contractItems(customers,listings).filter(x=>x.date>=today&&x.date<=end).sort((a,b)=>a.date.localeCompare(b.date));
+  }
+
+  function statCard(label,count,onclick,tone=''){
+    return `<button type="button" class="crm-r336-stat ${tone}" onclick="${onclick}">
+      <span>${esc(label)}</span><strong>${count}</strong>
+    </button>`;
+  }
+
+  function taskHtml(rows){
+    if(!rows.length)return '<div class="crm-r336-empty">오늘 처리할 업무가 없습니다.</div>';
+    return rows.map(x=>`<div class="crm-r336-task">
+      <span class="crm-r336-kind ${x.kind==='계약'?'contract':x.kind==='매물'?'listing':''}">${esc(x.kind)}</span>
+      <button type="button" class="crm-r336-task-main" onclick="${x.action}">
+        <strong>${esc(x.name)}</strong><small>${esc(x.sub)}</small>
+      </button>
+      <button type="button" class="ghost crm-r336-open" onclick="${x.action}">열기</button>
+    </div>`).join('');
+  }
+
+  function alertHtml(rows){
+    if(!rows.length)return '<div class="crm-r336-empty">긴급하게 확인할 항목이 없습니다.</div>';
+    return rows.map(x=>`<button type="button" class="crm-r336-alert ${x.tone}" onclick="renderView('${x.view}')">
+      <span>${esc(x.label)}</span><strong>${x.count}</strong>
+    </button>`).join('');
+  }
+
+  function recentHtml(customers,listings){
+    const rows=[
+      ...customers.map(x=>({name:x.name||'고객',sub:`고객 · ${x.status||'관리 중'}`,at:x.updated_at||x.created_at,action:`openCustomerModal('${x.id}')`})),
+      ...listings.map(x=>({name:x.title||'매물',sub:`매물 · ${x.transaction_type||''} ${listingPriceText(x)}`,at:x.updated_at||x.created_at,action:`openListingModal('${x.id}')`}))
+    ].filter(x=>x.at).sort((a,b)=>new Date(b.at)-new Date(a.at)).slice(0,6);
+
+    if(!rows.length)return '<div class="crm-r336-empty">최근 활동이 없습니다.</div>';
+    return rows.map(x=>`<button type="button" class="crm-r336-recent" onclick="${x.action}">
+      <div><strong>${esc(x.name)}</strong><small>${esc(x.sub)}</small></div>
+      <time>${fmtDate(x.at)}</time>
+    </button>`).join('');
+  }
+
+  async function renderCompactDashboard(){
+    try{
+      await Promise.all([loadCustomers(),loadListings()]);
+      if(state.profile?.role==='admin'&&typeof loadMembers==='function')await loadMembers();
+    }catch(e){toast(e.message)}
+
+    const {admin,customers,listings}=dashboardScope();
+    const tasks=taskRows(customers,listings);
+    const alerts=alertRows(customers,listings);
+    const visits=upcomingVisits(customers,listings);
+    const contracts=upcomingContracts(customers,listings);
+    const pending=admin?(state.members||[]).filter(x=>x.status==='pending').length:0;
+
+    const dueFu=customers.filter(x=>activeCustomer(x)&&dateOnly(x.next_follow_up_at)&&dateOnly(x.next_follow_up_at)<=todayStr()).length
+      +listings.filter(x=>activeListing(x)&&dateOnly(x.next_follow_up_at)&&dateOnly(x.next_follow_up_at)<=todayStr()).length;
+    const stale=listings.filter(x=>activeListing(x)&&((daysAgo(x.last_confirmed_at||x.updated_at||x.created_at)??0)>=15)).length;
+
+    q('#topActions').innerHTML=`
+      <div class="crm-r336-top-actions">
+        <button class="ghost" onclick="openCustomerModal()">+ 고객</button>
+        <button class="primary" onclick="openListingModal()">+ 매물</button>
+      </div>`;
+
+    q('#content').innerHTML=`
+      <section class="crm-r336-dashboard">
+        <div class="crm-r336-stats">
+          ${statCard('오늘·지연 FU',dueFu,"renderView('customers')",dueFu?'danger':'')}
+          ${statCard('7일 내 방문',visits.length,"renderView('customers')")}
+          ${statCard('7일 내 계약',contracts.length,"renderView('customers')")}
+          ${statCard('확인 필요 매물',stale,"renderView('myListings')",stale?'warn':'')}
+          ${admin?statCard('승인 대기',pending,"renderView('members')",pending?'admin':''):''}
+        </div>
+
+        <div class="crm-r336-main-grid">
+          <section class="crm-r336-panel crm-r336-tasks-panel">
+            <div class="crm-r336-panel-head">
+              <div><h3>오늘 할 일</h3><span>${tasks.length}건</span></div>
+              <button class="ghost" onclick="renderView('customers')">전체보기</button>
+            </div>
+            <div class="crm-r336-task-list">${taskHtml(tasks)}</div>
+          </section>
+
+          <section class="crm-r336-panel">
+            <div class="crm-r336-panel-head"><div><h3>긴급 확인</h3></div></div>
+            <div class="crm-r336-alert-list">${alertHtml(alerts)}</div>
+          </section>
+        </div>
+
+        <div class="crm-r336-bottom-grid">
+          <section class="crm-r336-panel">
+            <div class="crm-r336-panel-head"><div><h3>최근 활동</h3></div></div>
+            <div class="crm-r336-recent-list">${recentHtml(customers,listings)}</div>
+          </section>
+
+          <section class="crm-r336-panel">
+            <div class="crm-r336-panel-head"><div><h3>빠른 실행</h3></div></div>
+            <div class="crm-r336-quick">
+              <button class="primary" onclick="openCustomerModal()">고객 등록</button>
+              <button class="primary" onclick="openListingModal()">매물 등록</button>
+              <button class="ghost" onclick="renderView('globalSearch')">통합 검색</button>
+              <button class="ghost" onclick="renderView('smartMatch')">자동 매칭</button>
+            </div>
+            ${admin?`<div class="crm-r336-admin-summary">
+              <strong>관리자 현황</strong>
+              <span>승인 대기 ${pending}</span>
+              <span>미확인 매물 ${stale}</span>
+              <span>지연 업무 ${tasks.filter(x=>x.priority===0).length}</span>
+            </div>`:''}
+          </section>
+        </div>
+      </section>`;
+  }
+
+  window.renderDashboard=renderCompactDashboard;
+  try{renderDashboard=renderCompactDashboard}catch(_){}
+  console.info(`CRM v${VERSION} 콤팩트 대시보드 적용`);
+})();
