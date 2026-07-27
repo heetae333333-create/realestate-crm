@@ -2849,3 +2849,57 @@ table.listing-table tbody tr.crm-r311-listing-complete .muted {
   .crm-r336-task{grid-template-columns:45px minmax(0,1fr)}
   .crm-r336-open{display:none}
 }
+
+/* ===== CRM v3.10.24R3.37 · 공지 중심 대시보드 ===== */
+.crm-r337-dashboard{display:grid;gap:14px}
+.crm-r337-top-actions{display:flex;gap:8px}
+.crm-r337-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.crm-r337-stats button{display:flex;align-items:center;justify-content:space-between;min-height:64px;padding:13px 16px;border:1px solid #dbe3ec;border-radius:13px;background:#fff;cursor:pointer}
+.crm-r337-stats span{color:#64748b;font-size:12px;font-weight:800}
+.crm-r337-stats strong{font-size:23px;color:#0f172a}
+.crm-r337-panel{padding:15px;border:1px solid #dbe3ec;border-radius:14px;background:#fff}
+.crm-r337-panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.crm-r337-panel-head>div{display:flex;align-items:center;gap:8px}
+.crm-r337-panel-head h3{margin:0;font-size:16px}
+.crm-r337-panel-head span{color:#2563eb;font-size:12px;font-weight:800}
+.crm-r337-panel-head button{padding:6px 9px;font-size:11px}
+.crm-r337-schedule-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.crm-r337-notice,.crm-r337-schedule{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:48px;padding:8px 4px;border:0;border-top:1px solid #eef2f6;background:transparent;text-align:left;cursor:pointer}
+.crm-r337-notice:first-child,.crm-r337-schedule:first-child{border-top:0}
+.crm-r337-notice.unread strong{font-weight:900}
+.crm-r337-notice.read{opacity:.72}
+.crm-r337-notice-main{display:flex;align-items:center;gap:8px;min-width:0}
+.crm-r337-notice-main strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+.crm-r337-notice time{flex:0 0 auto;color:#94a3b8;font-size:11px}
+.crm-r337-notice-type{display:inline-flex;align-items:center;justify-content:center;min-width:38px;padding:3px 7px;border-radius:999px;font-size:10px;font-weight:900}
+.crm-r337-notice-type.important{background:#fff7ed;color:#c2410c}
+.crm-r337-notice-type.work{background:#eff6ff;color:#1d4ed8}
+.crm-r337-notice-type.normal{background:#f1f5f9;color:#475569}
+.crm-r337-required{padding:2px 6px;border-radius:999px;background:#fef3c7;color:#92400e;font-size:10px;font-weight:800}
+.crm-r337-schedule div{display:flex;flex-direction:column;gap:3px;min-width:0}
+.crm-r337-schedule strong,.crm-r337-schedule small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crm-r337-schedule strong{font-size:13px}
+.crm-r337-schedule small{color:#64748b;font-size:11px}
+.crm-r337-schedule>span{color:#64748b;font-size:11px}
+.crm-r337-quick{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.crm-r337-quick button{height:41px}
+.crm-r337-empty{padding:20px 8px;color:#94a3b8;font-size:12px;text-align:center}
+.crm-r337-notice-detail{display:grid;gap:14px}
+.crm-r337-notice-content{line-height:1.75;white-space:normal}
+.crm-r337-link{display:inline-flex;width:max-content;text-decoration:none}
+.crm-r337-manage-list{display:grid;gap:9px}
+.crm-r337-manage-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 14px;border:1px solid #e2e8f0;border-radius:12px}
+.crm-r337-manage-row>div:first-child{display:grid;gap:5px}
+.crm-r337-manage-row small{color:#64748b}
+.crm-r337-pin{display:inline-flex;padding:3px 7px;border-radius:999px;background:#fef3c7;color:#92400e;font-size:10px;font-weight:800}
+.crm-r337-editor .full{grid-column:1/-1}
+.crm-r337-all-notices{display:grid}
+@media(max-width:900px){
+  .crm-r337-stats{grid-template-columns:1fr 1fr}
+  .crm-r337-schedule-grid{grid-template-columns:1fr}
+  .crm-r337-quick{grid-template-columns:1fr 1fr}
+}
+@media(max-width:560px){
+  .crm-r337-manage-row{align-items:stretch;flex-direction:column}
+  .crm-r337-manage-row .row-actions{width:100%}
+}

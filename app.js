@@ -13617,3 +13617,345 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   try{renderDashboard=renderCompactDashboard}catch(_){}
   console.info(`CRM v${VERSION} 콤팩트 대시보드 적용`);
 })();
+
+
+/* =========================================================
+   CRM v3.10.24R3.37 · 공지 중심의 부드러운 대시보드
+   ========================================================= */
+(() => {
+  const VERSION='3.10.24R3.37';
+  const q=(s,r=document)=>r.querySelector(s);
+  const esc=v=>escapeHtml(String(v??''));
+  const today=()=>new Date().toISOString().slice(0,10);
+  const dateOnly=v=>v?String(v).slice(0,10):'';
+
+  async function loadAnnouncements(){
+    const {data,error}=await state.client
+      .from('announcements')
+      .select('*, announcement_reads!left(user_id, read_at)')
+      .or(`start_date.is.null,start_date.lte.${today()}`)
+      .or(`end_date.is.null,end_date.gte.${today()}`)
+      .order('is_pinned',{ascending:false})
+      .order('created_at',{ascending:false})
+      .limit(20);
+    if(error){
+      console.warn('공지사항 불러오기 실패',error);
+      return [];
+    }
+    return (data||[]).map(x=>({
+      ...x,
+      is_read:(x.announcement_reads||[]).some(r=>String(r.user_id)===String(state.profile?.id))
+    }));
+  }
+
+  function mineCustomers(){
+    return state.profile?.role==='admin'
+      ? state.customers
+      : state.customers.filter(x=>!x.owner_id||x.owner_id===state.profile?.id);
+  }
+
+  function mineListings(){
+    return state.profile?.role==='admin'
+      ? state.listings
+      : state.listings.filter(x=>x.owner_id===state.profile?.id);
+  }
+
+  function scheduleRows(customers,listings){
+    const rows=[];
+    const add=(name,date,label,id,type)=>{
+      const d=dateOnly(date);
+      if(!d)return;
+      rows.push({name,label,date:d,id,type});
+    };
+
+    customers.forEach(x=>{
+      add(x.name,x.next_follow_up_at,'고객 FU',x.id,'customer');
+      add(x.name,x.visit_date||x.visit_at||x.visit_schedule,'고객 방문',x.id,'customer');
+      add(x.name,x.provisional_contract_date,'가계약',x.id,'customer');
+      add(x.name,x.contract_date,'본계약',x.id,'customer');
+      add(x.name,x.interim_payment_date,'중도금',x.id,'customer');
+      add(x.name,x.final_payment_date,'잔금',x.id,'customer');
+    });
+
+    listings.forEach(x=>{
+      add(x.title,x.next_follow_up_at,'매물 FU',x.id,'listing');
+      add(x.title,x.visit_date||x.visit_at||x.visit_schedule,'매물 방문',x.id,'listing');
+      add(x.title,x.provisional_contract_date,'가계약',x.id,'listing');
+      add(x.title,x.contract_date,'본계약',x.id,'listing');
+      add(x.title,x.interim_payment_date,'중도금',x.id,'listing');
+      add(x.title,x.final_payment_date,'잔금',x.id,'listing');
+    });
+
+    return rows.sort((a,b)=>a.date.localeCompare(b.date));
+  }
+
+  function announcementBadge(type){
+    const t=type||'일반';
+    const cls=t==='중요'?'important':t==='업무'?'work':'normal';
+    return `<span class="crm-r337-notice-type ${cls}">${esc(t)}</span>`;
+  }
+
+  function announcementList(rows){
+    if(!rows.length)return '<div class="crm-r337-empty">등록된 공지사항이 없습니다.</div>';
+    return rows.slice(0,3).map(x=>`
+      <button type="button" class="crm-r337-notice ${x.is_read?'read':'unread'}" onclick="crmR337OpenAnnouncement('${x.id}')">
+        <div class="crm-r337-notice-main">
+          ${announcementBadge(x.notice_type)}
+          <strong>${esc(x.title)}</strong>
+          ${x.is_required&&!x.is_read?'<span class="crm-r337-required">확인 필요</span>':''}
+        </div>
+        <time>${fmtDate(x.created_at)}</time>
+      </button>`).join('');
+  }
+
+  function scheduleHtml(rows,mode){
+    const t=today();
+    const filtered=mode==='today'
+      ? rows.filter(x=>x.date===t)
+      : rows.filter(x=>x.date>t).slice(0,5);
+
+    if(!filtered.length)return `<div class="crm-r337-empty">${mode==='today'?'오늘 예정된 일정이 없습니다.':'다가오는 일정이 없습니다.'}</div>`;
+
+    return filtered.slice(0,6).map(x=>{
+      const label=mode==='today'?x.label:`${x.date} · ${x.label}`;
+      const action=x.type==='customer'
+        ? `openCustomerModal('${x.id}')`
+        : `openListingModal('${x.id}')`;
+      return `<button type="button" class="crm-r337-schedule" onclick="${action}">
+        <div><strong>${esc(x.name)}</strong><small>${esc(label)}</small></div>
+        <span>열기</span>
+      </button>`;
+    }).join('');
+  }
+
+  async function openAnnouncement(id){
+    const {data,error}=await state.client.from('announcements').select('*').eq('id',id).single();
+    if(error)return toast(error.message);
+
+    if(state.profile?.id){
+      await state.client.from('announcement_reads').upsert({
+        announcement_id:id,
+        user_id:state.profile.id,
+        read_at:new Date().toISOString()
+      },{onConflict:'announcement_id,user_id'});
+    }
+
+    q('#modalTitle').textContent=data.title;
+    q('#modalBody').innerHTML=`
+      <article class="crm-r337-notice-detail">
+        <div>${announcementBadge(data.notice_type)} <span class="muted">${fmtDate(data.created_at)}</span></div>
+        <div class="crm-r337-notice-content">${esc(data.content||'').replace(/\n/g,'<br>')}</div>
+        ${data.link_url?`<a class="primary crm-r337-link" href="${esc(data.link_url)}" target="_blank" rel="noopener">관련 링크 열기</a>`:''}
+      </article>`;
+    q('#modalSubmit').style.display='none';
+    q('#modal').showModal();
+  }
+
+  async function renderAnnouncementManager(){
+    const rows=await loadAnnouncements();
+    q('#pageTitle').textContent='공지사항 관리';
+    q('#pageSubtitle').textContent='회사 안내와 업무 공지를 등록하고 관리합니다.';
+    q('#topActions').innerHTML='<button class="primary" onclick="crmR337OpenAnnouncementEditor()">+ 공지 등록</button>';
+    q('#content').innerHTML=`<section class="panel">
+      <div class="crm-r337-manage-list">
+        ${rows.length?rows.map(x=>`
+          <article class="crm-r337-manage-row">
+            <div>
+              <div>${announcementBadge(x.notice_type)} ${x.is_pinned?'<span class="crm-r337-pin">상단 고정</span>':''}</div>
+              <strong>${esc(x.title)}</strong>
+              <small>${fmtDate(x.created_at)}${x.end_date?` · 게시 종료 ${esc(x.end_date)}`:''}</small>
+            </div>
+            <div class="row-actions">
+              <button class="ghost" onclick="crmR337OpenAnnouncement('${x.id}')">보기</button>
+              <button class="ghost" onclick="crmR337OpenAnnouncementEditor('${x.id}')">수정</button>
+              <button class="danger" onclick="crmR337DeleteAnnouncement('${x.id}')">삭제</button>
+            </div>
+          </article>`).join(''):'<div class="empty">등록된 공지사항이 없습니다.</div>'}
+      </div>
+    </section>`;
+  }
+
+  async function openAnnouncementEditor(id=''){
+    let x={notice_type:'일반',is_pinned:false,is_required:false,start_date:today(),end_date:''};
+    if(id){
+      const {data,error}=await state.client.from('announcements').select('*').eq('id',id).single();
+      if(error)return toast(error.message);
+      x=data;
+    }
+
+    q('#modalTitle').textContent=id?'공지 수정':'공지 등록';
+    q('#modalBody').innerHTML=`
+      <div class="form-grid crm-r337-editor">
+        <label>공지 구분
+          <select id="crmR337Type">
+            <option>중요</option><option>업무</option><option>일반</option>
+          </select>
+        </label>
+        <label>제목
+          <input id="crmR337Title" value="${esc(x.title||'')}" maxlength="120">
+        </label>
+        <label class="full">내용
+          <textarea id="crmR337Content" rows="8">${esc(x.content||'')}</textarea>
+        </label>
+        <label>게시 시작일
+          <input id="crmR337Start" type="date" value="${esc(dateOnly(x.start_date)||today())}">
+        </label>
+        <label>게시 종료일
+          <input id="crmR337End" type="date" value="${esc(dateOnly(x.end_date))}">
+        </label>
+        <label class="check-label"><input id="crmR337Pinned" type="checkbox" ${x.is_pinned?'checked':''}> 상단 고정</label>
+        <label class="check-label"><input id="crmR337Required" type="checkbox" ${x.is_required?'checked':''}> 확인 필수</label>
+        <label class="full">관련 링크
+          <input id="crmR337Link" type="url" value="${esc(x.link_url||'')}" placeholder="https://">
+        </label>
+      </div>`;
+    q('#crmR337Type').value=x.notice_type||'일반';
+
+    const submit=q('#modalSubmit');
+    submit.style.display='';
+    submit.textContent='저장';
+    submit.onclick=async e=>{
+      e.preventDefault();
+      const payload={
+        notice_type:q('#crmR337Type').value,
+        title:q('#crmR337Title').value.trim(),
+        content:q('#crmR337Content').value.trim(),
+        start_date:q('#crmR337Start').value||null,
+        end_date:q('#crmR337End').value||null,
+        is_pinned:q('#crmR337Pinned').checked,
+        is_required:q('#crmR337Required').checked,
+        link_url:q('#crmR337Link').value.trim()||null,
+        created_by:state.profile.id
+      };
+      if(!payload.title)return toast('공지 제목을 입력하세요.');
+      const query=id
+        ? state.client.from('announcements').update(payload).eq('id',id)
+        : state.client.from('announcements').insert(payload);
+      const {error}=await query;
+      if(error)return toast(error.message);
+      q('#modal').close();
+      toast(id?'공지를 수정했습니다.':'공지를 등록했습니다.');
+      await renderAnnouncementManager();
+    };
+    q('#modal').showModal();
+  }
+
+  async function deleteAnnouncement(id){
+    if(!confirm('이 공지사항을 삭제할까요?'))return;
+    const {error}=await state.client.from('announcements').delete().eq('id',id);
+    if(error)return toast(error.message);
+    toast('공지사항을 삭제했습니다.');
+    await renderAnnouncementManager();
+  }
+
+  async function renderSoftDashboard(){
+    try{
+      await Promise.all([loadCustomers(),loadListings()]);
+    }catch(e){toast(e.message)}
+    const announcements=await loadAnnouncements();
+    const customers=mineCustomers();
+    const listings=mineListings();
+    const schedules=scheduleRows(customers,listings);
+    const unread=announcements.filter(x=>!x.is_read).length;
+    const todayCount=schedules.filter(x=>x.date===today()).length;
+
+    q('#topActions').innerHTML=`
+      <div class="crm-r337-top-actions">
+        <button class="ghost" onclick="openCustomerModal()">+ 고객</button>
+        <button class="primary" onclick="openListingModal()">+ 매물</button>
+      </div>`;
+
+    q('#content').innerHTML=`
+      <section class="crm-r337-dashboard">
+        <div class="crm-r337-stats">
+          <button onclick="renderView('customers')"><span>${state.profile?.role==='admin'?'전체 고객':'내 고객'}</span><strong>${customers.length}</strong></button>
+          <button onclick="renderView('myListings')"><span>${state.profile?.role==='admin'?'전체 매물':'내 매물'}</span><strong>${listings.length}</strong></button>
+          <button><span>오늘 일정</span><strong>${todayCount}</strong></button>
+          <button onclick="crmR337ShowAllAnnouncements()"><span>새 공지</span><strong>${unread}</strong></button>
+        </div>
+
+        <section class="crm-r337-panel crm-r337-announcements">
+          <div class="crm-r337-panel-head">
+            <div><h3>공지사항</h3>${unread?`<span>새 공지 ${unread}건</span>`:''}</div>
+            <div>
+              ${state.profile?.role==='admin'?'<button class="ghost" onclick="renderView(\'announcements\')">관리</button>':''}
+              <button class="ghost" onclick="crmR337ShowAllAnnouncements()">전체보기</button>
+            </div>
+          </div>
+          <div>${announcementList(announcements)}</div>
+        </section>
+
+        <div class="crm-r337-schedule-grid">
+          <section class="crm-r337-panel">
+            <div class="crm-r337-panel-head"><div><h3>오늘 일정</h3></div></div>
+            <div>${scheduleHtml(schedules,'today')}</div>
+          </section>
+
+          <section class="crm-r337-panel">
+            <div class="crm-r337-panel-head"><div><h3>다가오는 일정</h3></div></div>
+            <div>${scheduleHtml(schedules,'upcoming')}</div>
+          </section>
+        </div>
+
+        <section class="crm-r337-panel">
+          <div class="crm-r337-panel-head"><div><h3>빠른 실행</h3></div></div>
+          <div class="crm-r337-quick">
+            <button class="primary" onclick="openCustomerModal()">고객 등록</button>
+            <button class="primary" onclick="openListingModal()">매물 등록</button>
+            <button class="ghost" onclick="renderView('globalSearch')">통합 검색</button>
+            <button class="ghost" onclick="renderView('smartMatch')">자동 매칭</button>
+          </div>
+        </section>
+      </section>`;
+  }
+
+  async function showAllAnnouncements(){
+    const rows=await loadAnnouncements();
+    q('#modalTitle').textContent='공지사항';
+    q('#modalBody').innerHTML=`<div class="crm-r337-all-notices">${rows.length?rows.map(x=>`
+      <button type="button" class="crm-r337-notice ${x.is_read?'read':'unread'}" onclick="crmR337OpenAnnouncement('${x.id}')">
+        <div class="crm-r337-notice-main">${announcementBadge(x.notice_type)}<strong>${esc(x.title)}</strong></div>
+        <time>${fmtDate(x.created_at)}</time>
+      </button>`).join(''):'<div class="empty">등록된 공지사항이 없습니다.</div>'}</div>`;
+    q('#modalSubmit').style.display='none';
+    q('#modal').showModal();
+  }
+
+  // 관리자 메뉴에 공지사항 관리 추가
+  const adminGroup=document.querySelector('.admin-nav')?.parentElement;
+  if(adminGroup&&!document.querySelector('[data-view="announcements"]')){
+    const btn=document.createElement('button');
+    btn.className='nav admin-nav';
+    btn.dataset.view='announcements';
+    btn.textContent='공지사항 관리';
+    adminGroup.insertBefore(btn,adminGroup.firstChild);
+    btn.onclick=()=>renderView('announcements');
+  }
+
+  const baseRenderView=window.renderView||globalThis.renderView;
+  if(typeof baseRenderView==='function'&&!baseRenderView.__crmR337Notice){
+    const wrapped=async function(view){
+      if(view==='announcements'){
+        state.view=view;
+        document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
+        return renderAnnouncementManager();
+      }
+      return baseRenderView.call(this,view);
+    };
+    wrapped.__crmR337Notice=true;
+    window.renderView=wrapped;
+    try{renderView=wrapped}catch(_){}
+  }
+
+  window.renderDashboard=renderSoftDashboard;
+  try{renderDashboard=renderSoftDashboard}catch(_){}
+
+  Object.assign(window,{
+    crmR337OpenAnnouncement:openAnnouncement,
+    crmR337ShowAllAnnouncements:showAllAnnouncements,
+    crmR337OpenAnnouncementEditor:openAnnouncementEditor,
+    crmR337DeleteAnnouncement:deleteAnnouncement
+  });
+
+  console.info(`CRM v${VERSION} 공지 중심 대시보드 적용`);
+})();
