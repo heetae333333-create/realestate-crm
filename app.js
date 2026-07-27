@@ -12785,3 +12785,135 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   Object.assign(window,{crmR331OpenMemberEdit:openMemberEdit});
   console.info(`CRM v${VERSION} 회원정보 및 로그인 이메일 수정 적용`);
 })();
+
+
+/* =========================================================
+   CRM v3.10.24R3.32 · 내 회원정보 수정
+   - 좌측 하단 회원정보 수정 버튼
+   - 이름/사무소/연락처/이메일(로그인 아이디) 변경
+   - profiles + Supabase Auth 이메일 동시 반영
+   ========================================================= */
+(() => {
+  const VERSION='3.10.24R3.32';
+  const q=(s,r=document)=>r.querySelector(s);
+
+  function formatPhoneInput(input){
+    const digits=String(input.value||'').replace(/\D/g,'').slice(0,11);
+    if(digits.length<=3) input.value=digits;
+    else if(digits.length<=7) input.value=`${digits.slice(0,3)}-${digits.slice(3)}`;
+    else input.value=`${digits.slice(0,3)}-${digits.slice(3,7)}-${digits.slice(7)}`;
+  }
+
+  function refreshSidebar(profile){
+    const badge=q('#userBadge');
+    if(!badge)return;
+    badge.innerHTML=`<strong>${escapeHtml(profile.full_name||'')}</strong><div class="muted">${profile.role==='admin'?'관리자':'공인중개사'}</div>`;
+  }
+
+  async function openSelfProfileEdit(){
+    const profile=state.profile;
+    if(!profile)return toast('회원 정보를 불러오지 못했습니다.');
+
+    q('#modalTitle').textContent='내 회원정보 수정';
+    q('#modalBody').innerHTML=`
+      <div class="crm-r332-self-edit">
+        <div class="notice">
+          이메일은 로그인 아이디로 사용됩니다. 이메일을 변경하면 저장 후 자동으로 로그아웃되며, 변경된 이메일로 다시 로그인해야 합니다.
+        </div>
+        <div class="form-grid">
+          <label>이름
+            <input id="crmR332Name" value="${escapeHtml(profile.full_name||'')}" maxlength="40">
+          </label>
+          <label>사무소
+            <input id="crmR332Office" value="${escapeHtml(profile.office_name||'')}" maxlength="100">
+          </label>
+          <label>연락처
+            <input id="crmR332Phone" value="${escapeHtml(profile.phone||'')}" placeholder="010-0000-0000" inputmode="numeric">
+          </label>
+          <label>이메일 · 로그인 아이디
+            <input id="crmR332Email" type="email" value="${escapeHtml(profile.email||state.session?.user?.email||'')}" autocomplete="off">
+          </label>
+        </div>
+      </div>`;
+
+    const phone=q('#crmR332Phone');
+    phone.addEventListener('input',()=>formatPhoneInput(phone));
+
+    const submit=q('#modalSubmit');
+    submit.style.display='';
+    submit.textContent='변경 저장';
+    submit.onclick=async e=>{
+      e.preventDefault();
+
+      const full_name=q('#crmR332Name').value.trim();
+      const office_name=q('#crmR332Office').value.trim();
+      const memberPhone=q('#crmR332Phone').value.trim();
+      const email=q('#crmR332Email').value.trim().toLowerCase();
+
+      if(!full_name)return toast('이름을 입력하세요.');
+      if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return toast('올바른 이메일을 입력하세요.');
+
+      const oldEmail=String(profile.email||state.session?.user?.email||'').trim().toLowerCase();
+      const changedEmail=email!==oldEmail;
+      const original=submit.textContent;
+      submit.disabled=true;
+      submit.textContent='저장 중...';
+
+      const {data,error}=await state.client.rpc('self_update_member_identity',{
+        p_full_name:full_name,
+        p_office_name:office_name||null,
+        p_phone:memberPhone||null,
+        p_email:email
+      });
+
+      if(error){
+        submit.disabled=false;
+        submit.textContent=original;
+        const msg=String(error.message||'');
+        if(msg.includes('already')||msg.includes('duplicate')||msg.includes('unique')||msg.includes('사용 중')){
+          return toast('이미 사용 중인 이메일입니다.');
+        }
+        return toast(`회원정보 수정 실패: ${msg}`);
+      }
+
+      state.profile={
+        ...state.profile,
+        full_name,
+        office_name:office_name||null,
+        phone:memberPhone||null,
+        email
+      };
+      refreshSidebar(state.profile);
+      q('#modal').close();
+
+      if(changedEmail){
+        toast('회원정보를 변경했습니다. 새 이메일로 다시 로그인하세요.');
+        setTimeout(async()=>{
+          await state.client.auth.signOut();
+          state.session=null;
+          state.profile=null;
+          location.reload();
+        },700);
+      }else{
+        toast('회원정보를 변경했습니다.');
+        if(state.view==='members'&&state.profile?.role==='admin'&&typeof renderMembers==='function'){
+          await renderMembers();
+        }
+      }
+    };
+
+    const reset=()=>{
+      submit.textContent='저장';
+      submit.disabled=false;
+      q('#modal').removeEventListener('close',reset);
+    };
+    q('#modal').addEventListener('close',reset);
+    q('#modal').showModal();
+  }
+
+  const btn=q('#profileEditBtn');
+  if(btn)btn.onclick=openSelfProfileEdit;
+
+  Object.assign(window,{crmR332OpenSelfProfileEdit:openSelfProfileEdit});
+  console.info(`CRM v${VERSION} 내 회원정보 수정 적용`);
+})();

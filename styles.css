@@ -2468,3 +2468,40 @@ table.listing-table tbody tr.crm-r311-listing-complete .muted {
   color:#1d4ed8;
   background:#eff6ff;
 }
+
+/* ===== CRM v3.10.24R3.32 · 좌측 개인 프로필 수정 ===== */
+.crm-r332-profile-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+.crm-r332-profile-row #userBadge{
+  min-width:0;
+}
+.crm-r332-profile-row #userBadge strong,
+.crm-r332-profile-row #userBadge .muted{
+  display:block;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.crm-r332-profile-edit{
+  flex:0 0 auto;
+  padding:7px 9px;
+  border-color:#475569;
+  background:#1f2937;
+  color:#fff;
+  font-size:11px;
+  white-space:nowrap;
+}
+.crm-r332-profile-edit:hover{
+  background:#334155;
+}
+.crm-r332-self-edit{
+  display:grid;
+  gap:16px;
+}
+.crm-r332-self-edit .notice{
+  line-height:1.6;
+}
