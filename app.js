@@ -12561,92 +12561,6 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
 
 
 /* =========================================================
-   CRM v3.10.24R3.30 · 매물 상세 상단 사진보기
-   - 내 매물 / 공동매물망 / 지도 상세에 동일 적용
-   - 변경 이력 복원과 같은 행의 우측 끝에 배치
-   - 사진 추가·삭제는 기존 canManageListing 권한 그대로 유지
-   ========================================================= */
-(() => {
-  const VERSION='3.10.24R3.30';
-  const q=(s,r=document)=>r.querySelector(s);
-
-  function isListingDetail(){
-    const modal=q('#modal');
-    const body=q('#modalBody');
-    if(!modal?.open||!body)return false;
-    const title=(q('#modalTitle')?.textContent||'').trim();
-    if(/FU 관리|진행상황|사진|히스토리/.test(title))return false;
-    return !!q('[name="title"]',body);
-  }
-
-  function addPhotoButton(id){
-    if(!id||!isListingDetail())return false;
-    const tools=q('#crm390DetailTools');
-    if(!tools)return false;
-
-    let btn=q('#crmR330PhotoView',tools);
-    if(!btn){
-      btn=document.createElement('button');
-      btn.type='button';
-      btn.id='crmR330PhotoView';
-      btn.className='ghost crm-r330-photo-view';
-      btn.innerHTML='🖼 사진보기';
-      tools.appendChild(btn);
-    }
-    btn.onclick=()=>window.openListingPhotos?.(id);
-    tools.classList.add('crm-r330-detail-tools');
-    return true;
-  }
-
-  function install(id){
-    window.__crmR330ListingId=id||window.__crmR330ListingId||null;
-    addPhotoButton(window.__crmR330ListingId);
-  }
-
-  const base=window.openListingModal||globalThis.openListingModal;
-  if(typeof base==='function'&&!base.__crmR330PhotoButton){
-    const wrapped=function(id,...args){
-      window.__crmR330ListingId=id||null;
-      const result=base.call(this,id,...args);
-      Promise.resolve(result).finally(()=>install(id));
-      [80,220,500,900].forEach(ms=>setTimeout(()=>install(id),ms));
-      return result;
-    };
-    wrapped.__crmR330PhotoButton=true;
-    window.openListingModal=wrapped;
-    try{openListingModal=wrapped}catch(_){}
-  }
-
-  const detailBase=window.openListingDetail||globalThis.openListingDetail;
-  if(typeof detailBase==='function'&&!detailBase.__crmR330PhotoButton){
-    const wrapped=function(id,...args){
-      window.__crmR330ListingId=id||null;
-      const result=detailBase.call(this,id,...args);
-      Promise.resolve(result).finally(()=>install(id));
-      [80,220,500,900].forEach(ms=>setTimeout(()=>install(id),ms));
-      return result;
-    };
-    wrapped.__crmR330PhotoButton=true;
-    window.openListingDetail=wrapped;
-    try{openListingDetail=wrapped}catch(_){}
-  }
-
-  // 기존 코드가 상세 도구의 innerHTML을 다시 그려도 사진보기 버튼을 복구한다.
-  const body=q('#modalBody');
-  if(body){
-    new MutationObserver(()=>{
-      if(isListingDetail()&&window.__crmR330ListingId){
-        addPhotoButton(window.__crmR330ListingId);
-      }
-    }).observe(body,{childList:true,subtree:true});
-  }
-
-  Object.assign(window,{crmR330InstallPhotoButton:install});
-  console.info(`CRM v${VERSION} 매물 상세 사진보기 버튼 적용`);
-})();
-
-
-/* =========================================================
    CRM v3.10.24R3.31 · 관리자 회원정보/로그인 이메일 수정
    ========================================================= */
 (() => {
@@ -14108,92 +14022,93 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
 
 
 /* =========================================================
-   CRM v3.10.24R3.41 · 관리자 타 중개사 매물 수정 안정화
-   - MutationObserver/반복 복구 제거
-   - 매물 상세 진입 시 관리자만 수정창 직접 오픈
+   CRM v3.10.24R3.42 · 매물 상세 멈춤 긴급 복구
    ========================================================= */
 (() => {
-  const VERSION='3.10.24R3.41';
+  const VERSION='3.10.24R3.42';
+  const q=(s,r=document)=>r.querySelector(s);
+  const isAdmin=()=>state.profile?.role==='admin'&&state.profile?.status==='approved';
 
-  function isApprovedAdmin(){
-    return state.profile?.role==='admin' && state.profile?.status==='approved';
+  function addPhotoButton(id){
+    if(!id)return;
+    const body=q('#modalBody');
+    const tools=q('#crm390DetailTools');
+    if(!body||!tools||!q('[name="title"]',body)||q('#crmR342PhotoView',tools))return;
+    const btn=document.createElement('button');
+    btn.type='button';
+    btn.id='crmR342PhotoView';
+    btn.className='ghost crm-r342-photo-view';
+    btn.textContent='🖼 사진보기';
+    btn.onclick=()=>window.openListingPhotos?.(id);
+    tools.appendChild(btn);
   }
 
-  function openAdminListingEdit(id){
+  function adminLabel(id){
+    if(!isAdmin()||!id)return;
     const listing=(state.listings||[]).find(x=>String(x.id)===String(id));
-    if(!listing)return toast('매물을 찾을 수 없습니다.');
+    const body=q('#modalBody');
+    if(!listing||!body||!q('[name="title"]',body))return;
 
-    const result=window.openListingModal(id);
+    q('.crm3810-readonly-notice',body)?.remove();
+    const title=q('#modalTitle');
+    if(title)title.textContent=`${listing.title} · 관리자 수정`;
 
-    const applyAdminLabel=()=>{
-      const modal=document.querySelector('#modal');
-      const body=document.querySelector('#modalBody');
-      if(!modal?.open || !body?.querySelector('[name="title"]'))return;
+    let notice=q('.crm-r342-admin-notice',body);
+    if(!notice){
+      notice=document.createElement('div');
+      notice.className='notice crm-r342-admin-notice';
+      notice.textContent=`관리자 권한으로 ${listing.owner?.full_name||'담당 중개사'}의 매물을 수정합니다. 담당 중개사는 변경되지 않습니다.`;
+      body.prepend(notice);
+    }
 
-      body.querySelector('.crm3810-readonly-notice')?.remove();
-
-      const title=document.querySelector('#modalTitle');
-      if(title)title.textContent=`${listing.title} · 관리자 수정`;
-
-      let notice=body.querySelector('.crm-r341-admin-notice');
-      if(!notice){
-        notice=document.createElement('div');
-        notice.className='notice crm-r341-admin-notice';
-        notice.textContent=`관리자 권한으로 ${listing.owner?.full_name||'담당 중개사'}의 매물을 수정합니다. 담당 중개사는 그대로 유지됩니다.`;
-        body.prepend(notice);
-      }
-
-      const submit=document.querySelector('#modalSubmit');
-      if(submit){
-        submit.style.display='';
-        submit.disabled=false;
-      }
-    };
-
-    Promise.resolve(result).finally(applyAdminLabel);
-    setTimeout(applyAdminLabel,80);
-    setTimeout(applyAdminLabel,220);
-    return result;
+    const submit=q('#modalSubmit');
+    if(submit){submit.style.display='';submit.disabled=false;}
   }
 
-  const originalReadOnly=window.crm3810ApplyReadOnlyListing||globalThis.crm3810ApplyReadOnlyListing;
-  if(typeof originalReadOnly==='function'){
-    const safeReadOnly=function(listing){
-      if(isApprovedAdmin())return;
-      return originalReadOnly.call(this,listing);
-    };
-    window.crm3810ApplyReadOnlyListing=safeReadOnly;
-    try{crm3810ApplyReadOnlyListing=safeReadOnly}catch(_){}
+  function afterOpen(id){
+    setTimeout(()=>{adminLabel(id);addPhotoButton(id)},80);
+    setTimeout(()=>{adminLabel(id);addPhotoButton(id)},260);
   }
 
   const originalDetail=window.openListingDetail||globalThis.openListingDetail;
-  const safeDetail=function(id){
-    if(isApprovedAdmin())return openAdminListingEdit(id);
+  window.openListingDetail=function(id){
+    if(isAdmin()){
+      const result=window.openListingModal(id);
+      Promise.resolve(result).finally(()=>afterOpen(id));
+      afterOpen(id);
+      return result;
+    }
     return originalDetail?.call(this,id);
   };
-  window.openListingDetail=safeDetail;
-  try{openListingDetail=safeDetail}catch(_){}
+  try{openListingDetail=window.openListingDetail}catch(_){}
 
   const originalGlobal=window.openGlobalSearchListing||globalThis.openGlobalSearchListing;
   if(typeof originalGlobal==='function'){
-    const safeGlobal=function(id){
-      if(isApprovedAdmin())return openAdminListingEdit(id);
+    window.openGlobalSearchListing=function(id){
+      if(isAdmin())return window.openListingDetail(id);
       return originalGlobal.call(this,id);
     };
-    window.openGlobalSearchListing=safeGlobal;
-    try{openGlobalSearchListing=safeGlobal}catch(_){}
+    try{openGlobalSearchListing=window.openGlobalSearchListing}catch(_){}
   }
 
   const originalMap=window.crm3895OpenListing||globalThis.crm3895OpenListing;
   if(typeof originalMap==='function'){
-    const safeMap=function(id){
+    window.crm3895OpenListing=function(id){
       window.crm3895CloseMissingPanel?.();
-      if(isApprovedAdmin())return openAdminListingEdit(id);
+      if(isAdmin())return window.openListingDetail(id);
       return originalMap.call(this,id);
     };
-    window.crm3895OpenListing=safeMap;
-    try{crm3895OpenListing=safeMap}catch(_){}
+    try{crm3895OpenListing=window.crm3895OpenListing}catch(_){}
   }
 
-  console.info(`CRM v${VERSION} 관리자 매물 수정 안정화 적용`);
+  const originalReadOnly=window.crm3810ApplyReadOnlyListing||globalThis.crm3810ApplyReadOnlyListing;
+  if(typeof originalReadOnly==='function'){
+    window.crm3810ApplyReadOnlyListing=function(listing){
+      if(isAdmin())return;
+      return originalReadOnly.call(this,listing);
+    };
+    try{crm3810ApplyReadOnlyListing=window.crm3810ApplyReadOnlyListing}catch(_){}
+  }
+
+  console.info(`CRM v${VERSION} 매물 상세 긴급 복구 적용`);
 })();

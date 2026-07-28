@@ -2957,10 +2957,17 @@ table.listing-table tbody tr.crm-r311-listing-complete .muted {
   .crm-r337-stats{grid-template-columns:1fr 1fr}
 }
 
-/* CRM v3.10.24R3.41 · 관리자 수정 안내 */
-.crm-r341-admin-notice{
+/* CRM v3.10.24R3.42 · 매물 상세 복구 */
+.crm-r342-admin-notice{
   border-color:#bfdbfe;
   background:#eff6ff;
   color:#1e40af;
   font-weight:700;
+}
+#crm390DetailTools .crm-r342-photo-view{
+  margin-left:auto;
+  border-color:#bfdbfe;
+  background:#eff6ff;
+  color:#1d4ed8;
+  font-weight:800;
 }
