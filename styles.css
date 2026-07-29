@@ -2971,3 +2971,20 @@ table.listing-table tbody tr.crm-r311-listing-complete .muted {
   color:#1d4ed8;
   font-weight:800;
 }
+
+/* CRM v3.10.24R3.43 · 사용승인일 */
+.crm-r343-field-title{
+  display:block;
+  margin-bottom:7px;
+  font-weight:800;
+}
+.crm3109-year-field input[name="usage_approval_date"]{
+  width:100%;
+}
+.crm-r343-help{
+  display:block;
+  margin-top:6px;
+  color:#64748b;
+  font-size:11px;
+  font-weight:500;
+}

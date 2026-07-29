@@ -14112,3 +14112,141 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
 
   console.info(`CRM v${VERSION} 매물 상세 긴급 복구 적용`);
 })();
+
+
+/* =========================================================
+   CRM v3.10.24R3.43 · 사용승인일 정확한 날짜 입력
+   ========================================================= */
+(() => {
+  const VERSION='3.10.24R3.43';
+  const q=(s,r=document)=>r.querySelector(s);
+
+  function dateValue(x){
+    if(x?.usage_approval_date)return String(x.usage_approval_date).slice(0,10);
+    if(x?.built_year)return `${x.built_year}-01-01`;
+    return '';
+  }
+
+  function installApprovalDate(id){
+    const form=q('#modalForm');
+    const old=q('[name="built_year"]',form);
+    if(!form||!old||q('[name="usage_approval_date"]',form))return;
+
+    const listing=(state.listings||[]).find(x=>String(x.id)===String(id))||{};
+    const label=old.closest('label');
+    if(!label)return;
+
+    old.type='hidden';
+    old.tabIndex=-1;
+
+    label.childNodes.forEach(node=>{
+      if(node.nodeType===Node.TEXT_NODE && node.textContent.includes('연식')) node.textContent='';
+    });
+
+    const yearWrap=old.closest('.crm3109-year-field');
+    if(yearWrap){
+      yearWrap.querySelectorAll('span').forEach(x=>x.remove());
+      const date=document.createElement('input');
+      date.type='date';
+      date.name='usage_approval_date';
+      date.value=dateValue(listing);
+      date.max='2100-12-31';
+      date.min='1800-01-01';
+      date.required=false;
+      date.addEventListener('change',()=>{
+        old.value=date.value?date.value.slice(0,4):'';
+      });
+      old.value=date.value?date.value.slice(0,4):(listing.built_year||'');
+      yearWrap.prepend(date);
+    }
+
+    const title=document.createElement('span');
+    title.className='crm-r343-field-title';
+    title.textContent='사용승인일';
+    label.prepend(title);
+
+    const help=document.createElement('small');
+    help.className='crm-r343-help';
+    help.textContent='건축물대장상의 정확한 사용승인일을 입력하세요.';
+    label.appendChild(help);
+
+    const submit=q('#modalSubmit');
+    if(!submit||submit.__crmR343)return;
+
+    const original=submit.onclick;
+    submit.__crmR343=true;
+    submit.onclick=async function(e){
+      const approval=q('[name="usage_approval_date"]',form)?.value||null;
+      const titleValue=String(q('[name="title"]',form)?.value||'').trim();
+
+      if(approval){
+        const d=new Date(`${approval}T00:00:00`);
+        const max=new Date();
+        max.setFullYear(max.getFullYear()+2);
+        if(Number.isNaN(d.getTime())||d.getFullYear()<1800||d>max){
+          e?.preventDefault?.();
+          return toast('사용승인일을 정확하게 확인하세요.');
+        }
+        old.value=approval.slice(0,4);
+      }else{
+        old.value='';
+      }
+
+      const result=typeof original==='function'?await original.call(this,e):undefined;
+
+      try{
+        let listingId=id;
+        if(!listingId){
+          const {data}=await state.client
+            .from('listings')
+            .select('id')
+            .eq('owner_id',state.profile.id)
+            .eq('title',titleValue)
+            .order('created_at',{ascending:false})
+            .limit(1)
+            .maybeSingle();
+          listingId=data?.id;
+        }
+
+        if(listingId){
+          const payload={
+            usage_approval_date:approval,
+            built_year:approval?Number(approval.slice(0,4)):null
+          };
+          const {error}=await state.client.from('listings').update(payload).eq('id',listingId);
+          if(error)throw error;
+
+          const local=(state.listings||[]).find(x=>String(x.id)===String(listingId));
+          if(local)Object.assign(local,payload);
+        }
+      }catch(err){
+        toast(`사용승인일 저장 실패: ${err.message||err}`);
+      }
+
+      return result;
+    };
+  }
+
+  const base=window.openListingModal||globalThis.openListingModal;
+  if(typeof base==='function'&&!base.__crmR343ApprovalDate){
+    const wrapped=function(id,...args){
+      const result=base.call(this,id,...args);
+      [40,120,300].forEach(ms=>setTimeout(()=>installApprovalDate(id),ms));
+      Promise.resolve(result).finally(()=>setTimeout(()=>installApprovalDate(id),60));
+      return result;
+    };
+    wrapped.__crmR343ApprovalDate=true;
+    window.openListingModal=wrapped;
+    try{openListingModal=wrapped}catch(_){}
+  }
+
+  // 소개서와 브리핑에서 정확한 날짜를 우선 표시
+  const oldBrochureBuiltYear=window.brochureBuiltYear||globalThis.brochureBuiltYear;
+  window.brochureBuiltYear=function(x){
+    if(x?.usage_approval_date)return fmtDate(x.usage_approval_date);
+    return typeof oldBrochureBuiltYear==='function'?oldBrochureBuiltYear(x):(x?.built_year?`${x.built_year}년`:'-');
+  };
+  try{brochureBuiltYear=window.brochureBuiltYear}catch(_){}
+
+  console.info(`CRM v${VERSION} 사용승인일 날짜 입력 적용`);
+})();
