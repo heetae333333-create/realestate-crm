@@ -3025,3 +3025,15 @@ table.listing-table tbody tr.crm-r311-listing-complete .muted {
   font-weight:800;
   white-space:nowrap;
 }
+
+/* CRM v3.10.24R3.48 · 고객 선택 이관 */
+.crm-r348-notice{
+  margin-bottom:14px;
+  line-height:1.6;
+}
+.crm-r348-count{
+  padding:9px 4px;
+  color:#64748b;
+  font-size:12px;
+  font-weight:800;
+}

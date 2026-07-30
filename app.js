@@ -14795,3 +14795,189 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
 
   console.info(`CRM v${VERSION} 대안 월세 저장/표시 확정`);
 })();
+
+
+/* =========================================================
+   CRM v3.10.24R3.48 · 고객 선택 이관 전체 고객 복구
+   - 관리자 고객 선택 이관 화면은 로그인 계정 소유 여부와 무관하게
+     전체 고객을 직접 불러옵니다.
+   ========================================================= */
+(() => {
+  const VERSION='3.10.24R3.48';
+  const q=(s,r=document)=>r.querySelector(s);
+  const same=(a,b)=>String(a??'')===String(b??'');
+
+  async function loadAllTransferCustomers(){
+    if(state.profile?.role!=='admin')return [];
+    if(typeof loadMembers==='function')await loadMembers();
+
+    const {data,error}=await state.client
+      .from('customers')
+      .select('*')
+      .order('created_at',{ascending:false});
+
+    if(error)throw error;
+
+    state.transferCustomers=data||[];
+    return state.transferCustomers;
+  }
+
+  function ownerLabel(customer){
+    const owner=(state.members||[]).find(m=>same(m.id,customer.owner_id));
+    return owner
+      ? `${owner.full_name||'-'}${owner.office_name?` · ${owner.office_name}`:''}`
+      : '담당자 미확인';
+  }
+
+  function renderRows(){
+    const search=String(q('#customerTransferSearch')?.value||'').trim().toLowerCase();
+    const owner=q('#customerTransferOwner')?.value||'';
+    const rows=(state.transferCustomers||[]).filter(c=>{
+      const member=(state.members||[]).find(m=>same(m.id,c.owner_id));
+      const hay=`${c.name||''} ${c.phone||''} ${c.customer_type||''} ${member?.full_name||''} ${member?.office_name||''}`.toLowerCase();
+      return (!search||hay.includes(search))&&(!owner||same(c.owner_id,owner));
+    });
+
+    const table=q('#customerTransferTable');
+    if(!table)return;
+
+    table.innerHTML=rows.length?`
+      <div class="crm-r348-count">전체 ${state.transferCustomers.length}명 · 현재 표시 ${rows.length}명</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th><input id="crmR348SelectAll" type="checkbox" onchange="crmR348ToggleAll(this.checked)"></th>
+              <th>고객</th>
+              <th>구분</th>
+              <th>연락처</th>
+              <th>현재 담당자</th>
+              <th>상태</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(c=>`
+              <tr>
+                <td><input class="customer-transfer-check" data-id="${c.id}" type="checkbox"
+                  ${state.selectedCustomers.has(c.id)?'checked':''}
+                  onchange="toggleTransferCustomer('${c.id}',this.checked)"></td>
+                <td><strong>${escapeHtml(c.name||'-')}</strong></td>
+                <td>${escapeHtml(c.customer_type||'-')}</td>
+                <td>${escapeHtml(c.phone||'-')}</td>
+                <td>${escapeHtml(ownerLabel(c))}</td>
+                <td>${escapeHtml(c.status||'-')}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`:
+      '<div class="empty">검색 조건에 맞는 고객이 없습니다.</div>';
+
+    const button=q('#bulkCustomerTransferBtn');
+    if(button){
+      button.disabled=!state.selectedCustomers.size;
+      button.textContent=`선택 고객 이관 (${state.selectedCustomers.size})`;
+    }
+  }
+
+  window.renderCustomerTransfer=async function(){
+    if(state.profile?.role!=='admin')return renderView('dashboard');
+
+    state.selectedCustomers.clear();
+    try{
+      await loadAllTransferCustomers();
+    }catch(e){
+      console.error('전체 고객 이관 목록 로드 실패',e);
+      toast(`전체 고객을 불러오지 못했습니다: ${e.message||e}`);
+      return;
+    }
+
+    q('#content').innerHTML=`
+      <div class="panel">
+        <div class="notice crm-r348-notice">
+          담당자가 변경된 고객도 사라지지 않고 전체 고객 목록에 계속 표시됩니다.
+        </div>
+        <div class="filters">
+          <input id="customerTransferSearch" placeholder="고객명·연락처·담당자 검색" oninput="filterCustomerTransfer()">
+          <select id="customerTransferOwner" onchange="filterCustomerTransfer()">
+            <option value="">전체 담당자</option>
+            ${(state.members||[]).filter(x=>x.status==='approved').map(x=>
+              `<option value="${x.id}">${escapeHtml(x.full_name||'')} · ${escapeHtml(x.office_name||'')}</option>`
+            ).join('')}
+          </select>
+          <button id="bulkCustomerTransferBtn" class="primary" onclick="openBulkCustomerTransfer()" disabled>
+            선택 고객 이관 (0)
+          </button>
+        </div>
+        <div id="customerTransferTable"></div>
+      </div>`;
+
+    renderRows();
+  };
+
+  window.filterCustomerTransfer=renderRows;
+  try{filterCustomerTransfer=renderRows}catch(_){}
+
+  window.crmR348ToggleAll=function(checked){
+    document.querySelectorAll('.customer-transfer-check').forEach(el=>{
+      el.checked=checked;
+      if(checked)state.selectedCustomers.add(el.dataset.id);
+      else state.selectedCustomers.delete(el.dataset.id);
+    });
+    renderRows();
+  };
+
+  const oldOpenTransfer=window.openBulkCustomerTransfer||globalThis.openBulkCustomerTransfer;
+  window.openBulkCustomerTransfer=async function(){
+    if(!state.selectedCustomers.size)return;
+
+    q('#modalTitle').textContent='선택 고객 일괄 이관';
+    q('#modalBody').innerHTML=`
+      <p><strong>${state.selectedCustomers.size}명</strong>을 새 담당자에게 이관합니다.</p>
+      <label>새 담당자
+        <select id="bulkCustomerTo">
+          <option value="">선택</option>
+          ${(state.members||[]).filter(x=>x.status==='approved').map(x=>
+            `<option value="${x.id}">${escapeHtml(x.full_name||'')} · ${escapeHtml(x.office_name||'')}</option>`
+          ).join('')}
+        </select>
+      </label>
+      <label>이관 사유
+        <input id="bulkCustomerReason" value="관리자 선택 일괄 이관">
+      </label>`;
+
+    const submit=q('#modalSubmit');
+    submit.style.display='';
+    submit.disabled=false;
+    submit.textContent='이관';
+    submit.onclick=async e=>{
+      e.preventDefault();
+      const to=q('#bulkCustomerTo').value;
+      if(!to)return toast('새 담당자를 선택하세요.');
+
+      submit.disabled=true;
+      submit.textContent='이관 중...';
+
+      const ids=[...state.selectedCustomers];
+      const {data,error}=await state.client.rpc('bulk_transfer_customers',{
+        p_ids:ids,
+        p_to:to,
+        p_reason:q('#bulkCustomerReason').value
+      });
+
+      if(error){
+        submit.disabled=false;
+        submit.textContent='이관';
+        return toast(error.message);
+      }
+
+      q('#modal').close();
+      state.selectedCustomers.clear();
+      toast(`${data??ids.length}명의 고객을 이관했습니다.`);
+      await window.renderCustomerTransfer();
+    };
+    q('#modal').showModal();
+  };
+  try{openBulkCustomerTransfer=window.openBulkCustomerTransfer}catch(_){}
+
+  console.info(`CRM v${VERSION} 고객 선택 이관 전체 목록 복구`);
+})();
