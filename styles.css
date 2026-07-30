@@ -3015,3 +3015,13 @@ table.listing-table tbody tr.crm-r311-listing-complete .muted {
 
 /* CRM v3.10.24R3.46 */
 .crm-r346-adjust{grid-column:1/-1;margin-top:10px;padding:12px;border:1px solid #dbeafe;border-radius:11px;background:#f8fbff}.crm-r346-check{display:flex;align-items:center;gap:7px;font-weight:800}.crm-r346-alt-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}.crm-r346-alt-fields[hidden]{display:none!important}.crm-r346-alt-line{display:inline-block;margin-top:2px;color:#2563eb;font-size:11px;font-weight:800}@media(max-width:650px){.crm-r346-alt-fields{grid-template-columns:1fr}}
+
+/* CRM v3.10.24R3.47 */
+.crm-r347-alt-line{
+  display:inline-block;
+  margin-top:2px;
+  color:#2563eb;
+  font-size:11px;
+  font-weight:800;
+  white-space:nowrap;
+}
