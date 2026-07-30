@@ -14671,3 +14671,74 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
   Object.assign(window,{crmR345OpenMyAccountEdit:openMyAccountEdit});
   console.info(`CRM v${VERSION} 회원정보·최초히스토리·보증금조정 적용`);
 })();
+
+
+/* =========================================================
+   CRM v3.10.24R3.46 · 대안 월세조건 + 최초 등록 히스토리
+   ========================================================= */
+(()=>{
+  const V='3.10.24R3.46',q=(s,r=document)=>r.querySelector(s),today=()=>new Date().toISOString().slice(0,10);
+  const num=v=>{const n=Number(v);return Number.isFinite(n)&&n>0?n:null};
+  const line=(d,r)=>{d=num(d);r=num(r);return d||r?`${d?d.toLocaleString('ko-KR'):'0'} / ${r?r.toLocaleString('ko-KR'):'0'}`:''};
+  const alt=x=>x?.deposit_adjustable?line(x.alternate_deposit,x.alternate_monthly_rent):'';
+
+  async function initialHistory(type,id,item,memo){
+    const idField=type==='customer'?'customer_id':'listing_id';
+    const table=type==='customer'?'customers':'listings';
+    const parts=[];
+    if(type==='customer'){
+      if(item.deal_type)parts.push(`거래유형 ${item.deal_type}`);
+      if(item.budget_max)parts.push(`희망금액 ${Number(item.budget_max).toLocaleString('ko-KR')}만원`);
+      if(item.desired_monthly_rent)parts.push(`희망월세 ${Number(item.desired_monthly_rent).toLocaleString('ko-KR')}만원`);
+      if(item.preferred_area)parts.push(`희망지역 ${item.preferred_area}`);
+      if(item.desired_rooms||item.desired_one_point_five_room)parts.push(`희망방 ${item.desired_one_point_five_room?'1.5룸':item.desired_rooms}`);
+      if(alt(item))parts.push(`대안 월세조건 ${alt(item)}`);
+    }else{
+      try{const opts=crm38DealOptions(item)||[]; if(opts.length)parts.push(opts.map(o=>o.deal_type==='월세'?`월세 ${line(o.price,o.monthly_rent)}`:`${o.deal_type} ${Number(o.price||0).toLocaleString('ko-KR')}만원`).join(' · '));}catch(_){ }
+      if(item.property_type)parts.push(`매물유형 ${item.property_type}`);
+      if(item.room_count||item.is_one_point_five_room)parts.push(`방 ${item.is_one_point_five_room?'1.5룸':item.room_count}`);
+      if(item.bathroom_count!==null&&item.bathroom_count!==undefined)parts.push(`욕실 ${item.bathroom_count}`);
+      if(item.area_m2)parts.push(`전용 ${item.area_m2}㎡`);
+      if(alt(item))parts.push(`대안 월세조건 ${alt(item)}`);
+    }
+    const content=[type==='customer'?'[최초 고객 등록]':'[최초 매물 등록]',`조건: ${parts.join(' · ')||'-'}`,`${type==='customer'?'상담메모':'상세설명(비밀메모)'}: ${memo||'-'}`].join('\n');
+    const {data:ex}=await state.client.from('interaction_history').select('id').eq(idField,id).eq('contact_method','최초등록').limit(1);
+    if(!ex?.length){
+      const row={customer_id:type==='customer'?id:null,listing_id:type==='listing'?id:null,created_by:state.profile.id,follow_up_date:today(),contact_method:'최초등록',content,next_follow_up_at:null};
+      const {error}=await state.client.from('interaction_history').insert(row); if(error)throw error;
+    }
+    const payload={last_follow_up_at:today()}; if(type==='listing')payload.last_confirmed_at=today();
+    const {error}=await state.client.from(table).update(payload).eq('id',id); if(error)throw error;
+  }
+
+  function installCustomer(id){
+    const body=q('#modalBody'); if(!body||!q('[name="name"]',body))return;
+    const c=(state.customers||[]).find(x=>String(x.id)===String(id))||{};
+    q('#crmR345CustomerDepositAdjust',body)?.remove(); q('#crmR346CustomerAdjust',body)?.remove();
+    const monthly=q('#customerMonthlyRentWrap',body); if(!monthly)return;
+    monthly.insertAdjacentHTML('afterend',`<div class="crm-r346-adjust" id="crmR346CustomerAdjust"><label class="inline-check crm-r346-check"><input type="checkbox" id="crmR346CustomerCheck" ${c.deposit_adjustable?'checked':''}> 보증금 조정 가능</label><div class="crm-r346-alt-fields" id="crmR346CustomerFields"><label>다른 보증금(만원)<input id="crmR346CustomerDeposit" type="number" min="0" value="${c.alternate_deposit??''}"></label><label>다른 월세(만원)<input id="crmR346CustomerRent" type="number" min="0" value="${c.alternate_monthly_rent??''}"></label></div></div>`);
+    const check=q('#crmR346CustomerCheck',body),fields=q('#crmR346CustomerFields',body);
+    const sync=()=>{const monthlyOn=String(q('[name="deal_type"]',body)?.value||'').includes('월세');q('#crmR346CustomerAdjust',body).style.display=monthlyOn?'':'none';fields.hidden=!(monthlyOn&&check.checked)};
+    check.onchange=sync; q('[name="deal_type"]',body)?.addEventListener('change',sync); q('#customerKind',body)?.addEventListener('change',sync); sync();
+    const submit=q('#modalSubmit'); if(!submit||submit.__crmR346C)return; const orig=submit.onclick; submit.__crmR346C=true;
+    submit.onclick=async function(e){const isNew=!id,name=q('[name="name"]',body)?.value.trim()||'',memo=q('[name="notes"]',body)?.value.trim()||''; const payload={deposit_adjustable:check.checked,alternate_deposit:check.checked?num(q('#crmR346CustomerDeposit',body)?.value):null,alternate_monthly_rent:check.checked?num(q('#crmR346CustomerRent',body)?.value):null}; const out=typeof orig==='function'?await orig.call(this,e):undefined; try{let cid=id;if(!cid){const {data}=await state.client.from('customers').select('*').eq('owner_id',state.profile.id).eq('name',name).order('created_at',{ascending:false}).limit(1).maybeSingle();cid=data?.id}if(cid){let {error}=await state.client.from('customers').update(payload).eq('id',cid);if(error)throw error;const {data:fresh}=await state.client.from('customers').select('*').eq('id',cid).single();if(isNew)await initialHistory('customer',cid,{...(fresh||{}),...payload},memo)}}catch(err){toast(`고객 추가정보 저장 실패: ${err.message||err}`)}return out}
+  }
+
+  function installListing(id){
+    const body=q('#modalBody'); if(!body||!q('[name="title"]',body))return;
+    const l=(state.listings||[]).find(x=>String(x.id)===String(id))||{};
+    q('#crmR345ListingDepositAdjust',body)?.remove(); q('#crmR346ListingAdjust',body)?.remove();
+    const card=[...body.querySelectorAll('.crm38-deal-card')].find(x=>x.dataset.type==='월세'); if(!card)return; const f=q('.crm38-deal-fields',card); if(!f)return;
+    f.insertAdjacentHTML('beforeend',`<div class="crm-r346-adjust" id="crmR346ListingAdjust"><label class="inline-check crm-r346-check"><input type="checkbox" id="crmR346ListingCheck" ${l.deposit_adjustable?'checked':''}> 보증금 조정 가능</label><div class="crm-r346-alt-fields" id="crmR346ListingFields"><label>다른 보증금(만원)<input id="crmR346ListingDeposit" type="number" min="0" value="${l.alternate_deposit??''}"></label><label>다른 월세(만원)<input id="crmR346ListingRent" type="number" min="0" value="${l.alternate_monthly_rent??''}"></label></div></div>`);
+    const check=q('#crmR346ListingCheck',body),fields=q('#crmR346ListingFields',body); const sync=()=>fields.hidden=!check.checked; check.onchange=sync; sync();
+    const submit=q('#modalSubmit'); if(!submit||submit.__crmR346L)return; const orig=submit.onclick; submit.__crmR346L=true;
+    submit.onclick=async function(e){const isNew=!id,title=q('[name="title"]',body)?.value.trim()||'',memo=q('[name="description"]',body)?.value.trim()||''; const payload={deposit_adjustable:check.checked,alternate_deposit:check.checked?num(q('#crmR346ListingDeposit',body)?.value):null,alternate_monthly_rent:check.checked?num(q('#crmR346ListingRent',body)?.value):null}; const out=typeof orig==='function'?await orig.call(this,e):undefined; try{let lid=id;if(!lid){const {data}=await state.client.from('listings').select('*').eq('owner_id',state.profile.id).eq('title',title).order('created_at',{ascending:false}).limit(1).maybeSingle();lid=data?.id}if(lid){let {error}=await state.client.from('listings').update(payload).eq('id',lid);if(error)throw error;const {data:fresh}=await state.client.from('listings').select('*').eq('id',lid).single();if(isNew)await initialHistory('listing',lid,{...(fresh||{}),...payload},memo)}}catch(err){toast(`매물 추가정보 저장 실패: ${err.message||err}`)}return out}
+  }
+
+  const bc=window.openCustomerModal||globalThis.openCustomerModal;if(typeof bc==='function'){const w=function(id,...a){const r=bc.call(this,id,...a);[80,200,420].forEach(ms=>setTimeout(()=>installCustomer(id),ms));return r};window.openCustomerModal=w;try{openCustomerModal=w}catch(_){}}
+  const bl=window.openListingModal||globalThis.openListingModal;if(typeof bl==='function'){const w=function(id,...a){const r=bl.call(this,id,...a);[80,200,420].forEach(ms=>setTimeout(()=>installListing(id),ms));return r};window.openListingModal=w;try{openListingModal=w}catch(_){}}
+
+  const cb=window.customerBudgetText||globalThis.customerBudgetText;if(typeof cb==='function'){const w=x=>{let b=String(cb(x)).replace(/<br><span class="crm-r345-adjust-list">.*?<\/span>/g,'');const a=alt(x);return a?`${b}<br><span class="crm-r346-alt-line">${escapeHtml(a)}</span>`:b};window.customerBudgetText=w;try{customerBudgetText=w}catch(_){}}
+  const lp=window.listingPriceText||globalThis.listingPriceText;if(typeof lp==='function'){const w=x=>{let b=String(lp(x)).replace(/<br><span class="crm-r345-adjust-list">.*?<\/span>/g,'');const a=alt(x);return a?`${b}<br><span class="crm-r346-alt-line">${escapeHtml(a)}</span>`:b};window.listingPriceText=w;try{listingPriceText=w}catch(_){}}
+  console.info(`CRM v${V} 적용`);
+})();
