@@ -14325,3 +14325,349 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
 
   console.info(`CRM v${VERSION} 소개자료 사용승인일 통일 적용`);
 })();
+
+
+/* =========================================================
+   CRM v3.10.24R3.45
+   1) 내 회원정보: 이름/연락처 → 이메일/비밀번호 순서
+   2) 최초 매물 등록 내용 자동 히스토리 + 금일 최종 FU
+   3) 고객/매물 월세 보증금 조정 가능 및 대안금액
+   ========================================================= */
+(() => {
+  const VERSION='3.10.24R3.45';
+  const q=(s,r=document)=>r.querySelector(s);
+  const today=()=>new Date().toISOString().slice(0,10);
+  const n=v=>{const x=Number(v);return Number.isFinite(x)&&x>0?x:null};
+  const money=v=>{const x=n(v);return x?`${x.toLocaleString('ko-KR')}만원`:'-'};
+
+  /* ---------- 1. 내 회원정보 수정 ---------- */
+  function phoneFormat(input){
+    const d=String(input.value||'').replace(/\D/g,'').slice(0,11);
+    input.value=d.length<=3?d:d.length<=7?`${d.slice(0,3)}-${d.slice(3)}`:`${d.slice(0,3)}-${d.slice(3,7)}-${d.slice(7)}`;
+  }
+
+  async function openMyAccountEdit(){
+    const p=state.profile;
+    if(!p)return toast('회원정보를 불러오지 못했습니다.');
+
+    q('#modalTitle').textContent='내 회원정보 수정';
+    q('#modalBody').innerHTML=`
+      <div class="crm-r345-account">
+        <div class="notice">이메일은 로그인 아이디입니다. 이메일 또는 비밀번호를 변경하면 저장 후 자동 로그아웃됩니다.</div>
+
+        <section class="crm-r345-account-section">
+          <h3>기본 정보</h3>
+          <div class="form-grid">
+            <label>이름
+              <input id="crmR345Name" value="${escapeHtml(p.full_name||'')}" maxlength="40">
+            </label>
+            <label>연락처
+              <input id="crmR345Phone" value="${escapeHtml(p.phone||'')}" inputmode="numeric" placeholder="010-0000-0000">
+            </label>
+            <label class="span-2">사무소
+              <input id="crmR345Office" value="${escapeHtml(p.office_name||'')}" maxlength="100">
+            </label>
+          </div>
+        </section>
+
+        <section class="crm-r345-account-section">
+          <h3>로그인 정보</h3>
+          <div class="form-grid">
+            <label class="span-2">이메일 · 로그인 아이디
+              <input id="crmR345Email" type="email" value="${escapeHtml(p.email||state.session?.user?.email||'')}" autocomplete="off">
+            </label>
+            <label>새 비밀번호
+              <input id="crmR345Password" type="password" minlength="8" autocomplete="new-password" placeholder="변경할 때만 입력">
+            </label>
+            <label>새 비밀번호 확인
+              <input id="crmR345PasswordConfirm" type="password" minlength="8" autocomplete="new-password" placeholder="비밀번호 다시 입력">
+            </label>
+          </div>
+          <small>비밀번호는 영문·숫자를 포함해 8자 이상으로 입력하세요.</small>
+        </section>
+      </div>`;
+
+    const phone=q('#crmR345Phone');
+    phone.addEventListener('input',()=>phoneFormat(phone));
+
+    const submit=q('#modalSubmit');
+    submit.style.display='';
+    submit.disabled=false;
+    submit.textContent='변경 저장';
+    submit.onclick=async e=>{
+      e.preventDefault();
+      const full_name=q('#crmR345Name').value.trim();
+      const phoneValue=q('#crmR345Phone').value.trim();
+      const office_name=q('#crmR345Office').value.trim();
+      const email=q('#crmR345Email').value.trim().toLowerCase();
+      const password=q('#crmR345Password').value;
+      const confirmPassword=q('#crmR345PasswordConfirm').value;
+
+      if(!full_name)return toast('이름을 입력하세요.');
+      if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return toast('올바른 이메일을 입력하세요.');
+      if(password){
+        if(password.length<8||!/[A-Za-z]/.test(password)||!/\d/.test(password))return toast('비밀번호는 영문·숫자를 포함해 8자 이상 입력하세요.');
+        if(password!==confirmPassword)return toast('새 비밀번호가 서로 다릅니다.');
+      }
+
+      const oldEmail=String(p.email||state.session?.user?.email||'').toLowerCase();
+      const authChanged=email!==oldEmail||!!password;
+      submit.disabled=true;
+      submit.textContent='저장 중...';
+
+      const {error}=await state.client.rpc('self_update_member_account',{
+        p_full_name:full_name,
+        p_office_name:office_name||null,
+        p_phone:phoneValue||null,
+        p_email:email,
+        p_password:password||null
+      });
+      if(error){
+        submit.disabled=false;
+        submit.textContent='변경 저장';
+        const msg=String(error.message||'');
+        return toast(msg.includes('사용 중')||msg.includes('duplicate')?'이미 사용 중인 이메일입니다.':`회원정보 수정 실패: ${msg}`);
+      }
+
+      state.profile={...p,full_name,office_name:office_name||null,phone:phoneValue||null,email};
+      const badge=q('#userBadge');
+      if(badge)badge.innerHTML=`<strong>${escapeHtml(full_name)}</strong><div class="muted">${p.role==='admin'?'관리자':'공인중개사'}</div>`;
+      q('#modal').close();
+
+      if(authChanged){
+        toast('로그인 정보를 변경했습니다. 새 정보로 다시 로그인하세요.');
+        setTimeout(async()=>{await state.client.auth.signOut();location.reload()},650);
+      }else{
+        toast('회원정보를 변경했습니다.');
+      }
+    };
+    q('#modal').showModal();
+  }
+
+  function bindProfileButton(){
+    const btn=q('#profileEditBtn');
+    if(btn)btn.onclick=openMyAccountEdit;
+  }
+  bindProfileButton();
+  setTimeout(bindProfileButton,300);
+
+  /* ---------- 보증금 조정 공통 ---------- */
+  function adjustmentText(x){
+    if(!x?.deposit_adjustable)return '';
+    return x.alternate_deposit?`보증금 조정 가능 · 대안 ${money(x.alternate_deposit)}`:'보증금 조정 가능';
+  }
+
+  function injectListingAdjustment(id){
+    const body=q('#modalBody');
+    if(!body||!q('[name="title"]',body)||q('#crmR345ListingDepositAdjust',body))return;
+    const listing=(state.listings||[]).find(x=>String(x.id)===String(id))||{};
+    const monthlyCard=[...body.querySelectorAll('.crm38-deal-card')].find(x=>x.dataset.type==='월세');
+    if(!monthlyCard)return;
+
+    const fields=q('.crm38-deal-fields',monthlyCard);
+    if(!fields)return;
+    fields.insertAdjacentHTML('beforeend',`
+      <div class="crm-r345-adjust" id="crmR345ListingDepositAdjust">
+        <label class="inline-check">
+          <input type="checkbox" id="crmR345ListingAdjustCheck" ${listing.deposit_adjustable?'checked':''}>
+          보증금 조정 가능
+        </label>
+        <label id="crmR345ListingAltWrap">조정 가능한 다른 보증금(만원)
+          <input id="crmR345ListingAltDeposit" type="number" min="0" value="${listing.alternate_deposit??''}" placeholder="예: 2000">
+        </label>
+      </div>`);
+    const check=q('#crmR345ListingAdjustCheck');
+    const wrap=q('#crmR345ListingAltWrap');
+    const input=q('#crmR345ListingAltDeposit');
+    const sync=()=>{
+      wrap.hidden=!check.checked;
+      input.disabled=!check.checked;
+      if(!check.checked)input.value='';
+    };
+    check.addEventListener('change',sync);
+    sync();
+
+    const submit=q('#modalSubmit');
+    if(!submit||submit.__crmR345Listing)return;
+    const original=submit.onclick;
+    submit.__crmR345Listing=true;
+    submit.onclick=async function(e){
+      const title=String(q('[name="title"]',body)?.value||'').trim();
+      const isNew=!id;
+      const description=String(q('[name="description"]',body)?.value||'').trim();
+      const deals=[...body.querySelectorAll('.crm38-deal-card')]
+        .filter(c=>q('.crm38-deal-check',c)?.checked)
+        .map(c=>{
+          const type=c.dataset.type;
+          const price=n(q('.crm38-deal-price',c)?.value);
+          const rent=n(q('.crm38-deal-rent',c)?.value);
+          return type==='월세'?`${type} ${money(price)} / 월 ${money(rent)}`:`${type} ${money(price)}`;
+        });
+      const payload={
+        deposit_adjustable:check.checked,
+        alternate_deposit:check.checked?n(input.value):null
+      };
+
+      const result=typeof original==='function'?await original.call(this,e):undefined;
+
+      try{
+        let listingId=id;
+        if(!listingId){
+          const {data}=await state.client.from('listings').select('id').eq('owner_id',state.profile.id).eq('title',title).order('created_at',{ascending:false}).limit(1).maybeSingle();
+          listingId=data?.id;
+        }
+        if(listingId){
+          const {error:uErr}=await state.client.from('listings').update(payload).eq('id',listingId);
+          if(uErr)throw uErr;
+
+          if(isNew){
+            const adjust=payload.deposit_adjustable?` / ${adjustmentText(payload)}`:'';
+            const content=[
+              '[최초 매물 등록]',
+              `거래조건: ${deals.join(' · ')||'-'}${adjust}`,
+              `상세설명(비밀메모): ${description||'-'}`
+            ].join('\n');
+
+            const {data:exists}=await state.client.from('interaction_history')
+              .select('id').eq('listing_id',listingId).eq('contact_method','최초등록').limit(1);
+            if(!exists?.length){
+              const {error:hErr}=await state.client.from('interaction_history').insert({
+                listing_id:listingId,
+                customer_id:null,
+                created_by:state.profile.id,
+                follow_up_date:today(),
+                contact_method:'최초등록',
+                content,
+                next_follow_up_at:null
+              });
+              if(hErr)throw hErr;
+            }
+            const {error:fErr}=await state.client.from('listings').update({
+              last_follow_up_at:today(),
+              last_confirmed_at:today()
+            }).eq('id',listingId);
+            if(fErr)throw fErr;
+          }
+
+          const local=(state.listings||[]).find(x=>String(x.id)===String(listingId));
+          if(local)Object.assign(local,payload,isNew?{last_follow_up_at:today(),last_confirmed_at:today()}:{});
+        }
+      }catch(err){
+        toast(`추가정보 저장 실패: ${err.message||err}`);
+      }
+      return result;
+    };
+  }
+
+  function injectCustomerAdjustment(id){
+    const body=q('#modalBody');
+    if(!body||!q('[name="name"]',body)||q('#crmR345CustomerDepositAdjust',body))return;
+    const customer=(state.customers||[]).find(x=>String(x.id)===String(id))||{};
+    const monthly=q('#customerMonthlyRentWrap',body);
+    if(!monthly)return;
+
+    monthly.insertAdjacentHTML('afterend',`
+      <div class="crm-r345-adjust crm-r345-customer-adjust" id="crmR345CustomerDepositAdjust">
+        <label class="inline-check">
+          <input type="checkbox" id="crmR345CustomerAdjustCheck" ${customer.deposit_adjustable?'checked':''}>
+          보증금 조정 가능
+        </label>
+        <label id="crmR345CustomerAltWrap">조정 가능한 다른 보증금(만원)
+          <input id="crmR345CustomerAltDeposit" type="number" min="0" value="${customer.alternate_deposit??''}" placeholder="예: 2000">
+        </label>
+      </div>`);
+    const check=q('#crmR345CustomerAdjustCheck');
+    const wrap=q('#crmR345CustomerAltWrap');
+    const input=q('#crmR345CustomerAltDeposit');
+    const sync=()=>{
+      const isMonthly=String(q('[name="deal_type"]',body)?.value||'').includes('월세');
+      const show=isMonthly&&check.checked;
+      q('#crmR345CustomerDepositAdjust').style.display=isMonthly?'':'none';
+      wrap.hidden=!show;
+      input.disabled=!show;
+      if(!show&&!check.checked)input.value='';
+    };
+    check.addEventListener('change',sync);
+    q('[name="deal_type"]',body)?.addEventListener('change',sync);
+    q('#customerKind',body)?.addEventListener('change',sync);
+    sync();
+
+    const submit=q('#modalSubmit');
+    if(!submit||submit.__crmR345Customer)return;
+    const original=submit.onclick;
+    submit.__crmR345Customer=true;
+    submit.onclick=async function(e){
+      const name=String(q('[name="name"]',body)?.value||'').trim();
+      const payload={
+        deposit_adjustable:check.checked,
+        alternate_deposit:check.checked?n(input.value):null
+      };
+      const result=typeof original==='function'?await original.call(this,e):undefined;
+      try{
+        let customerId=id;
+        if(!customerId){
+          const {data}=await state.client.from('customers').select('id').eq('owner_id',state.profile.id).eq('name',name).order('created_at',{ascending:false}).limit(1).maybeSingle();
+          customerId=data?.id;
+        }
+        if(customerId){
+          const {error}=await state.client.from('customers').update(payload).eq('id',customerId);
+          if(error)throw error;
+          const local=(state.customers||[]).find(x=>String(x.id)===String(customerId));
+          if(local)Object.assign(local,payload);
+        }
+      }catch(err){toast(`보증금 조정정보 저장 실패: ${err.message||err}`)}
+      return result;
+    };
+  }
+
+  const baseListing=window.openListingModal||globalThis.openListingModal;
+  if(typeof baseListing==='function'&&!baseListing.__crmR345){
+    const wrapped=function(id,...args){
+      const result=baseListing.call(this,id,...args);
+      [70,180,380].forEach(ms=>setTimeout(()=>injectListingAdjustment(id),ms));
+      return result;
+    };
+    wrapped.__crmR345=true;
+    window.openListingModal=wrapped;
+    try{openListingModal=wrapped}catch(_){}
+  }
+
+  const baseCustomer=window.openCustomerModal||globalThis.openCustomerModal;
+  if(typeof baseCustomer==='function'&&!baseCustomer.__crmR345){
+    const wrapped=function(id,...args){
+      const result=baseCustomer.call(this,id,...args);
+      [70,180,380].forEach(ms=>setTimeout(()=>injectCustomerAdjustment(id),ms));
+      return result;
+    };
+    wrapped.__crmR345=true;
+    window.openCustomerModal=wrapped;
+    try{openCustomerModal=wrapped}catch(_){}
+  }
+
+  /* ---------- 리스트 금액 표기 ---------- */
+  const oldCustomerBudget=window.customerBudgetText||globalThis.customerBudgetText;
+  if(typeof oldCustomerBudget==='function'){
+    const wrapped=function(x){
+      const base=oldCustomerBudget.call(this,x);
+      const extra=adjustmentText(x);
+      return extra?`${base}<br><span class="crm-r345-adjust-list">${escapeHtml(extra)}</span>`:base;
+    };
+    window.customerBudgetText=wrapped;
+    try{customerBudgetText=wrapped}catch(_){}
+  }
+
+  const oldListingPrice=window.listingPriceText||globalThis.listingPriceText;
+  if(typeof oldListingPrice==='function'){
+    const wrapped=function(x){
+      const base=oldListingPrice.call(this,x);
+      const hasMonthly=(typeof crm38DealOptions==='function'?crm38DealOptions(x):[]).some(o=>o.deal_type==='월세')||x.transaction_type==='월세';
+      const extra=hasMonthly?adjustmentText(x):'';
+      return extra?`${base}<br><span class="crm-r345-adjust-list">${escapeHtml(extra)}</span>`:base;
+    };
+    window.listingPriceText=wrapped;
+    try{listingPriceText=wrapped}catch(_){}
+  }
+
+  Object.assign(window,{crmR345OpenMyAccountEdit:openMyAccountEdit});
+  console.info(`CRM v${VERSION} 회원정보·최초히스토리·보증금조정 적용`);
+})();

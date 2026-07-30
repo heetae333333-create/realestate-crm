@@ -2988,3 +2988,27 @@ table.listing-table tbody tr.crm-r311-listing-complete .muted {
   font-size:11px;
   font-weight:500;
 }
+
+/* ===== CRM v3.10.24R3.45 ===== */
+.crm-r345-account{display:grid;gap:15px}
+.crm-r345-account-section{padding:14px;border:1px solid #dbe3ec;border-radius:13px;background:#f8fafc}
+.crm-r345-account-section h3{margin:0 0 12px;font-size:15px}
+.crm-r345-account-section small{display:block;margin-top:8px;color:#64748b}
+.crm-r345-adjust{
+  grid-column:1/-1;
+  display:grid;
+  grid-template-columns:auto minmax(220px,1fr);
+  align-items:end;
+  gap:12px;
+  margin-top:10px;
+  padding:12px;
+  border:1px solid #dbeafe;
+  border-radius:11px;
+  background:#f8fbff;
+}
+.crm-r345-adjust .inline-check{align-self:center;font-weight:800}
+.crm-r345-customer-adjust{margin-top:0}
+.crm-r345-adjust-list{color:#2563eb;font-size:11px;font-weight:800;white-space:nowrap}
+@media(max-width:650px){
+  .crm-r345-adjust{grid-template-columns:1fr}
+}
