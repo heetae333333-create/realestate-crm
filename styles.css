@@ -3037,3 +3037,176 @@ table.listing-table tbody tr.crm-r311-listing-complete .muted {
   font-size:12px;
   font-weight:800;
 }
+
+
+/* =========================================================
+   CRM v3.10.24R3.49 · 고객/매물 목록 한 화면 압축
+   ========================================================= */
+
+/* 공통 테이블 밀도 축소 */
+.customer-table,
+.listing-table,
+.crm-r319-admin-customer-table{
+  width:100%;
+  table-layout:fixed;
+  font-size:11.5px;
+}
+.customer-table th,
+.customer-table td,
+.listing-table th,
+.listing-table td,
+.crm-r319-admin-customer-table th,
+.crm-r319-admin-customer-table td{
+  padding:7px 5px!important;
+  line-height:1.28;
+  vertical-align:middle;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.customer-table th,
+.listing-table th,
+.crm-r319-admin-customer-table th{
+  font-size:11px;
+  white-space:nowrap;
+}
+.customer-table td,
+.listing-table td,
+.crm-r319-admin-customer-table td{
+  white-space:normal;
+  word-break:keep-all;
+}
+.customer-table strong,
+.listing-table strong,
+.crm-r319-admin-customer-table strong{
+  font-size:12px;
+}
+.customer-table .muted,
+.listing-table .muted,
+.crm-r319-admin-customer-table .muted{
+  font-size:10px;
+}
+.customer-table .badge,
+.listing-table .badge,
+.crm-r319-admin-customer-table .badge{
+  padding:3px 6px;
+  font-size:10px;
+}
+.customer-table .row-actions,
+.listing-table .row-actions,
+.crm-r319-admin-customer-table .row-actions{
+  gap:3px;
+  flex-wrap:wrap;
+}
+.customer-table .row-actions button,
+.listing-table .row-actions button,
+.crm-r319-admin-customer-table .row-actions button{
+  min-height:28px;
+  padding:4px 6px;
+  font-size:10px;
+}
+
+/* 고객시트 열 폭 */
+.customer-table th:nth-child(1), .customer-table td:nth-child(1){width:42px}
+.customer-table th:nth-child(2), .customer-table td:nth-child(2){width:72px}
+.customer-table th:nth-child(3), .customer-table td:nth-child(3){width:150px}
+.customer-table th:nth-child(4), .customer-table td:nth-child(4){width:130px}
+.customer-table th:nth-child(5), .customer-table td:nth-child(5){width:72px}
+.customer-table th:nth-child(6), .customer-table td:nth-child(6){width:78px}
+.customer-table th:nth-child(7), .customer-table td:nth-child(7){width:54px}
+.customer-table th:nth-child(8), .customer-table td:nth-child(8){width:140px}
+.customer-table th:nth-child(9), .customer-table td:nth-child(9){width:58px}
+.customer-table th:nth-child(10), .customer-table td:nth-child(10){width:145px}
+.customer-table th:nth-child(11), .customer-table td:nth-child(11){width:78px}
+.customer-table th:nth-child(12), .customer-table td:nth-child(12){width:82px}
+.customer-table th:nth-child(n+13), .customer-table td:nth-child(n+13){width:80px}
+
+/* 매물시트 열 폭 */
+.listing-table th:nth-child(1), .listing-table td:nth-child(1){width:42px}
+.listing-table th:nth-child(2), .listing-table td:nth-child(2){width:78px}
+.listing-table th:nth-child(3), .listing-table td:nth-child(3){width:145px}
+.listing-table th:nth-child(4), .listing-table td:nth-child(4){width:76px}
+.listing-table th:nth-child(5), .listing-table td:nth-child(5){width:74px}
+.listing-table th:nth-child(6), .listing-table td:nth-child(6){width:102px}
+.listing-table th:nth-child(7), .listing-table td:nth-child(7){width:112px}
+.listing-table th:nth-child(8), .listing-table td:nth-child(8){width:128px}
+.listing-table th:nth-child(9), .listing-table td:nth-child(9){width:105px}
+.listing-table th:nth-child(10), .listing-table td:nth-child(10){width:54px}
+.listing-table th:nth-child(11), .listing-table td:nth-child(11){width:92px}
+.listing-table th:nth-child(12), .listing-table td:nth-child(12){width:67px}
+.listing-table th:nth-child(13), .listing-table td:nth-child(13){width:82px}
+.listing-table th:nth-child(14), .listing-table td:nth-child(14){width:74px}
+.listing-table th:nth-child(15), .listing-table td:nth-child(15){width:78px}
+.listing-table th:nth-child(16), .listing-table td:nth-child(16){width:76px}
+.listing-table th:nth-child(17), .listing-table td:nth-child(17){width:76px}
+.listing-table th:nth-child(18), .listing-table td:nth-child(18){width:110px}
+
+/* 주소 보조행은 더 작게 */
+.listing-table .crm3812-list-address{
+  font-size:10px;
+  line-height:1.15;
+  margin-bottom:3px;
+}
+
+/* 긴 텍스트는 최대 2줄 */
+.customer-table td,
+.listing-table td{
+  display:table-cell;
+}
+.customer-table td > *,
+.listing-table td > *{
+  max-width:100%;
+}
+.customer-table td:nth-child(3) strong,
+.listing-table td:nth-child(3) strong,
+.listing-table .listing-title-cell strong{
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+}
+
+/* 상단 필터도 조금 더 압축 */
+.filters{
+  gap:8px!important;
+}
+.filters input,
+.filters select,
+.filters button{
+  min-height:42px;
+  padding:8px 10px;
+  font-size:12px;
+}
+.crm3880-filter-grid,
+.admin-listing-filters{
+  gap:8px!important;
+}
+
+/* PC에서는 가로스크롤 없이 최대한 한 화면에 */
+@media(min-width:1280px){
+  .table-wrap,
+  .listing-table-wrap{
+    overflow-x:hidden!important;
+  }
+  #content{
+    max-width:none;
+  }
+}
+
+/* 1100px 이하에서는 정상적으로 가로스크롤 허용 */
+@media(max-width:1279px){
+  .table-wrap,
+  .listing-table-wrap{
+    overflow-x:auto!important;
+  }
+  .customer-table{min-width:1180px}
+  .listing-table{min-width:1480px}
+}
+
+/* 초광폭 모니터에서 너무 작아 보이지 않도록 */
+@media(min-width:1750px){
+  .customer-table,
+  .listing-table,
+  .crm-r319-admin-customer-table{
+    font-size:12px;
+  }
+}

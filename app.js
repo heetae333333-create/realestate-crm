@@ -14981,3 +14981,31 @@ console.info('CRM v3.10.10 층수·연식 저장/복원/소개문구 수정 완�
 
   console.info(`CRM v${VERSION} 고객 선택 이관 전체 목록 복구`);
 })();
+
+
+/* CRM v3.10.24R3.49 · 목록 압축 보정 */
+(() => {
+  const VERSION='3.10.24R3.49';
+
+  function compactTables(){
+    document.querySelectorAll('.customer-table,.listing-table,.crm-r319-admin-customer-table')
+      .forEach(t=>t.classList.add('crm-r349-compact-table'));
+  }
+
+  const functions=['renderCustomers','renderMyListings','renderAdminListings','renderAdminCustomers','renderNetwork'];
+  functions.forEach(name=>{
+    const base=window[name]||globalThis[name];
+    if(typeof base!=='function'||base.__crmR349)return;
+    const wrapped=async function(...args){
+      const out=await base.apply(this,args);
+      requestAnimationFrame(compactTables);
+      setTimeout(compactTables,80);
+      return out;
+    };
+    wrapped.__crmR349=true;
+    window[name]=wrapped;
+    try{globalThis[name]=wrapped}catch(_){}
+  });
+
+  console.info(`CRM v${VERSION} 목록 압축 적용`);
+})();
