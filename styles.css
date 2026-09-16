@@ -3182,3 +3182,43 @@ table.listing-table tbody tr.crm-r311-listing-complete .muted {
   font-size:11px!important;
   line-height:1.3!important;
 }
+
+/* =========================================================
+   CRM v3.10.24R3.53 · 매물명 강조
+   ========================================================= */
+
+/* 매물 목록 본문 기본 글씨도 살짝 키움 */
+#myListingTable td,
+#adminListingTable td,
+#networkTable td{
+  font-size:13px!important;
+}
+
+/* 매물명은 확실히 크게 */
+#myListingTable td:nth-child(3) strong,
+#myListingTable td:nth-child(3) a,
+#adminListingTable td:nth-child(3) strong,
+#adminListingTable td:nth-child(3) a,
+#networkTable td:nth-child(3) strong,
+#networkTable td:nth-child(3) a{
+  font-size:15px!important;
+  font-weight:900!important;
+  line-height:1.35!important;
+  letter-spacing:-0.02em!important;
+}
+
+/* 매물명 아래 내부사진 버튼은 작게 유지 */
+#myListingTable td:nth-child(3) button,
+#adminListingTable td:nth-child(3) button,
+#networkTable td:nth-child(3) button{
+  font-size:10.5px!important;
+  font-weight:700!important;
+}
+
+/* 주소 보조행도 조금 더 또렷하게 */
+#myListingTable .crm3812-list-address,
+#adminListingTable .crm3812-list-address,
+#networkTable .crm3812-list-address{
+  font-size:12px!important;
+  font-weight:800!important;
+}
