@@ -3256,3 +3256,79 @@ table.listing-table .photo-link{
   font-size:10.5px!important;
   font-weight:700!important;
 }
+
+/* =========================================================
+   CRM v3.10.24R3.56 · 목록 가독성 우선
+   ========================================================= */
+table.listing-table thead th,
+#myListingTable thead th,
+#adminListingTable thead th,
+#networkTable thead th{
+  font-size:13px!important;
+  font-weight:900!important;
+  line-height:1.25!important;
+  padding:10px 6px!important;
+}
+
+table.listing-table tbody td,
+#myListingTable tbody td,
+#adminListingTable tbody td,
+#networkTable tbody td{
+  font-size:14px!important;
+  line-height:1.45!important;
+  padding:11px 6px!important;
+}
+
+table.listing-table .crm3814-listing-title-link,
+#myListingTable .crm3814-listing-title-link,
+#adminListingTable .crm3814-listing-title-link,
+#networkTable .crm3814-listing-title-link,
+.crm3839-title-cell .crm3814-listing-title-link,
+.crm3848-title-stack .crm3814-listing-title-link{
+  font-size:17px!important;
+  font-weight:900!important;
+  line-height:1.4!important;
+  letter-spacing:-0.02em!important;
+  color:#0f172a!important;
+}
+
+table.listing-table .crm3813-address-row td,
+#myListingTable .crm3813-address-row td,
+#adminListingTable .crm3813-address-row td,
+#networkTable .crm3813-address-row td{
+  font-size:14px!important;
+  font-weight:900!important;
+  line-height:1.35!important;
+  padding:8px 10px!important;
+}
+
+table.listing-table .muted,
+#myListingTable .muted,
+#adminListingTable .muted,
+#networkTable .muted{
+  font-size:11.5px!important;
+  line-height:1.3!important;
+}
+
+table.listing-table .badge,
+#myListingTable .badge,
+#adminListingTable .badge,
+#networkTable .badge{
+  font-size:11px!important;
+  padding:4px 8px!important;
+}
+
+table.listing-table .photo-link,
+#myListingTable .photo-link,
+#adminListingTable .photo-link,
+#networkTable .photo-link{
+  font-size:11px!important;
+  padding:5px 8px!important;
+  margin-top:5px!important;
+}
+
+#myListingTable table,
+#adminListingTable table,
+#networkTable table{
+  font-size:14px!important;
+}
