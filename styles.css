@@ -3222,3 +3222,37 @@ table.listing-table tbody tr.crm-r311-listing-complete .muted {
   font-size:12px!important;
   font-weight:800!important;
 }
+
+/* =========================================================
+   CRM v3.10.24R3.54 · 매물명 실제 클래스 직접 확대
+   ========================================================= */
+
+/* 기존 표 압축 CSS보다 우선 적용 */
+table.listing-table .crm3814-listing-title-link,
+#myListingTable .crm3814-listing-title-link,
+#adminListingTable .crm3814-listing-title-link,
+#networkTable .crm3814-listing-title-link,
+.crm3839-title-cell .crm3814-listing-title-link,
+.crm3848-title-stack .crm3814-listing-title-link{
+  font-size:17px!important;
+  font-weight:900!important;
+  line-height:1.35!important;
+  letter-spacing:-0.03em!important;
+  color:#0f172a!important;
+  text-decoration:underline!important;
+  text-underline-offset:2px!important;
+}
+
+/* 매물명 셀은 제목이 충분히 보이도록 */
+table.listing-table td:has(.crm3814-listing-title-link),
+.crm3839-title-cell{
+  font-size:17px!important;
+  line-height:1.35!important;
+}
+
+/* 내부사진 버튼은 제목과 분리해서 작게 */
+table.listing-table .photo-link{
+  margin-top:4px!important;
+  font-size:10.5px!important;
+  font-weight:700!important;
+}
