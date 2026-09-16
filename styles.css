@@ -3332,3 +3332,51 @@ table.listing-table .photo-link,
 #networkTable table{
   font-size:14px!important;
 }
+
+/* =========================================================
+   CRM v3.10.24R3.57 · 매물명/주소 확실한 대형 글씨
+   ========================================================= */
+
+/* 매물명 열 자체를 조금 넓힘 */
+.crm3839-reordered-table .crm3843-col-title,
+.crm3839-reordered-table td.crm3843-col-title,
+.crm3839-reordered-table th.crm3843-col-title{
+  width:185px!important;
+  min-width:185px!important;
+  max-width:185px!important;
+}
+
+/* 실제 매물명 버튼을 20px로 강제 */
+.crm3839-reordered-table td.crm3843-col-title .crm3814-listing-title-link,
+table.listing-table .crm3814-listing-title-link,
+#myListingTable .crm3814-listing-title-link,
+#adminListingTable .crm3814-listing-title-link,
+#networkTable .crm3814-listing-title-link,
+.crm3848-title-stack .crm3814-listing-title-link{
+  font-size:20px!important;
+  font-weight:900!important;
+  line-height:1.32!important;
+  letter-spacing:-0.03em!important;
+  color:#0f172a!important;
+}
+
+/* 주소도 확실히 크게 */
+.crm3839-reordered-table .crm3813-address-row td,
+.crm3839-reordered-table .crm3829-address-text,
+.crm3839-reordered-table .crm3841-address-text{
+  font-size:15px!important;
+  font-weight:900!important;
+  line-height:1.35!important;
+}
+
+/* 나머지 주요 데이터도 가독성 확보 */
+.crm3839-reordered-table tbody td:not(.crm3843-col-title){
+  font-size:14px!important;
+}
+
+/* 내부사진 버튼은 보조 기능이라 작게 */
+.crm3839-reordered-table td.crm3843-col-title .photo-link{
+  font-size:11px!important;
+  padding:5px 8px!important;
+  margin-top:6px!important;
+}
